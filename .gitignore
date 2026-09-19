@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.local
+
+# 測定データ(未発表の研究データ)はリポジトリに含めない
+samples/
+*.jdf
+*.nmrfig
+
+# 開発時の確認用出力
+.dev-output/
+
+# 配布用の出力
+release/

@@ -1,0 +1,683 @@
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { layerAt, toData, type LayerGeom } from '../lib/layout';
+import { nucleusDefaults } from '../lib/nuclei';
+import { annotationBox, buildScene, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { snapToPeak } from '../lib/spectrum';
+import {
+  addAnnotation,
+  addIntegral,
+  addRegion,
+  beginGesture,
+  edit,
+  endGesture,
+  fitY,
+  fullRange,
+  notify,
+  pointSpacing,
+  select,
+  setLayerScale,
+  setTool,
+  setView,
+  toggleMarker,
+  openStructureEditor,
+  togglePeakLabel,
+  updateFigureImage,
+  updateAnnotation,
+  updateIntegral,
+  useEditor,
+} from '../state/store';
+import { annotationDefaults, type AnnotationKind, type NmrDocument, type ViewState } from '../state/types';
+import { AnnotationShape, FigureContent } from './FigureContent';
+import { imageRect } from './FigureImages';
+
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p1' | 'p2';
+
+type Gesture =
+  | {
+      type: 'drag';
+      x0: number;
+      y0: number;
+      view: ViewState;
+      /** 最初に動いた向きで、左右なら移動、上下なら高さの変更に決める */
+      axis: 'x' | 'y' | null;
+      layerId: string | null;
+      scale: number;
+      all: boolean;
+      token: number | null;
+    }
+  | { type: 'integral'; g: LayerGeom; x0: number; x1: number }
+  | { type: 'integralEdge'; id: string; side: 'from' | 'to'; g: LayerGeom; token: number }
+  | { type: 'zoom' | 'region'; x0: number; x1: number }
+  | { type: 'create'; kind: AnnotationKind; g: LayerGeom; x0: number; y0: number; x1: number; y1: number }
+  | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; g: LayerGeom; token: number }
+  | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; g: LayerGeom; token: number }
+  | { type: 'legend'; x0: number; y0: number; lx: number; ly: number; token: number }
+  | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
+  | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
+
+const SHAPE_TOOLS: AnnotationKind[] = ['ellipse', 'rect', 'arrow', 'line'];
+
+export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | null> }) {
+  const doc = useEditor((s) => s.doc);
+  const data = useEditor((s) => s.data);
+  const tool = useEditor((s) => s.tool);
+  const selection = useEditor((s) => s.selection);
+  const scene = useMemo(() => buildScene(doc, data), [doc, data]);
+  const gesture = useRef<Gesture | null>(null);
+  const [draft, setDraft] = useState<Gesture | null>(null);
+  const { layout } = scene;
+
+  const toSvg = (e: { clientX: number; clientY: number }) => {
+    const svg = svgRef.current!;
+    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM()!.inverse());
+    return { x: pt.x, y: pt.y };
+  };
+
+  // ホイール: 横方向の拡大縮小。Shift で縦方向
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      const { doc: d } = useEditor.getState();
+      if (!d.layers.length) return;
+      e.preventDefault();
+      const factor = Math.pow(1.0015, e.deltaY || e.deltaX);
+      if (e.shiftKey || useEditor.getState().tool === 'height') {
+        setView({ yZoom: d.view.yZoom / factor });
+        return;
+      }
+      const lay = buildScene(d, useEditor.getState().data).layout;
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM()!.inverse());
+      const at = lay.pxToX(Math.min(lay.plot.x + lay.plot.w, Math.max(lay.plot.x, p.x)));
+      setView({ xMax: at + (d.view.xMax - at) * factor, xMin: at + (d.view.xMin - at) * factor });
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, [svgRef]);
+
+  const snapWindow = (g: LayerGeom) => {
+    const pxWin = (8 * (doc.view.xMax - doc.view.xMin)) / layout.plot.w;
+    return Math.max(pxWin, Math.min(nucleusDefaults(g.meta.nucleus).snapPpm, pxWin * 3));
+  };
+
+  const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.button !== 0 || !doc.layers.length) return;
+    const { x, y } = toSvg(e);
+    const hit = (e.target as Element).closest('[data-hit]')?.getAttribute('data-hit') ?? null;
+    const [hitKind, hitId, hitHandle] = hit?.split(':') ?? [];
+    const g = layerAt(layout, x, y);
+    const capture = () => (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+
+    if (tool === 'height') {
+      select(null);
+      const all = !e.shiftKey || !g;
+      gesture.current = {
+        type: 'drag',
+        x0: x,
+        y0: y,
+        view: doc.view,
+        axis: 'y',
+        layerId: g?.layer.id ?? null,
+        scale: g?.layer.scale ?? 1,
+        all,
+        token: all ? null : beginGesture(),
+      };
+      capture();
+      return;
+    }
+
+    if (tool === 'select') {
+      if (hitKind === 'handle' || hitKind === 'annotation') {
+        const pa = scene.annotations.find((p) => p.a.id === hitId);
+        const ag = pa && layout.layers.find((l) => l.layer.id === pa.a.layerId);
+        if (!pa || !ag) return;
+        select({ kind: 'annotation', id: pa.a.id });
+        const token = beginGesture();
+        gesture.current =
+          hitKind === 'handle'
+            ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, g: ag, token }
+            : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa, g: ag, token };
+        capture();
+        return;
+      }
+      if (hitKind === 'marker' || hitKind === 'peakLabel' || hitKind === 'integral') {
+        select({ kind: hitKind, id: hitId });
+        return;
+      }
+      if (hitKind === 'ihandle') {
+        const x = doc.integrals.find((i) => i.id === hitId);
+        const ig = x && layout.layers.find((l) => l.layer.id === x.layerId);
+        if (!ig) return;
+        gesture.current = { type: 'integralEdge', id: hitId, side: hitHandle as 'from' | 'to', g: ig, token: beginGesture() };
+        capture();
+        return;
+      }
+      if ((hitKind === 'image' || hitKind === 'imageHandle') && hitId) {
+        const image = doc.figureImages.find((x) => x.id === hitId);
+        if (!image) return;
+        select({ kind: 'image', id: hitId });
+        gesture.current =
+          hitKind === 'imageHandle'
+            ? { type: 'imageResize', id: hitId, x0: x, w0: image.w, token: beginGesture() }
+            : { type: 'imageMove', id: hitId, x0: x, y0: y, ox: image.x, oy: image.y, token: beginGesture() };
+        capture();
+        return;
+      }
+      if (hitKind === 'legend' && scene.legend) {
+        select({ kind: 'legend', id: 'legend' });
+        gesture.current = { type: 'legend', x0: x, y0: y, lx: scene.legend.x, ly: scene.legend.y, token: beginGesture() };
+        capture();
+        return;
+      }
+      select(null);
+      gesture.current = {
+        type: 'drag',
+        x0: x,
+        y0: y,
+        view: doc.view,
+        axis: null,
+        layerId: g?.layer.id ?? null,
+        scale: g?.layer.scale ?? 1,
+        all: e.shiftKey || !g,
+        token: null,
+      };
+      capture();
+      return;
+    }
+
+    if (tool === 'integral') {
+      if (hitKind === 'integral' || hitKind === 'ihandle') {
+        const x = doc.integrals.find((i) => i.id === hitId);
+        const ig = x && layout.layers.find((l) => l.layer.id === x.layerId);
+        if (hitKind === 'ihandle' && ig) {
+          gesture.current = { type: 'integralEdge', id: hitId, side: hitHandle as 'from' | 'to', g: ig, token: beginGesture() };
+          capture();
+        } else {
+          select({ kind: 'integral', id: hitId });
+        }
+        return;
+      }
+      if (!g) return;
+      gesture.current = { type: 'integral', g, x0: x, x1: x };
+      setDraft(gesture.current);
+      capture();
+      return;
+    }
+
+    if (tool === 'zoom' || tool === 'region') {
+      gesture.current = { type: tool, x0: x, x1: x };
+      setDraft(gesture.current);
+      capture();
+      return;
+    }
+
+    if (!g) return;
+
+    if (SHAPE_TOOLS.includes(tool as AnnotationKind)) {
+      gesture.current = { type: 'create', kind: tool as AnnotationKind, g, x0: x, y0: y, x1: x, y1: y };
+      setDraft(gesture.current);
+      capture();
+      return;
+    }
+
+    if (tool === 'text') {
+      const p = toData(g, layout, x, y);
+      addAnnotation({ ...annotationDefaults('text'), layerId: g.layer.id, x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+      requestAnimationFrame(() => document.getElementById('annotation-text')?.focus());
+      return;
+    }
+
+    const win = snapWindow(g);
+    const peak = snapToPeak(g.data, g.meta, layout.pxToX(x), win);
+    if (!peak) return;
+    const raw = peak.ppm - g.meta.refOffset;
+
+    if (tool === 'peak') {
+      if (hitKind === 'peakLabel') {
+        edit((d) => {
+          d.peakLabels = d.peakLabels.filter((p) => p.id !== hitId);
+        });
+        return;
+      }
+      togglePeakLabel(g.layer.id, raw, pointSpacing(g.meta) * 1.5);
+    } else if (tool === 'marker') {
+      const styleId = useEditor.getState().activeMarkerStyleId;
+      if (!styleId) {
+        notify('右の「マーカー・凡例」で付けたい種類を選んでください', 'error');
+        return;
+      }
+      toggleMarker(g.layer.id, styleId, raw, pointSpacing(g.meta) * 1.5);
+    } else if (tool === 'reference') {
+      useEditor.setState({ pendingReference: { layerId: g.layer.id, ppm: peak.ppm } });
+    }
+  };
+
+  const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const { x, y } = toSvg(e);
+    const cur = gesture.current;
+    if (!cur) {
+      if (doc.layers.length && x >= layout.plot.x && x <= layout.plot.x + layout.plot.w) {
+        useEditor.setState({ cursorPpm: layout.pxToX(x) });
+      }
+      return;
+    }
+    switch (cur.type) {
+      case 'drag': {
+        if (!cur.axis) {
+          if (Math.hypot(x - cur.x0, y - cur.y0) < 4) break;
+          cur.axis = Math.abs(x - cur.x0) >= Math.abs(y - cur.y0) ? 'x' : 'y';
+          if (cur.axis === 'y') cur.token = cur.all ? null : beginGesture();
+        }
+        if (cur.axis === 'x') {
+          const d = ((x - cur.x0) / layout.plot.w) * (cur.view.xMax - cur.view.xMin);
+          setView({ xMax: cur.view.xMax + d, xMin: cur.view.xMin + d });
+        } else {
+          // 上へドラッグで高く、下へで低く (100 px で約 2.3 倍)
+          const factor = Math.exp((cur.y0 - y) / 120);
+          if (cur.all || !cur.layerId) setView({ yZoom: cur.view.yZoom * factor });
+          else setLayerScale(cur.layerId, cur.scale * factor);
+        }
+        break;
+      }
+      case 'integral':
+        cur.x1 = x;
+        setDraft({ ...cur });
+        break;
+      case 'integralEdge': {
+        const ppm = layout.pxToX(Math.min(layout.plot.x + layout.plot.w, Math.max(layout.plot.x, x))) - cur.g.meta.refOffset;
+        updateIntegral(cur.id, { [cur.side]: ppm }, false);
+        break;
+      }
+      case 'zoom':
+      case 'region':
+        cur.x1 = x;
+        setDraft({ ...cur });
+        break;
+      case 'create':
+        cur.x1 = x;
+        cur.y1 = y;
+        if (e.shiftKey) constrain(cur);
+        setDraft({ ...cur });
+        break;
+      case 'move': {
+        const dx = x - cur.x0;
+        const dy = y - cur.y0;
+        const { p1, p2 } = cur.orig;
+        const q1 = toData(cur.g, layout, p1.px + dx, p1.py + dy);
+        const q2 = toData(cur.g, layout, p2.px + dx, p2.py + dy);
+        updateAnnotation(cur.id, { x1: q1.x, y1: q1.y, x2: q2.x, y2: q2.y }, false);
+        break;
+      }
+      case 'resize': {
+        const next = resizePoints(cur.orig, cur.handle, x, y, e.shiftKey);
+        const q1 = toData(cur.g, layout, next.p1.px, next.p1.py);
+        const q2 = toData(cur.g, layout, next.p2.px, next.p2.py);
+        updateAnnotation(cur.id, { x1: q1.x, y1: q1.y, x2: q2.x, y2: q2.y }, false);
+        break;
+      }
+      case 'imageMove': {
+        updateFigureImage(cur.id, { x: cur.ox + (x - cur.x0) / layout.width, y: cur.oy + (y - cur.y0) / layout.height }, false);
+        break;
+      }
+      case 'imageResize': {
+        // 右下の角をドラッグ。縦横比はそのまま
+        updateFigureImage(cur.id, { w: Math.max(0.03, cur.w0 + (x - cur.x0) / layout.width) }, false);
+        break;
+      }
+      case 'legend': {
+        const { plot } = layout;
+        const lx = cur.lx + x - cur.x0;
+        const ly = cur.ly + y - cur.y0;
+        edit((d) => {
+          d.figure.legendPos = { x: (lx - plot.x) / plot.w, y: (ly - plot.y) / plot.h };
+        }, false);
+        break;
+      }
+    }
+  };
+
+  const onPointerUp = () => {
+    const cur = gesture.current;
+    gesture.current = null;
+    setDraft(null);
+    if (!cur) return;
+    if (cur.type === 'zoom') {
+      if (Math.abs(cur.x1 - cur.x0) > 4) {
+        setView({ xMax: layout.pxToX(Math.min(cur.x0, cur.x1)), xMin: layout.pxToX(Math.max(cur.x0, cur.x1)) });
+        fitY();
+      }
+    } else if (cur.type === 'drag') {
+      if (cur.token !== null) endGesture(cur.token);
+    } else if (cur.type === 'integralEdge') {
+      endGesture(cur.token);
+    } else if (cur.type === 'integral') {
+      if (Math.abs(cur.x1 - cur.x0) > 2) {
+        const off = cur.g.meta.refOffset;
+        addIntegral(cur.g.layer.id, layout.pxToX(cur.x0) - off, layout.pxToX(cur.x1) - off);
+      }
+    } else if (cur.type === 'region') {
+      if (Math.abs(cur.x1 - cur.x0) > 2) {
+        addRegion(layout.pxToX(cur.x0), layout.pxToX(cur.x1));
+        setTool('select');
+      }
+    } else if (cur.type === 'create') {
+      const tiny = Math.hypot(cur.x1 - cur.x0, cur.y1 - cur.y0) < 4;
+      // クリックだけのときは既定の大きさで作る
+      const x1 = tiny ? cur.x0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 40) : cur.x1;
+      const y1 = tiny ? cur.y0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 0) : cur.y1;
+      const p = toData(cur.g, layout, cur.x0, cur.y0);
+      const q = toData(cur.g, layout, x1, y1);
+      addAnnotation({ ...annotationDefaults(cur.kind), layerId: cur.g.layer.id, x1: p.x, y1: p.y, x2: q.x, y2: q.y });
+    } else if (cur.type === 'move' || cur.type === 'resize' || cur.type === 'legend' || cur.type === 'imageMove' || cur.type === 'imageResize') {
+      endGesture(cur.token);
+    }
+  };
+
+  const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const hit = (e.target as Element).closest('[data-hit]');
+    if (hit) {
+      const value = hit.getAttribute('data-hit') ?? '';
+      if (value.startsWith('annotation:')) document.getElementById('annotation-text')?.focus();
+      // アプリで描いた構造式は、ダブルクリックで描き直せる
+      if (value.startsWith('image:')) {
+        const image = doc.figureImages.find((x) => x.id === value.slice('image:'.length));
+        if (image?.source) openStructureEditor(image.id);
+      }
+      return;
+    }
+    if (tool === 'select' || tool === 'zoom') fullRange();
+  };
+
+  const selected = selection?.kind === 'annotation' ? scene.annotations.find((p) => p.a.id === selection.id) : undefined;
+
+  return (
+    <svg
+      ref={svgRef}
+      className={`figure tool-${tool}`}
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerLeave={() => useEditor.setState({ cursorPpm: null })}
+      onDoubleClick={onDoubleClick}
+    >
+      <rect data-ui="bg" x={0} y={0} width={layout.width} height={layout.height} fill="#ffffff" />
+      {(doc.trend.showOnSpectrum || tool === 'region') && <RegionBands scene={scene} doc={doc} />}
+      <FigureContent scene={scene} figure={doc.figure} images={doc.figureImages ?? []} />
+      {tool === 'select' && <ImageHits images={doc.figureImages ?? []} figure={layout} />}
+      {tool === 'select' && <HitLayer scene={scene} />}
+      {(tool === 'select' || tool === 'integral') && <IntegralHits scene={scene} />}
+      {(tool === 'peak' || tool === 'select') && <PeakLabelHits scene={scene} />}
+      <SelectionOverlay scene={scene} selected={selected} doc={doc} />
+      {draft && <DraftOverlay draft={draft} scene={scene} />}
+    </svg>
+  );
+}
+
+function constrain(c: Extract<Gesture, { type: 'create' }>) {
+  const dx = c.x1 - c.x0;
+  const dy = c.y1 - c.y0;
+  if (c.kind === 'ellipse' || c.kind === 'rect') {
+    const s = Math.max(Math.abs(dx), Math.abs(dy));
+    c.x1 = c.x0 + Math.sign(dx || 1) * s;
+    c.y1 = c.y0 + Math.sign(dy || 1) * s;
+  } else if (Math.abs(dx) > Math.abs(dy)) c.y1 = c.y0;
+  else c.x1 = c.x0;
+}
+
+function resizePoints(orig: PlacedAnnotation, handle: Handle, x: number, y: number, keepRatio: boolean) {
+  const { p1, p2 } = orig;
+  if (handle === 'p1') return { p1: { px: x, py: y }, p2 };
+  if (handle === 'p2') return { p1, p2: { px: x, py: y } };
+  let left = Math.min(p1.px, p2.px);
+  let right = Math.max(p1.px, p2.px);
+  let top = Math.min(p1.py, p2.py);
+  let bottom = Math.max(p1.py, p2.py);
+  if (handle.includes('w')) left = Math.min(x, right - 2);
+  if (handle.includes('e')) right = Math.max(x, left + 2);
+  if (handle.includes('n')) top = Math.min(y, bottom - 2);
+  if (handle.includes('s')) bottom = Math.max(y, top + 2);
+  if (keepRatio && handle.length === 2) {
+    const s = Math.max(right - left, bottom - top);
+    if (handle.includes('w')) left = right - s;
+    else right = left + s;
+    if (handle.includes('n')) top = bottom - s;
+    else bottom = top + s;
+  }
+  return { p1: { px: left, py: top }, p2: { px: right, py: bottom } };
+}
+
+/** 選択ツールのときだけ出す、クリック判定用の透明な図形 */
+/** 構造式・画像をつかむ場所 (本体と、右下の角) */
+function ImageHits({ images, figure }: { images: NmrDocument['figureImages']; figure: { width: number; height: number } }) {
+  return (
+    <g data-ui="hit">
+      {images.map((image) => {
+        const r = imageRect(image, figure);
+        return (
+          <g key={image.id}>
+            <rect data-hit={`image:${image.id}`} x={r.x} y={r.y} width={r.w} height={r.h} fill="transparent" className="hit" />
+            <rect
+              data-hit={`imageHandle:${image.id}`}
+              x={r.x + r.w - 5}
+              y={r.y + r.h - 5}
+              width={10}
+              height={10}
+              className="handle handle-se"
+            />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function HitLayer({ scene }: { scene: Scene }) {
+  return (
+    <g data-ui="hit">
+      {scene.annotations.map((pa) => {
+        const { a, p1, p2 } = pa;
+        const hit = `annotation:${a.id}`;
+        if (a.kind === 'line' || a.kind === 'arrow') {
+          return <line key={a.id} data-hit={hit} x1={p1.px} y1={p1.py} x2={p2.px} y2={p2.py} stroke="transparent" strokeWidth={12} className="hit" />;
+        }
+        const b = annotationBox(pa);
+        if (a.kind === 'ellipse') {
+          return (
+            <ellipse
+              key={a.id}
+              data-hit={hit}
+              cx={b.x + b.w / 2}
+              cy={b.y + b.h / 2}
+              rx={b.w / 2}
+              ry={b.h / 2}
+              fill="transparent"
+              stroke="transparent"
+              strokeWidth={10}
+              className="hit"
+            />
+          );
+        }
+        return (
+          <rect key={a.id} data-hit={hit} x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" stroke="transparent" strokeWidth={10} className="hit" />
+        );
+      })}
+      {scene.markers.map((m) => (
+        <circle key={m.id} data-hit={`marker:${m.id}`} cx={m.x} cy={m.y} r={7} fill="transparent" className="hit" />
+      ))}
+      {scene.legend && (
+        <rect
+          data-hit="legend:legend"
+          x={scene.legend.x - 3}
+          y={scene.legend.y - 3}
+          width={scene.legend.w + 6}
+          height={scene.legend.h + 6}
+          fill="transparent"
+          className="hit move"
+        />
+      )}
+    </g>
+  );
+}
+
+/** 積分曲線と値のクリック判定 */
+function IntegralHits({ scene }: { scene: Scene }) {
+  return (
+    <g data-ui="hit">
+      {scene.integrals.map((x) => {
+        const len = x.text.length * 7 + 4;
+        const hit = `integral:${x.id}`;
+        return (
+          <g key={x.id} data-hit={hit} className="hit pointer">
+            {x.curve && <path d={x.curve} fill="none" stroke="transparent" strokeWidth={10} />}
+            <rect x={x.tx - 7} y={x.anchor === 'end' ? x.ty : x.ty - len} width={14} height={len} fill="transparent" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function PeakLabelHits({ scene }: { scene: Scene }) {
+  return (
+    <g data-ui="hit">
+      {scene.peakLabels.map((p) => {
+        const len = p.text.length * 7 + 4;
+        const y = p.anchor === 'end' ? p.ty : p.ty - len;
+        return <rect key={p.id} data-hit={`peakLabel:${p.id}`} x={p.tx - 7} y={y} width={14} height={len} fill="transparent" className="hit" />;
+      })}
+    </g>
+  );
+}
+
+function SelectionOverlay({ scene, selected, doc }: { scene: Scene; selected?: PlacedAnnotation; doc: NmrDocument }) {
+  const selection = useEditor((s) => s.selection);
+  const tool = useEditor((s) => s.tool);
+  if (!selection) return null;
+  if (selection.kind === 'integral') {
+    const x = scene.integrals.find((i) => i.id === selection.id);
+    if (!x) return null;
+    const len = x.text.length * 7 + 4;
+    const handles: ['from' | 'to', number, number][] = [
+      ['from', x.start.x, x.start.y],
+      ['to', x.end.x, x.end.y],
+    ];
+    return (
+      <g data-ui="sel">
+        {x.curve && <path d={x.curve} fill="none" className="sel-curve" />}
+        <rect x={x.tx - 7} y={x.anchor === 'end' ? x.ty : x.ty - len} width={14} height={len} className="sel-outline" />
+        {(tool === 'select' || tool === 'integral') &&
+          handles.map(([side, hx, hy]) => (
+            <rect key={side} data-hit={`ihandle:${x.id}:${side}`} x={hx - 3} y={hy - 9} width={6} height={18} className="handle handle-e" />
+          ))}
+      </g>
+    );
+  }
+  if (selection.kind === 'marker') {
+    const m = scene.markers.find((x) => x.id === selection.id);
+    return m ? <circle data-ui="sel" cx={m.x} cy={m.y} r={doc.figure.markerSize / 2 + 4} className="sel-outline" /> : null;
+  }
+  if (selection.kind === 'peakLabel') {
+    const p = scene.peakLabels.find((x) => x.id === selection.id);
+    if (!p) return null;
+    const len = p.text.length * 7 + 4;
+    const y = p.anchor === 'end' ? p.ty : p.ty - len;
+    return <rect data-ui="sel" x={p.tx - 7} y={y} width={14} height={len} className="sel-outline" />;
+  }
+  if (selection.kind === 'image') {
+    const image = doc.figureImages.find((x) => x.id === selection.id);
+    if (!image) return null;
+    const r = imageRect(image, scene.layout);
+    return <rect data-ui="sel" x={r.x - 2} y={r.y - 2} width={r.w + 4} height={r.h + 4} className="sel-outline" />;
+  }
+  if (selection.kind === 'legend') {
+    const l = scene.legend;
+    return l ? <rect data-ui="sel" x={l.x - 3} y={l.y - 3} width={l.w + 6} height={l.h + 6} className="sel-outline" /> : null;
+  }
+  if (!selected) return null;
+  const { a, p1, p2 } = selected;
+  const handles: [Handle, number, number][] = [];
+  if (a.kind === 'line' || a.kind === 'arrow') {
+    handles.push(['p1', p1.px, p1.py], ['p2', p2.px, p2.py]);
+  } else if (a.kind !== 'text') {
+    const b = annotationBox(selected);
+    const xs = [b.x, b.x + b.w / 2, b.x + b.w];
+    const ys = [b.y, b.y + b.h / 2, b.y + b.h];
+    handles.push(
+      ['nw', xs[0], ys[0]],
+      ['n', xs[1], ys[0]],
+      ['ne', xs[2], ys[0]],
+      ['e', xs[2], ys[1]],
+      ['se', xs[2], ys[2]],
+      ['s', xs[1], ys[2]],
+      ['sw', xs[0], ys[2]],
+      ['w', xs[0], ys[1]],
+    );
+  }
+  const b = annotationBox(selected);
+  return (
+    <g data-ui="sel">
+      <rect x={b.x - 2} y={b.y - 2} width={b.w + 4} height={b.h + 4} className="sel-outline" />
+      {tool === 'select' &&
+        handles.map(([h, x, y]) => (
+          <rect key={h} data-hit={`handle:${a.id}:${h}`} x={x - 4} y={y - 4} width={8} height={8} className={`handle handle-${h}`} />
+        ))}
+    </g>
+  );
+}
+
+/** 推移グラフで追跡している範囲 (画面だけに出す) */
+function RegionBands({ scene, doc }: { scene: Scene; doc: NmrDocument }) {
+  const { plot, xToPx } = scene.layout;
+  return (
+    <g data-ui="regions" pointerEvents="none">
+      {doc.trend.regions.map((r) => {
+        const a = Math.max(plot.x, Math.min(xToPx(r.from), xToPx(r.to)));
+        const b = Math.min(plot.x + plot.w, Math.max(xToPx(r.from), xToPx(r.to)));
+        if (b <= a) return null;
+        return (
+          <g key={r.id}>
+            <rect x={a} y={plot.y} width={b - a} height={plot.h} fill={r.color} opacity={0.1} />
+            <text x={(a + b) / 2} y={plot.y + plot.h - 4} fontSize={11} textAnchor="middle" fill={r.color}>
+              {r.name}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function DraftOverlay({ draft, scene }: { draft: Gesture; scene: Scene }) {
+  const { plot } = scene.layout;
+  if (draft.type === 'integral') {
+    const x = Math.min(draft.x0, draft.x1);
+    return <rect data-ui="draft" x={x} y={draft.g.bandTop} width={Math.abs(draft.x1 - draft.x0)} height={draft.g.baseY - draft.g.bandTop} className="integral-band" />;
+  }
+  if (draft.type === 'zoom' || draft.type === 'region') {
+    const x = Math.min(draft.x0, draft.x1);
+    return (
+      <rect
+        data-ui="draft"
+        x={x}
+        y={plot.y}
+        width={Math.abs(draft.x1 - draft.x0)}
+        height={plot.h}
+        className={draft.type === 'zoom' ? 'zoom-band' : 'region-band'}
+      />
+    );
+  }
+  if (draft.type !== 'create') return null;
+  const pa: PlacedAnnotation = {
+    a: { ...annotationDefaults(draft.kind), id: 'draft', layerId: draft.g.layer.id, x1: 0, y1: 0, x2: 0, y2: 0 },
+    p1: { px: draft.x0, py: draft.y0 },
+    p2: { px: draft.x1, py: draft.y1 },
+  };
+  return (
+    <g data-ui="draft" opacity={0.7}>
+      <AnnotationShape pa={pa} />
+    </g>
+  );
+}
+
