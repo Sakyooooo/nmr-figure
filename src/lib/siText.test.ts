@@ -60,7 +60,8 @@ describe('SI テキストの書式', () => {
 // 実データ: 自動で積分して、iPr の CH3 を 12H にしたときの文
 const sample = join(import.meta.dirname, '../../samples/sample-c6d6-1h.jdf');
 describe.skipIf(!existsSync(sample))('実データの SI テキスト', () => {
-  const buf = readFileSync(sample);
+  // describe の中身は skip のときも読まれるので、無いときは空で受ける (CI には測定データを置かない)
+  const buf = existsSync(sample) ? readFileSync(sample) : Buffer.alloc(0);
   const { meta, data } = readJdf(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), 'x.jdf');
   const settings = defaultSettings();
 

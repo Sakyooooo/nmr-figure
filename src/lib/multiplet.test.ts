@@ -68,7 +68,8 @@ describe('多重線の解析', () => {
 // 実データ: iPr の CH3 (1.33, d) と P(OMe)3 (3.58, d; 3.67, t)
 const sample = join(import.meta.dirname, '../../samples/sample-c6d6-1h.jdf');
 describe.skipIf(!existsSync(sample))('実データの多重線', () => {
-  const buf = readFileSync(sample);
+  // describe の中身は skip のときも読まれるので、無いときは空で受ける (CI には測定データを置かない)
+  const buf = existsSync(sample) ? readFileSync(sample) : Buffer.alloc(0);
   const { meta: m, data } = readJdf(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), 'x.jdf');
   it('1.33 は d (J ≈ 6.8 Hz)', () => {
     const r = analyzeMultiplet(data, m, 1.37, 1.29, m.freqMHz);
