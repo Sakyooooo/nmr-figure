@@ -7,7 +7,7 @@ import { snapToPeak } from '../lib/spectrum';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
 import { ask } from './dialog';
-import { canOpen, load2dExperiment, loadExperiment, useLibrary } from './library';
+import { canOpen, load2dExperiment, loadExperiment, sampleKeyOf, saveFigure, useLibrary } from './library';
 import { addSpectra, addSpectrum2d, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
 import { emptyDocument } from './types';
 
@@ -161,6 +161,66 @@ export async function openDialog(mode: 'add' | 'new' = 'add') {
   input.click();
 }
 
+/**
+ * 保存した図を、使った測定のサンプルのカードに残す (ホーム画面から開き直せるように)。
+ * 中身はブラウザの中 (IndexedDB) に置く。文献だけの図は、紐づけるサンプルがないので残さない。
+ */
+async function rememberFigure(json: string, fileName: string, handle: FileHandle | null) {
+  const { doc } = useEditor.getState();
+  const real = doc.spectra.filter((m) => !m.simulated);
+  const sampleKeys = [
+    ...new Set([
+      ...real.map((m) => sampleKeyOf({ title: m.title, fileName: m.fileName })),
+      ...doc.spectra2d.map((m) => sampleKeyOf({ title: m.title, fileName: m.fileName })),
+    ]),
+  ].filter(Boolean);
+  if (!sampleKeys.length) return;
+  const nuclei = doc.plot2d
+    ? [...new Set(doc.spectra2d.map((m) => `${m.x.nucleus}/${m.y.nucleus}`))]
+    : [...new Set(doc.spectra.map((m) => m.nucleus))];
+  const figure = {
+    id: doc.id,
+    name: baseName(fileName),
+    sampleKeys,
+    nuclei,
+    layers: doc.plot2d ? doc.spectra2d.length : doc.layers.length,
+    savedAt: Date.now(),
+    json,
+  };
+  // 保存先のファイルも覚えておくと、開き直したあとも「上書き保存」できる。
+  // ただしブラウザに置けない形 (関数を持つ偽物など) のときは、図の中身だけ残す
+  await saveFigure({ ...figure, handle: storable(handle) });
+  if (!useLibrary.getState().figures.some((f) => f.id === figure.id)) {
+    notify('図をホーム画面に残せませんでした (ブラウザの保存領域を確認してください)', 'error');
+  }
+}
+
+/** IndexedDB に置ける値か調べる (置けなければ null) */
+function storable<T>(value: T): T | null {
+  if (!value) return null;
+  try {
+    structuredClone(value);
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** ホーム画面のカードから、保存した図を開く */
+export async function openSavedFigure(id: string) {
+  const figure = useLibrary.getState().figures.find((f) => f.id === id);
+  if (!figure) return;
+  if (!(await confirmDiscard())) return;
+  try {
+    const { doc, data, fids, fids2d, data2d } = parseProject(figure.json);
+    loadDocument(doc, data, `${figure.name}${PROJECT_EXT}`, figure.handle ?? null, fids, { data2d, fids2d });
+    useEditor.setState({ screen: 'editor' });
+    notify(`${figure.name} を開きました`);
+  } catch (e) {
+    notify(`開けませんでした: ${(e as Error).message}`, 'error');
+  }
+}
+
 function defaultProjectName() {
   const { doc, projectName } = useEditor.getState();
   if (projectName) return projectName;
@@ -188,13 +248,15 @@ export async function saveProject(saveAs = false) {
       await w.close();
       markSaved(handle.name, handle);
       notify(`${handle.name} に上書き保存しました`);
+      await rememberFigure(text, handle.name, handle);
       return;
     } else {
       const name = defaultProjectName();
       downloadBlob(new Blob([text], { type: 'application/json' }), name);
       markSaved(name, null);
+      notify('保存しました');
+      await rememberFigure(text, name, null);
     }
-    notify('保存しました');
   } catch (e) {
     if ((e as Error).name !== 'AbortError') notify(`保存できませんでした: ${(e as Error).message}`, 'error');
   }

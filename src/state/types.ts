@@ -319,6 +319,8 @@ export interface FigureImage {
 
 export interface NmrDocument {
   version: 1;
+  /** この図の id。ホーム画面に保存した図を上書きするのに使う */
+  id: string;
   spectra: SpectrumMeta[];
   /** 図に置いた構造式・画像 */
   figureImages: FigureImage[];
@@ -421,6 +423,7 @@ export function defaultMarkerStyles(): MarkerStyle[] {
 export function emptyDocument(): NmrDocument {
   return {
     version: 1,
+    id: crypto.randomUUID(),
     spectra: [],
     figureImages: [],
     spectra2d: [],
@@ -444,6 +447,7 @@ export function migrateDocument(doc: NmrDocument): NmrDocument {
   return {
     ...base,
     ...doc,
+    id: doc.id || base.id,
     figureImages: doc.figureImages ?? [],
     spectra2d: doc.spectra2d ?? [],
     plot2d: doc.plot2d ?? null,

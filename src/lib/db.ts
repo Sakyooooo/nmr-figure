@@ -1,10 +1,11 @@
 /**
  * ブラウザ内の保存 (IndexedDB)。データフォルダの場所、ファイル情報のキャッシュ、
- * サンプルごとのメモ・タグ・スキーム、作業中の図 (自動保存) を置く。使えない環境では何もしない。
+ * サンプルごとのメモ・タグ・スキーム、作業中の図 (自動保存)、保存した図を置く。
+ * 使えない環境では何もしない。
  */
 const DB_NAME = 'nmr-figure-editor';
-const VERSION = 2;
-export type StoreName = 'kv' | 'meta' | 'notes' | 'work';
+const VERSION = 3;
+export type StoreName = 'kv' | 'meta' | 'notes' | 'work' | 'figures';
 
 let opening: Promise<IDBDatabase> | null = null;
 
@@ -12,7 +13,7 @@ function open(): Promise<IDBDatabase> {
   opening ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => {
-      for (const name of ['kv', 'meta', 'notes', 'work']) {
+      for (const name of ['kv', 'meta', 'notes', 'work', 'figures']) {
         if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
       }
     };

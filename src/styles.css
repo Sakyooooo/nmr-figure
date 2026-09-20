@@ -855,6 +855,21 @@ details.sub[open] {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* 保存した図 (比較) のチップ */
+.exp.figure {
+  padding-left: 8px;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  cursor: pointer;
+}
+.exp.figure .exp-nuc {
+  color: var(--accent);
+}
+.exp.figure .mini {
+  padding: 0 4px;
+  line-height: 1.2;
+}
+
 .exp {
   display: inline-flex;
   align-items: center;

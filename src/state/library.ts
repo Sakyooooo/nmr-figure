@@ -3,7 +3,7 @@ import { dbDelete, dbEntries, dbGet, dbSet } from '../lib/db';
 import { readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
 import { readJdf2d, type Loaded2dSpectrum } from '../lib/jdf2d';
 import { experimentKey, readJdfMeta, type ExperimentMeta } from '../lib/jdfMeta';
-import { notify } from './store';
+import { notify, type FileHandle } from './store';
 import type { HomeSort } from '../lib/settings';
 
 /** サンプル (Delta のタイトル) ごとのメモ。同じサンプルの測定で共通 */
@@ -15,6 +15,24 @@ export interface SampleNote {
   /** アプリ内で描いたときの元データ (MOL / RXN)。描き直すのに使う */
   schemeSource?: string | null;
   updatedAt: number;
+}
+
+/** ホーム画面のカードに並べる、保存した図 (比較) */
+export interface SavedFigure {
+  id: string;
+  /** 表示する名前 (保存したファイル名から作る) */
+  name: string;
+  /** この図に入っている測定のサンプル。全部のカードに出す */
+  sampleKeys: string[];
+  /** チップに出す核種 (1H, 19F …) */
+  nuclei: string[];
+  /** 重ねた本数 */
+  layers: number;
+  savedAt: number;
+  /** プロジェクトの中身 (.nmrfig と同じ JSON) */
+  json: string;
+  /** 保存先のファイル。開き直したあとも「上書き保存」できるように覚えておく */
+  handle?: FileHandle | null;
 }
 
 export type NucleusFilter = '1H' | '13C' | '19F' | '31P' | '2D' | 'other';
@@ -31,6 +49,8 @@ interface LibraryState {
   failed: { fileName: string; message: string }[];
   progress: { done: number; total: number } | null;
   notes: Record<string, SampleNote>;
+  /** 保存した図 (新しい順) */
+  figures: SavedFigure[];
   query: string;
   nuclei: NucleusFilter[];
   solvent: string;
@@ -52,6 +72,7 @@ export const useLibrary = create<LibraryState>(() => ({
   failed: [],
   progress: null,
   notes: {},
+  figures: [],
   query: '',
   nuclei: [],
   solvent: '',
@@ -97,6 +118,7 @@ export function canOpen(e: ExperimentMeta) {
 export async function initLibrary() {
   const notes = await dbEntries<SampleNote>('notes');
   set({ notes: Object.fromEntries(notes) });
+  await loadFigures();
   const saved = await dbGet<DirHandle>('kv', FOLDER_KEY);
   if (!saved) {
     set({ status: 'no-folder' });
@@ -269,6 +291,23 @@ export async function saveNote(sampleKey: string, patch: Partial<SampleNote>) {
   const empty = !next.memo && !next.tags.length && !next.scheme && !next.schemeSource;
   if (empty) await dbDelete('notes', sampleKey);
   else await dbSet('notes', sampleKey, next);
+}
+
+/** 保存した図をブラウザから読み直す */
+export async function loadFigures() {
+  const list = await dbEntries<SavedFigure>('figures');
+  set({ figures: [...list.values()].sort((a, b) => b.savedAt - a.savedAt) });
+}
+
+/** 図を保存する (同じ id なら上書き) */
+export async function saveFigure(figure: SavedFigure) {
+  await dbSet('figures', figure.id, figure);
+  await loadFigures();
+}
+
+export async function deleteFigure(id: string) {
+  await dbDelete('figures', id);
+  await loadFigures();
 }
 
 export function toggleSelected(key: string, on?: boolean) {

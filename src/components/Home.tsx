@@ -2,16 +2,17 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 're
 import type { ExperimentMeta } from '../lib/jdfMeta';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
-import { openDialog, openExperiments, readOptions } from '../state/fileOps';
+import { openDialog, openExperiments, openSavedFigure, readOptions } from '../state/fileOps';
 import {
   NUCLEUS_FILTERS,
   canOpen,
   chosenFile,
+  deleteFigure,
   fileVersion,
-  groupMeasurements,
   filteredExperiments,
   grantPermission,
   groupList,
+  groupMeasurements,
   loadExperiment,
   localDay,
   nucleusFilterOf,
@@ -24,6 +25,7 @@ import {
   useLibrary,
   type Measurement,
   type NucleusFilter,
+  type SavedFigure,
 } from '../state/library';
 import { setHomeSort, notify, useEditor } from '../state/store';
 import type { HomeSort } from '../lib/settings';
@@ -230,6 +232,9 @@ function SortControl() {
 
 function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: Measurement[]; showDay?: boolean }) {
   const note = useLibrary((s) => s.notes[sampleKey]);
+  // セレクタで filter すると毎回別の配列になって再描画が止まらないので、取り出してから絞る
+  const allFigures = useLibrary((s) => s.figures);
+  const figures = useMemo(() => allFigures.filter((f) => f.sampleKeys.includes(sampleKey)), [allFigures, sampleKey]);
   const selected = useLibrary((s) => s.selected);
   const focus = useLibrary((s) => s.focus);
   const choice = useLibrary((s) => s.versionChoice);
@@ -264,6 +269,9 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
               checked={m.files.some((f) => selected.includes(f.key))}
               focused={m.files.some((f) => f.key === focus)}
             />
+          ))}
+          {figures.map((f) => (
+            <FigureChip key={f.id} figure={f} />
           ))}
         </div>
       </div>
@@ -345,6 +353,39 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
         </span>
       )}
       {processed > 1 && <span className="badge">{processed} 版</span>}
+    </div>
+  );
+}
+
+/** 保存した図 (比較) のチップ。クリックで開く */
+function FigureChip({ figure }: { figure: SavedFigure }) {
+  return (
+    <div
+      className="exp figure"
+      title={`${figure.name}
+${figure.layers} 本を重ねた図 (${formatStamp(figure.savedAt)})
+クリックで開く`}
+      onClick={(ev) => {
+        ev.stopPropagation();
+        void openSavedFigure(figure.id);
+      }}
+      onPointerUp={(ev) => ev.stopPropagation()}
+    >
+      <span className="exp-nuc">
+        図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
+      </span>
+      <span className="exp-time">{formatTime(figure.savedAt)}</span>
+      {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
+      <button
+        className="mini danger"
+        title="この図をホーム画面から消す (測定データは消えません)"
+        onClick={(ev) => {
+          ev.stopPropagation();
+          void deleteFigure(figure.id);
+        }}
+      >
+        ×
+      </button>
     </div>
   );
 }
