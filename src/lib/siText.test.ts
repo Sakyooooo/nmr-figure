@@ -58,11 +58,16 @@ describe('SI テキストの書式', () => {
 });
 
 // 実データ: 自動で積分して、iPr の CH3 を 12H にしたときの文
+/** 測定データを読む (テストを飛ばすときは呼ばない) */
+function load(path: string) {
+  const b = readFileSync(path);
+  return readJdf(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, 'x.jdf');
+}
+
 const sample = join(import.meta.dirname, '../../samples/sample-c6d6-1h.jdf');
 describe.skipIf(!existsSync(sample))('実データの SI テキスト', () => {
-  // describe の中身は skip のときも読まれるので、無いときは空で受ける (CI には測定データを置かない)
-  const buf = existsSync(sample) ? readFileSync(sample) : Buffer.alloc(0);
-  const { meta, data } = readJdf(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), 'x.jdf');
+  // describe の中身は skip のときも読まれるので、ファイルが無いときは読まない (CI には測定データを置かない)
+  const { meta, data } = existsSync(sample) ? load(sample) : ({} as ReturnType<typeof load>);
   const settings = defaultSettings();
 
   function docWith(regions: [number, number][]): NmrDocument {
