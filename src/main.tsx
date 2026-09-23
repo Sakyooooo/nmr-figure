@@ -27,7 +27,30 @@ void restoreWork().finally(() => {
   startAutoSave();
   // Delta との同期は、前回の図を読み込んでから始める (図の中の .jdf を見に行くため)
   startDeltaSync();
+  if (import.meta.env.DEV) void openDemo();
 });
+
+/**
+ * 開発用: ?demo=… で決まった画面を開く (画面の見本を撮るため。別の保存領域のブラウザで使う)
+ * spectra (既定) = samples/ の 2 本 / empty = 何もない / palette = 操作を探す / narrow などは幅で撮る
+ */
+async function openDemo() {
+  const demo = new URLSearchParams(location.search).get('demo');
+  if (demo === null) return;
+  const load = async (path: string) => {
+    const res = await fetch(path);
+    await openFiles([{ file: new File([await res.arrayBuffer()], decodeURIComponent(path.split('/').pop()!)) }]);
+  };
+  if (demo !== 'empty') {
+    await load('/samples/sample-c6d6-1h.jdf');
+    await load('/samples/sample-c6d6-1h-b.jdf');
+  }
+  useEditor.setState({ screen: demo === 'home' ? 'home' : 'editor' });
+  if (demo === 'palette') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+  if (demo === 'integral') useEditor.setState({ tool: 'integral' });
+  // scripts/ui-shots.mjs はこれを待ってから撮る
+  Object.assign(window, { __demoReady: true });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

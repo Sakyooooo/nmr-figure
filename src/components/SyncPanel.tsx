@@ -53,7 +53,15 @@ export function SyncPanel() {
   };
 
   return (
-    <Section title={synced ? 'Delta との同期・記録' : '編集記録'} extra={synced ? <StatusBadge view={view} /> : undefined}>
+    <Section
+      title={synced ? 'Delta との同期・記録' : '編集記録'}
+      extra={synced ? <StatusBadge view={view} /> : undefined}
+      help={
+        synced
+          ? `ピーク値・積分を変えると ${view.fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。`
+          : '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。'
+      }
+    >
       {synced && <SyncStatus view={view} layerId={layerId} />}
 
       <div className="record-form">
@@ -66,7 +74,7 @@ export function SyncPanel() {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) record();
           }}
         />
-        <button className="primary" onClick={record} title="今のピーク値・積分を記録に残します。あとからこの時点に戻せます">
+        <button onClick={record} title="今のピーク値・積分を記録に残します。あとからこの時点に戻せます">
           記録を付ける
         </button>
       </div>
@@ -88,14 +96,7 @@ export function SyncPanel() {
           </ul>
         </div>
       ) : (
-        <p className="hint">「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。</p>
-      )}
-
-      {synced && (
-        <p className="hint">
-          ピーク値・積分を変えると {view.fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。
-          Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。
-        </p>
+        <p className="muted">まだ記録はありません</p>
       )}
 
       {(autos.length > 0 || hasOriginal) && (

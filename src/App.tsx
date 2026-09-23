@@ -241,7 +241,7 @@ function ZoomControl({ zoom }: { zoom: number }) {
       : '';
   return (
     <div className="zoom-control bar">
-      <span className="readout num">{readout}</span>
+      <span className="readout num">{readout || (is2d ? 'F2 —, F1 —' : 'δ — ppm')}</span>
       <IconButton icon="minus" size="sm" label="縮小" shortcut="-" onClick={() => setViewZoom(stepZoom(zoom, -1))} />
       <button type="button" className={`zoom-value num${viewZoom === 'fit' ? ' on' : ''}`} onClick={() => setViewZoom('fit')} title="画面に合わせる">
         {Math.round(zoom * 100)}%

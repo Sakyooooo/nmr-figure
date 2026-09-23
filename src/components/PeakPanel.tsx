@@ -38,11 +38,12 @@ export function PeakPanel() {
   };
 
   return (
-    <Section title={`ピーク値${layer.label ? ` — ${layer.label}` : ''} (${rows.length})`}>
-      <p className="hint">「自動で拾う」で高いピークにまとめて付きます。ピーク値ツール (P) でクリックすると 1 本ずつ付け外しできます。</p>
+    <Section
+      title={`ピーク値${layer.label ? ` — ${layer.label}` : ''} (${rows.length})`}
+      help="「自動で拾う」で高いピークにまとめて付きます。ピーク値ツール (P) でクリックすると 1 本ずつ付け外しできます。"
+    >
       <div className="row wrap">
         <button
-          className="primary"
           onClick={() => {
             const n = autoPeakLabels(layer.id, threshold / 100, !visibleOnly);
             notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした');

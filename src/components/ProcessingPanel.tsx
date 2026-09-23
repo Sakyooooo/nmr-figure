@@ -17,13 +17,13 @@ export function ProcessingPanel() {
   const set = (patch: Partial<Processing>) => setProcessing(id, patch);
 
   return (
-    <Section title="FID の処理 (位相補正)">
-      <p className="hint">
-        Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。
-      </p>
+    <Section
+      title="FID の処理 (位相補正)"
+      help="Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。"
+    >
       {!canRedo && <p className="hint warn">元の FID がないため、調整できません (古い形式で保存した図です)。</p>}
       <div className="row wrap">
-        <button className="primary" disabled={!canRedo} onClick={() => autoPhaseSpectrum(id)}>
+        <button disabled={!canRedo} onClick={() => autoPhaseSpectrum(id)}>
           位相を自動で合わせる
         </button>
         <button

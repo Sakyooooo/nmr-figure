@@ -32,10 +32,11 @@ export function SiPanel() {
   };
 
   return (
-    <Section title="SI 用テキスト" defaultOpen={false}>
-      <p className="hint">
-        ¹H は積分した範囲ごとに、多重度と J を自動で読みます (重なった信号は m)。¹³C などは積分がなければピーク値、それもなければ自動で拾ったピークを並べます。違うところは表で直せます。
-      </p>
+    <Section
+      title="SI 用テキスト"
+      defaultOpen={false}
+      help="¹H は積分した範囲ごとに、多重度と J を自動で読みます (重なった信号は m)。¹³C などは積分がなければピーク値、それもなければ自動で拾ったピークを並べます。違うところは表で直せます。"
+    >
 
       {layer && active && (
         <>
@@ -99,7 +100,7 @@ export function SiPanel() {
         {formatted.length ? formatted.map((f) => <p key={f.entry.layerId} dangerouslySetInnerHTML={{ __html: f.html }} />) : <p className="muted">表示中のスペクトルがありません</p>}
       </div>
       <div className="row wrap">
-        <button className="primary" disabled={!formatted.length} onClick={() => void copy(true)} title="上付き・下付き・斜体を残したままコピー">
+        <button disabled={!formatted.length} onClick={() => void copy(true)} title="上付き・下付き・斜体を残したままコピー">
           Word 用にコピー
         </button>
         <button disabled={!formatted.length} onClick={() => void copy(false)} title="¹H, C₆D₆ などは Unicode の文字になります">

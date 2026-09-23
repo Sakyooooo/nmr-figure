@@ -65,7 +65,7 @@ export function TopBar({
         ]}
       >
         <Icon name="download" size={16} />
-        <span>書き出し</span>
+        <span className="btn-label">書き出し</span>
         <Icon name="chevron-down" size={16} />
       </MenuButton>
       <button
@@ -122,27 +122,32 @@ function SyncPill() {
   const list = Object.values(links).filter((v) => v.status !== 'duplicate');
   if (!list.length) return null;
   const bad = list.find((v) => v.status === 'need-permission' || v.status === 'error');
-  const busy = list.some((v) => v.status === 'pending' || v.status === 'waiting');
+  const writing = list.some((v) => v.status === 'pending');
+  const waiting = list.find((v) => v.status === 'waiting');
   const last = Math.max(0, ...list.map((v) => v.lastSyncAt ?? 0));
   const text = bad
     ? bad.status === 'need-permission'
       ? 'Delta へは許可が必要'
       : 'Delta: エラー'
-    : busy
-      ? 'Delta と同期中…'
-      : `Delta と同期${last ? ` ${time(last)}` : ''}`;
+    : writing
+      ? 'Delta に書き込み中…'
+      : waiting && !last
+        ? 'Delta: 待機中'
+        : `Delta と同期${last ? ` ${time(last)}` : ''}`;
+  const tone = bad ? ' warn' : waiting && !last ? ' idle' : '';
   return (
     <button
       type="button"
-      className={`sync-pill${bad ? ' warn' : ''}`}
-      title={bad?.message || '右の「記録」で詳しく見られます'}
+      className={`sync-pill${tone}`}
+      aria-label={text}
+      title={bad?.message || waiting?.message || `${text} (右の「記録」で詳しく見られます)`}
       onClick={() => {
         useEditor.setState({ inspectorTab: 'record' });
         if (!useEditor.getState().settings.ui.rightOpen) togglePanel('right');
       }}
     >
       <span className="dot" aria-hidden="true" />
-      {text}
+      <span className="sync-text">{text}</span>
     </button>
   );
 }

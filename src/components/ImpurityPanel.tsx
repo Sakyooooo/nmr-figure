@@ -127,11 +127,15 @@ export function MarkerPanel() {
     });
 
   return (
-    <Section title="マーカー・凡例">
-      <p className="hint">
-        色を選んでからピークをクリックすると付け外しできます。名前を入れるとその色が凡例に出ます (空のままなら出ません)。
-        名前は H_{'{2}'}O のように書くと下付きになります。
-      </p>
+    <Section
+      title="マーカー・凡例"
+      help={
+        <>
+          色を選んでからピークをクリックすると付け外しできます。名前を入れるとその色が凡例に出ます (空のままなら出ません)。
+          名前は H_{'{2}'}O のように書くと下付きになります。
+        </>
+      }
+    >
       <ul className="marker-styles">
         {styles.map((s) => (
           <li key={s.id} className={s.id === activeId ? 'active' : ''}>

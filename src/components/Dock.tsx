@@ -81,7 +81,7 @@ export function ToolHint() {
   const text = is2d ? (current === 'zoom' ? '範囲を拡大: ドラッグ · ダブルクリックで全体' : 'ドラッグで移動 · ホイールで拡大縮小') : tool(current)?.hint;
   if (!text) return null;
   return (
-    <div className="tool-hint" role="status" aria-live="polite">
+    <div className="tool-hint" role="status" aria-live="polite" title={text.replace(/[[\]]/g, '')}>
       {text.split(/(\[[^\]]+\])/).map((part, i) =>
         part.startsWith('[') ? (
           <kbd key={i} className="kbd inverse">

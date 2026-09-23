@@ -41,13 +41,12 @@ export function IntegralPanel() {
   const off = meta?.refOffset ?? 0;
 
   return (
-    <Section title={`積分${layer.label ? ` — ${layer.label}` : ''} (${mine.length})`}>
-      <p className="hint">
-        「自動で積分」で信号をまとめて積分します。積分ツール (I) で左右にドラッグすると手でも引けます。値を書き換えると、その積分を基準にほかがそろいます。
-      </p>
+    <Section
+      title={`積分${layer.label ? ` — ${layer.label}` : ''} (${mine.length})`}
+      help="「自動で積分」で信号をまとめて積分します。積分ツール (I) で左右にドラッグすると手でも引けます。値を書き換えると、その積分を基準にほかがそろいます。"
+    >
       <div className="row wrap">
         <button
-          className="primary"
           title="溶媒の残存ピークと、不純物マーカーを付けたピークは除きます"
           onClick={() => {
             const n = autoDetectSignals(layer.id, threshold / 100, visibleOnly);

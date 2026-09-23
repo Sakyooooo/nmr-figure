@@ -41,10 +41,11 @@ export function TemplatePanel() {
   };
 
   return (
-    <Section title="スタイルのテンプレート" defaultOpen={false}>
-      <p className="hint">
-        文字の大きさ・フォント・線の色・表示の設定などをまとめて保存します。★の付いた既定のテンプレートは、新しく .jdf を開いたときに自動で当たります。
-      </p>
+    <Section
+      title="スタイルのテンプレート"
+      defaultOpen={false}
+      help="文字の大きさ・フォント・線の色・表示の設定などをまとめて保存します。★の付いた既定のテンプレートは、新しく .jdf を開いたときに自動で当たります。"
+    >
       <div className="row">
         <select className="grow" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
           <option value="">テンプレートを選ぶ ({templates.length})</option>
@@ -59,7 +60,6 @@ export function TemplatePanel() {
       </div>
       <div className="row wrap">
         <button
-          className="primary"
           disabled={!selected}
           onClick={() => {
             if (!selected) return;

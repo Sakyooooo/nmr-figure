@@ -25,8 +25,11 @@ export function TrendPanel() {
   const unit = t.timeUnit;
 
   return (
-    <Section title="推移グラフ" defaultOpen={tab === 'trend'}>
-      <p className="hint">範囲ツール (G) でスペクトル上を左右にドラッグすると、追跡する範囲を追加できます。時間は左の各スペクトルで入れるか、名前 (例: 24 h) から読み取ります。</p>
+    <Section
+      title="推移グラフ"
+      defaultOpen={tab === 'trend'}
+      help="範囲ツール (G) でスペクトル上を左右にドラッグすると、追跡する範囲を追加できます。時間は左の一覧でスペクトルを選んで入れるか、名前 (例: 24 h) から読み取ります。"
+    >
       <div className="row wrap">
         <button
           onClick={() => {
@@ -37,7 +40,7 @@ export function TrendPanel() {
           ＋ 範囲を追加
         </button>
         {tab === 'spectrum' ? (
-          <button className="primary" onClick={() => setCanvasTab('trend')}>
+          <button onClick={() => setCanvasTab('trend')}>
             グラフを表示
           </button>
         ) : (

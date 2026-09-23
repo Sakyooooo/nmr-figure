@@ -61,6 +61,7 @@
 }
 .ibtn:disabled {
   opacity: 1;
+  background: transparent;
   color: var(--color-text-disabled);
 }
 
@@ -352,6 +353,10 @@
 .sync-pill.warn {
   background: var(--color-status-warning-bg);
   color: var(--color-status-warning-fg);
+}
+.sync-pill.idle {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
 }
 .sync-pill .dot {
   width: 8px;
@@ -706,25 +711,249 @@
   }
 }
 
-/* 幅が狭いとき (1,024 未満): パネルは図に重ねて出す。図の場所は空けない */
-@media (max-width: 1023px) {
-  .editor.left-open .canvas-scroll,
-  .editor.right-open .canvas-scroll {
-    padding-right: var(--spacing-12);
+/* ---------- 幅に合わせる ---------- */
+/* 1,280 未満: スペクトルの一覧は図に重ねて出す (図の場所は空けない)。右のパネルは少し細く。倍率は道具の帯の上に */
+@media (max-width: 1279px) {
+  :root {
+    --size-panel-right: 280px;
+  }
+  .editor.left-open .canvas-scroll {
     padding-left: var(--spacing-12);
   }
   .editor.left-open .stage-top,
-  .editor.left-open .stage-bottom,
-  .editor.right-open .stage-top,
-  .editor.right-open .stage-bottom {
-    right: var(--spacing-12);
+  .editor.left-open .stage-bottom {
     left: var(--spacing-12);
+  }
+  .float-panel.left {
+    z-index: 5;
+    /* 倍率と道具の帯の上で止める */
+    max-height: calc(100% - var(--spacing-12) - 136px);
+    box-shadow: var(--elevation-2);
+  }
+  .zoom-control {
+    bottom: 76px;
+  }
+  .zoom-control .readout {
+    display: none;
   }
   .command-search {
     width: auto;
+    min-width: 0;
   }
   .command-search .grow,
   .command-search .kbd {
     display: none;
   }
+  .topbar .btn .btn-label {
+    display: none;
+  }
+}
+/* 1,024 未満: 右のパネルも重ねて出す。上の帯はアイコンだけ */
+@media (max-width: 1023px) {
+  .editor.right-open .canvas-scroll {
+    padding-right: var(--spacing-12);
+  }
+  .editor.right-open .stage-top,
+  .editor.right-open .stage-bottom {
+    right: var(--spacing-12);
+  }
+  .float-panel.right {
+    z-index: 5;
+    box-shadow: var(--elevation-2);
+  }
+  .file-state,
+  .segmented,
+  .sync-pill .sync-text {
+    display: none;
+  }
+  .sync-pill {
+    padding: 0 var(--spacing-8);
+  }
+}
+
+/* ---------- 左のパネル: スペクトルの一覧 ---------- */
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-height: 44px;
+  padding: 0 var(--spacing-4) 0 var(--spacing-12);
+}
+.panel-head h2 {
+  margin: 0;
+  font: var(--type-heading);
+}
+.panel-head .count {
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+}
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-4) var(--spacing-4) var(--spacing-4) var(--spacing-12);
+}
+.layer-row:hover {
+  background: var(--color-bg-subtle);
+}
+.layer-row.on {
+  background: var(--color-bg-selected);
+}
+.layer-row input.color {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.layer-row input.color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.layer-row input.color::-webkit-color-swatch {
+  border: 0;
+  border-radius: var(--radius-full);
+}
+.layer-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.layer-name:hover:not(:disabled) {
+  background: transparent;
+}
+.layer-name .name {
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--type-body);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layer-row.on .layer-name .name {
+  color: var(--color-text-accent);
+  font: var(--type-body-strong);
+  line-height: 20px;
+}
+.layer-name .meta {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layer-row.hidden-layer .layer-name {
+  opacity: 0.55;
+}
+.layer-details,
+.view-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12);
+  border-top: 1px solid var(--color-border-subtle);
+}
+.view-panel {
+  padding-top: 0;
+}
+.view-panel .panel-head {
+  margin: 0 calc(-1 * var(--spacing-12));
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--spacing-8);
+  align-items: center;
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+}
+.field-grid .row {
+  gap: var(--spacing-4);
+}
+.field-grid input,
+.field-grid select {
+  font: var(--type-body);
+}
+.file-line {
+  margin: 0;
+  overflow: hidden;
+  font: var(--type-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+/* 数値欄の上下の小さな矢印は出さない (矢印キー・ホイールで増減できる)。幅を数字に使う */
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+.field-grid .row input[type='number'] {
+  flex: 1 1 0;
+  min-width: 48px;
+}
+
+.ibtn.section-help {
+  position: absolute;
+}
+details.sub > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-height: var(--size-control-sm);
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+  list-style: none;
+}
+details.sub > summary::-webkit-details-marker {
+  display: none;
+}
+details.sub > summary::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin: 0 2px;
+  border-right: 1.5px solid var(--color-icon-subtle);
+  border-bottom: 1.5px solid var(--color-icon-subtle);
+  transform: rotate(-45deg);
+  transition: transform var(--motion-duration-fast);
+}
+details.sub[open] > summary::before {
+  transform: rotate(45deg);
+}
+.tool-hint {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tool-hint > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

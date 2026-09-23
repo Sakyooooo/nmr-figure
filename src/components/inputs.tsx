@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { beginGesture, endGesture, isGestureOpen } from '../state/store';
+import { Icon } from './Icon';
 
 /** 確定 (Enter / フォーカスが外れる) したときだけ反映する数値入力。1文字ごとに履歴を積まない */
 export function NumberInput({
@@ -161,14 +162,51 @@ export function Check({ checked, onChange, children }: { checked: boolean; onCha
   );
 }
 
-export function Section({ title, children, defaultOpen = true, extra }: { title: string; children: ReactNode; defaultOpen?: boolean; extra?: ReactNode }) {
+/**
+ * 開け閉めできる区画。help (使い方の説明) は常には出さず、見出しの右の ⓘ で開く
+ */
+export function Section({
+  title,
+  children,
+  defaultOpen = true,
+  extra,
+  help,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  extra?: ReactNode;
+  help?: ReactNode;
+}) {
+  const [showHelp, setShowHelp] = useState(false);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
   return (
-    <details className="section" open={defaultOpen}>
-      <summary>
-        <span>{title}</span>
-        {extra}
-      </summary>
-      <div className="section-body">{children}</div>
-    </details>
+    <div className={`section-wrap${help ? ' has-help' : ''}`}>
+      <details className="section" open={defaultOpen} ref={detailsRef}>
+        <summary>
+          <span>{title}</span>
+          {extra}
+        </summary>
+        <div className="section-body">
+          {help && showHelp && <p className="hint section-help-text">{help}</p>}
+          {children}
+        </div>
+      </details>
+      {help && (
+        <button
+          type="button"
+          className={`ibtn sm section-help${showHelp ? ' on' : ''}`}
+          aria-label={`${title} の使い方`}
+          aria-expanded={showHelp}
+          title="使い方"
+          onClick={() => {
+            if (detailsRef.current && !detailsRef.current.open) detailsRef.current.open = true;
+            setShowHelp((v) => !v);
+          }}
+        >
+          <Icon name="info" size={16} />
+        </button>
+      )}
+    </div>
   );
 }
