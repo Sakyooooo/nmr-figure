@@ -49,6 +49,10 @@ interface Link {
   timer?: ReturnType<typeof setTimeout>;
 }
 
+/** 書き込みを許してもらえなかったとき (アプリの中のブラウザは、許可の確認そのものを出せない) */
+const NO_PERMISSION =
+  'Delta のファイルへの書き込みが許可されていません。アプリの中のブラウザなど、許可の確認を出せない所では書き込めないので、Chrome か Edge で開いてください (このソフトでの変更は図に残っています)';
+
 /** 変更が止まってから書くまでの待ち時間 */
 const DEBOUNCE = 1500;
 /** Delta で保存されたかを見に行く間隔 */
@@ -151,6 +155,7 @@ function errorText(e: unknown) {
   if (err?.name === 'NoModificationAllowedError' || err?.name === 'InvalidStateError') {
     return 'ファイルに書き込めませんでした (Delta など、ほかのソフトが使っている可能性があります)。次に変更したとき、もう一度書きます';
   }
+  if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return NO_PERMISSION;
   if (err?.name === 'NotFoundError') return 'ファイルが見つかりません (動かしたか、消した可能性があります)';
   return `Delta との同期でエラーが出ました: ${err?.message ?? String(e)}`;
 }
@@ -457,7 +462,8 @@ export async function grantDeltaWrite(layerId: string) {
   const link = links.get(layerId);
   if (!link) return;
   if (!(await writable(link, true))) {
-    notify('書き込みが許可されませんでした。Delta への反映は止まったままです', 'error');
+    show(link, { status: 'need-permission', message: NO_PERMISSION });
+    notify(NO_PERMISSION, 'error');
     return;
   }
   for (const l of links.values()) if (l.localChangedAt) queue(l, () => push(l));
@@ -539,11 +545,18 @@ export async function exportEntry(layerId: string, entry: HistoryEntry) {
   try {
     if (picker) {
       const handle = await picker({ suggestedName: name, types: [{ description: 'JEOL Delta', accept: { 'application/octet-stream': ['.jdf'] } }] });
-      await writeFile(handle, out);
-      notify(`${handle.name} に書き出しました`);
-    } else {
-      downloadBlob(new Blob([out], { type: 'application/octet-stream' }), name);
+      try {
+        await writeFile(handle, out);
+        notify(`${handle.name} に書き出しました`);
+        return;
+      } catch (e) {
+        const refused = (e as Error).name === 'NotAllowedError' || (e as Error).name === 'SecurityError';
+        if (!refused) throw e;
+        // このブラウザではファイルに直接書けない。ダウンロードで出す
+      }
     }
+    downloadBlob(new Blob([out], { type: 'application/octet-stream' }), name);
+    notify(`${name} をダウンロードとして書き出しました`);
   } catch (e) {
     if ((e as Error).name !== 'AbortError') notify(`書き出せませんでした: ${(e as Error).message}`, 'error');
   }

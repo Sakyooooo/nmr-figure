@@ -243,23 +243,39 @@ export async function saveProject(saveAs = false) {
       handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultProjectName(), types: PROJECT_TYPES });
     }
     if (handle) {
-      const w = await handle.createWritable();
-      await w.write(text);
-      await w.close();
+      try {
+        const w = await handle.createWritable();
+        await w.write(text);
+        await w.close();
+      } catch (e) {
+        if (!writeRefused(e)) throw e;
+        // ブラウザがファイルへの書き込みを許していない (アプリの中のブラウザなど、許可の確認を出せない所)。ダウンロードで残す
+        await downloadProject(text, handle.name, 'このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)');
+        return;
+      }
       markSaved(handle.name, handle);
       notify(`${handle.name} に上書き保存しました`);
       await rememberFigure(text, handle.name, handle);
       return;
-    } else {
-      const name = defaultProjectName();
-      downloadBlob(new Blob([text], { type: 'application/json' }), name);
-      markSaved(name, null);
-      notify('保存しました');
-      await rememberFigure(text, name, null);
     }
+    await downloadProject(text, defaultProjectName(), '保存しました');
   } catch (e) {
     if ((e as Error).name !== 'AbortError') notify(`保存できませんでした: ${(e as Error).message}`, 'error');
   }
+}
+
+/** ダウンロードとして保存する (ファイルに直接書けないブラウザ) */
+async function downloadProject(text: string, name: string, message: string) {
+  downloadBlob(new Blob([text], { type: 'application/json' }), name);
+  markSaved(name, null);
+  notify(message);
+  await rememberFigure(text, name, null);
+}
+
+/** ブラウザがファイルへの書き込みを許さなかった (許可がない・許可の確認を出せない) */
+export function writeRefused(e: unknown) {
+  const name = (e as Error)?.name;
+  return name === 'NotAllowedError' || name === 'SecurityError';
 }
 
 /** 覚えていた保存先に書き込めるか (必要なら許可を求める) */
