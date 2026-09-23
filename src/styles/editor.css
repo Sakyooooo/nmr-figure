@@ -1073,3 +1073,10 @@ details.sub[open] > summary::before {
   height: var(--size-control-lg);
   padding: 0 var(--spacing-24);
 }
+
+/* 1,440 未満: 左下の δ の欄を詰めて、道具の帯とぶつからないように */
+@media (max-width: 1439px) {
+  .zoom-control .readout {
+    min-width: 88px;
+  }
+}
