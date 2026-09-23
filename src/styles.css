@@ -1298,3 +1298,14 @@ details.sub[open] {
   font-size: 14px;
   text-align: center;
 }
+.record-form {
+  display: flex;
+  gap: 6px;
+}
+.record-form input {
+  flex: 1;
+  min-width: 0;
+}
+.history-row .history-time + .history-note {
+  grid-column: 2 / -1;
+}

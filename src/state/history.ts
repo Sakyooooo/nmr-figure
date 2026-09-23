@@ -1,7 +1,8 @@
 /**
- * Delta との同期の記録。.jdf (ファイル名) ごとに、ピーク値・積分がどう移り変わったかを残す。
- * Delta もこのアプリも同じファイルに上書きするので、前の中身を戻せるのはこの記録だけ。
- * - Delta で保存されたのを見つけたとき・このアプリから書いたとき (同期ごと) に 1 件足す
+ * 編集記録。.jdf (ファイル名) ごとに、ピーク値・積分の中身を残す。
+ * - 自分で付ける記録 (manual): 好きなときに「記録を付ける」で残す。メモは任意。自動では消さない
+ * - 自動の控え: Delta もこのアプリも同じファイルに上書きするので、前の中身を戻せるように同期のたびに残す
+ *   (Delta で保存されたのを見つけたとき・このアプリから書いたとき)。画面では畳んでおき、ファイルごとに AUTO_LIMIT 件まで
  * - Delta が書いた中身は、注釈の場所をそのまま (block) 残す。戻すときは Delta が書いたとおりに戻る (文字などの注釈も)
  * - このアプリで初めて書き込む前のファイルは、丸ごと別に残す (originals)
  * 置き場所はブラウザの中 (IndexedDB)。消されないよう、ブラウザに「残してほしい」と頼んでおく (navigator.storage.persist)
@@ -24,6 +25,10 @@ export interface HistoryEntry {
   key: string;
   /** Delta が書いた注釈の場所 (そのまま戻すため) */
   block?: Uint8Array | null;
+  /** 自分で付けた記録 (「記録を付ける」)。無ければ同期のたびの自動の控え */
+  manual?: boolean;
+  /** 自分で付けた記録のメモ */
+  memo?: string;
 }
 
 interface FileHistory {
@@ -37,8 +42,16 @@ export interface Original {
   bytes: ArrayBuffer;
 }
 
-/** 1 ファイルに残す記録の上限 (古いものから消す。最初の 1 件は残す) */
-const LIMIT = 300;
+/** 1 ファイルに残す自動の控えの上限 (古いものから消す。最初の 1 件と、自分で付けた記録は消さない) */
+export const AUTO_LIMIT = 100;
+
+/** 自動の控えが多すぎたら、古いものから消す (最初の 1 件と、自分で付けた記録は残す) */
+export function pruneHistory(list: HistoryEntry[], limit = AUTO_LIMIT): HistoryEntry[] {
+  const autos = list.filter((e) => !e.manual);
+  if (autos.length <= limit) return list;
+  const keep = new Set([autos[0], ...autos.slice(autos.length - limit + 1)].map((e) => e.id));
+  return list.filter((e) => e.manual || keep.has(e.id));
+}
 
 /** 記録が増えたことを画面に知らせる (ファイル名 → 変わった回数) */
 export const useHistory = create<{ version: Record<string, number> }>(() => ({ version: {} }));
@@ -60,19 +73,43 @@ export async function addHistory(
   options: { skipIfSeen?: boolean } = {},
 ): Promise<boolean> {
   const entries = await historyOf(fileName);
-  const last = entries[entries.length - 1];
-  if (last && last.key === entry.key) return false;
-  if (options.skipIfSeen) {
-    const lastSame = [...entries].reverse().find((e) => e.source === entry.source);
-    if (lastSame && lastSame.key === entry.key) return false;
+  // 自動の控えは、直前の控えと同じ中身なら足さない (自分で付けた記録は、同じ中身でも必ず残す)
+  const autos = entries.filter((e) => !e.manual);
+  const last = autos[autos.length - 1];
+  if (!entry.manual) {
+    if (last && last.key === entry.key) return false;
+    if (options.skipIfSeen) {
+      const lastSame = [...autos].reverse().find((e) => e.source === entry.source);
+      if (lastSame && lastSame.key === entry.key) return false;
+    }
   }
   const next: HistoryEntry = { id: crypto.randomUUID(), at: entry.at ?? Date.now(), ...entry };
-  let list = [...entries, next];
-  if (list.length > LIMIT) list = [list[0], ...list.slice(list.length - LIMIT + 1)];
-  await dbPut('history', fileName, { fileName, entries: list } satisfies FileHistory);
+  await saveEntries(fileName, pruneHistory([...entries, next]));
   await askPersist();
-  useHistory.setState((s) => ({ version: { ...s.version, [fileName]: (s.version[fileName] ?? 0) + 1 } }));
   return true;
+}
+
+/** 自分で付けた記録のメモを書き換える */
+export async function updateMemo(fileName: string, id: string, memo: string) {
+  const entries = await historyOf(fileName);
+  await saveEntries(
+    fileName,
+    entries.map((e) => (e.id === id ? { ...e, memo } : e)),
+  );
+}
+
+/** 自分で付けた記録を消す (自動の控えは消さない) */
+export async function deleteRecord(fileName: string, id: string) {
+  const entries = await historyOf(fileName);
+  await saveEntries(
+    fileName,
+    entries.filter((e) => !(e.id === id && e.manual)),
+  );
+}
+
+async function saveEntries(fileName: string, entries: HistoryEntry[]) {
+  await dbPut('history', fileName, { fileName, entries } satisfies FileHistory);
+  useHistory.setState((s) => ({ version: { ...s.version, [fileName]: (s.version[fileName] ?? 0) + 1 } }));
 }
 
 /** 初めて書き込む前のファイルを残す (すでにあれば何もしない) */

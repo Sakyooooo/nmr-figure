@@ -163,15 +163,21 @@ function errorText(e: unknown) {
 // ---------------------------------------------------------------- 今の中身
 
 function appState(link: Link) {
+  return layerState(link.layerId);
+}
+
+/** 図のスペクトル 1 本ぶんのピーク値・積分と、その鍵 */
+function layerState(layerId: string) {
   const s = useEditor.getState();
-  const meta = s.doc.spectra.find((x) => x.id === link.spectrumId);
-  const data = s.data[link.spectrumId];
+  const layer = s.doc.layers.find((l) => l.id === layerId);
+  const meta = layer && s.doc.spectra.find((x) => x.id === layer.spectrumId);
+  const data = meta && s.data[meta.id];
   if (!meta || !data) return null;
-  const ann = layerAnnotations(s.doc, link.layerId);
+  const ann = layerAnnotations(s.doc, layerId);
   return { ann, key: annotationKey(ann, data, meta), data, meta };
 }
 
-type AppState = NonNullable<ReturnType<typeof appState>>;
+type AppState = NonNullable<ReturnType<typeof layerState>>;
 
 function fileState(bytes: ArrayBuffer, app: AppState) {
   const ann = fileAnnotations(bytes);
@@ -470,11 +476,42 @@ export async function grantDeltaWrite(layerId: string) {
   if (!link.localChangedAt) show(link, { status: 'synced', message: '' });
 }
 
-/** 記録のある時点に戻す (Delta のファイルも図も)。戻す前の中身も記録に残る */
+/**
+ * 今の中身を記録に残す (「記録を付ける」)。メモは空でもよい。
+ * Delta と同じ中身のときは、Delta のファイルの注釈の場所もそのまま残す (戻すと Delta が書いたとおりに戻る)
+ */
+export async function recordNow(layerId: string, memo: string) {
+  const state = layerState(layerId);
+  if (!state || state.meta.simulated) return;
+  let block: Uint8Array | null = null;
+  const link = links.get(layerId);
+  if (link?.handle && link.attached) {
+    try {
+      const bytes = await (await link.handle.getFile()).arrayBuffer();
+      if (fileState(bytes, state).key === state.key) block = annotationBlock(bytes);
+    } catch {
+      // ファイルが読めなくても、図の中身だけで記録する
+    }
+  }
+  await addHistory(state.meta.fileName, { ...entryOf('app', '記録', state.ann, state.key, state, block), manual: true, memo: memo.trim() });
+  notify(memo.trim() ? `記録を付けました: ${memo.trim()}` : '記録を付けました');
+}
+
+/** 記録のある時点に戻す (Delta と同期していれば Delta のファイルも)。戻す前の中身も記録に残る */
 export async function restoreEntry(layerId: string, entry: HistoryEntry) {
   const link = links.get(layerId);
-  if (!link?.handle) return notify('この .jdf とはまだ同期していないので戻せません', 'error');
   const time = new Date(entry.at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!link?.handle) {
+    // Delta と同期していないスペクトル (FID をこのソフトで処理したものなど): 図だけ戻す (元に戻すで戻せる)
+    const ok = await ask('この時点に戻す', `${time} の中身 (${summary(entry.annotations)}) に、図のピーク値・積分を戻します。`, [
+      { label: '戻す', value: 'ok', kind: 'primary' },
+    ]);
+    const state = layerState(layerId);
+    if (ok !== 'ok' || !state) return;
+    edit((d) => applyAnnotations(d, layerId, entry.annotations, state.meta));
+    notify(`${time} の記録に戻しました`);
+    return;
+  }
   const ok = await ask('この時点に戻す', `${time} の中身 (${summary(entry.annotations)}) に戻します。Delta の ${link.fileName} も書き換わります。今の中身は記録に残ります。`, [
     { label: '戻す', value: 'ok', kind: 'primary' },
   ]);
