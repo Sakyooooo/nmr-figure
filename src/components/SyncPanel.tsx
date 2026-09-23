@@ -9,6 +9,7 @@ import { exportEntry, grantDeltaWrite, recordNow, restoreEntry, restoreOriginal,
 import { deleteRecord, historyOf, originalOf, updateMemo, useHistory, type HistoryEntry } from '../state/history';
 import { useEditor } from '../state/store';
 import { Section, TextInput } from './inputs';
+import { Icon } from './Icon';
 
 export function SyncPanel() {
   const activeLayerId = useEditor((s) => s.activeLayerId);
@@ -149,9 +150,28 @@ function StatusBadge({ view }: { view: LinkView }) {
 function SyncStatus({ view, layerId }: { view: LinkView; layerId: string }) {
   if (view.status === 'need-permission') {
     return (
-      <div className="sync-alert">
-        <p className="hint warn">{view.message}</p>
-        <button className="primary" onClick={() => void grantDeltaWrite(layerId)}>
+      <div className="sync-alert" role="alert">
+        <p className="sync-alert-title">Delta と自動で行き来するには、書き込みの許可が要ります</p>
+        <ul className="benefits">
+          <li>
+            <Icon name="check" size={16} />
+            Delta で直した積分・ピーク値が、ここにも自動で入ります
+          </li>
+          <li>
+            <Icon name="check" size={16} />
+            ここで直したものが、Delta で開いたときにも入っています
+          </li>
+          <li>
+            <Icon name="check" size={16} />
+            書き込む前の状態は「記録」からいつでも戻せます
+          </li>
+        </ul>
+        <p className="hint">
+          {view.message}
+          {/* 確認を出せないブラウザ (アプリの中のブラウザなど) では、次の確認は出ない */}
+          {!view.message.includes('Chrome か Edge') && '。次にブラウザが確認を出したら「許可」を押してください (許可はこのデータフォルダだけ)'}
+        </p>
+        <button className="btn primary" onClick={() => void grantDeltaWrite(layerId)}>
           書き込みを許可する
         </button>
       </div>

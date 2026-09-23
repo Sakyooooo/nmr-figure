@@ -41,10 +41,12 @@ async function openDemo() {
     const res = await fetch(path);
     await openFiles([{ file: new File([await res.arrayBuffer()], decodeURIComponent(path.split('/').pop()!)) }]);
   };
-  if (demo !== 'empty') {
+  if (demo === '2d') await load('/samples/cosy-2d.jdf');
+  else if (demo !== 'empty') {
     await load('/samples/sample-c6d6-1h.jdf');
     await load('/samples/sample-c6d6-1h-b.jdf');
   }
+  if (demo === 'trend') useEditor.setState({ canvasTab: 'trend' });
   if (demo === 'home') {
     const names = ['sample-c6d6-1h.jdf', 'sample-c6d6-1h-b.jdf', 'fid-c6d6-1h.jdf', 'fid-c6d6-31p.jdf', 'fid-13c.jdf', 'fid-19f.jdf', 'delta-13c.jdf', 'cosy-2d.jdf'];
     const files = await Promise.all(

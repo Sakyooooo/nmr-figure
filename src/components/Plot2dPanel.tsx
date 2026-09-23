@@ -43,19 +43,19 @@ export function Spectrum2dPanel() {
         <div className="grid2">
           <label className="field">
             F2 左
-            <NumberInput value={round(plot.view.xMax)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ xMax: v })} />
+            <NumberInput value={round2(plot.view.xMax)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ xMax: v })} />
           </label>
           <label className="field">
             F2 右
-            <NumberInput value={round(plot.view.xMin)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ xMin: v })} />
+            <NumberInput value={round2(plot.view.xMin)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ xMin: v })} />
           </label>
           <label className="field">
             F1 上
-            <NumberInput value={round(plot.view.yMax)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ yMax: v })} />
+            <NumberInput value={round2(plot.view.yMax)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ yMax: v })} />
           </label>
           <label className="field">
             F1 下
-            <NumberInput value={round(plot.view.yMin)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ yMin: v })} />
+            <NumberInput value={round2(plot.view.yMin)} step={0.5} width={66} onCommit={(v) => v !== null && setView2d({ yMin: v })} />
           </label>
         </div>
         <div className="row">
@@ -189,4 +189,9 @@ function squareFigure() {
 
 function round(v: number) {
   return Math.round(v * 1000) / 1000;
+}
+
+/** 表示範囲は 0.01 ppm まで出せば足りる (欄に収まる) */
+function round2(v: number) {
+  return Math.round(v * 100) / 100;
 }

@@ -43,12 +43,22 @@ const READINGS: Record<string, string> = {
 };
 
 /** 名前で操作を探して実行する (Ctrl+K)。あまり使わない操作の置き場も兼ねる */
-export function CommandPalette({ svgRef, onClose, onSettings }: { svgRef: RefObject<SVGSVGElement | null>; onClose: () => void; onSettings: () => void }) {
+export function CommandPalette({
+  svgRef,
+  onClose,
+  onSettings,
+  onTouchHelp,
+}: {
+  svgRef: RefObject<SVGSVGElement | null>;
+  onClose: () => void;
+  onSettings: () => void;
+  onTouchHelp: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const commands = useCommands(svgRef, onSettings);
+  const commands = useCommands(svgRef, onSettings, onTouchHelp);
 
   const results = useMemo(() => {
     const q = normalize(query.trim());
@@ -151,7 +161,7 @@ function normalize(s: string) {
     .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
-function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => void): Command[] {
+function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => void, onTouchHelp: () => void): Command[] {
   const hasData = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
   const is2d = useEditor((s) => !!s.doc.plot2d);
   const tab = useEditor((s) => s.canvasTab);
@@ -234,5 +244,6 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
     { group: '編集', label: '元に戻す', icon: 'undo', shortcut: 'Ctrl+Z', run: undo, enabled: canUndo },
     { group: '編集', label: 'やり直す', icon: 'redo', shortcut: 'Ctrl+Y', run: redo, enabled: canRedo },
     { group: '設定', label: '設定 (研究室の基準値・自作の不純物・PNG の解像度)', icon: 'settings', run: onSettings, enabled: true },
+    { group: '設定', label: 'タッチでの操作 (使い方)', icon: 'info', keywords: 'たぶれっと ゆび ヘルプ', run: onTouchHelp, enabled: true },
   ];
 }

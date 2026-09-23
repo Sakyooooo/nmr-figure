@@ -15,6 +15,7 @@ import { SiImportDialog } from './components/SiImportDialog';
 import { Spectrum2dPanel } from './components/Plot2dPanel';
 import { LayerPanel, ViewPanel } from './components/LayerPanel';
 import { TopBar } from './components/TopBar';
+import { TouchHelp, useFirstTouchHelp } from './components/TouchHelp';
 import { TrendChart } from './components/TrendChart';
 import { IconButton, Kbd } from './components/ui';
 import { computeLayout } from './lib/layout';
@@ -59,6 +60,7 @@ export default function App() {
   const trend = useEditor((s) => s.doc.trend);
   const screen = useEditor((s) => s.screen);
   const [w, h] = tab === 'trend' ? [trend.width, trend.height] : [figure.width, figure.height];
+  const [touchHelp, setTouchHelp] = useFirstTouchHelp(hasData && screen === 'editor');
   const paperWidth = usePaperWidth(scrollRef, w, h, `${ui.leftOpen}${ui.rightOpen}${hasData}${screen}`);
 
   useKeyboard(svgRef, w, paperWidth, () => setPaletteOpen(true));
@@ -161,7 +163,10 @@ export default function App() {
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}
-      {paletteOpen && <CommandPalette svgRef={svgRef} onClose={() => setPaletteOpen(false)} onSettings={() => setSettingsOpen(true)} />}
+      {paletteOpen && (
+        <CommandPalette svgRef={svgRef} onClose={() => setPaletteOpen(false)} onSettings={() => setSettingsOpen(true)} onTouchHelp={() => setTouchHelp(true)} />
+      )}
+      {touchHelp && <TouchHelp onClose={() => setTouchHelp(false)} />}
       <PrintView svgRef={svgRef} />
       <DialogHost />
     </div>

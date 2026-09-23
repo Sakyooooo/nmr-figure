@@ -23,6 +23,8 @@ const SHOTS = [
   ['selected-1440', 'selected', 1440, 900],
   ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"]').click()`],
   ['figure-tab-1440', 'spectra', 1440, 900, `document.querySelector('#inspector-tab-figure').click()`],
+  ['2d-1440', '2d', 1440, 900],
+  ['trend-1440', 'trend', 1440, 900],
   ['home-1440', 'home', 1440, 900],
   ['home-1024', 'home', 1024, 768],
 ];

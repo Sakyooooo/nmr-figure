@@ -7,6 +7,7 @@ import { setReferenceOffset, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { RichHtml } from './RichText';
 import { ICON_LICENSE } from './iconPaths';
+import { IconButton } from './ui';
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -17,9 +18,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     <dialog ref={ref} className={`modal${wide ? ' wide' : ''}`} onClose={onClose} onCancel={onClose}>
       <header>
         <h2>{title}</h2>
-        <button className="mini" onClick={onClose} aria-label="閉じる">
-          ×
-        </button>
+        <IconButton icon="x" label="閉じる (Esc)" onClick={onClose} />
       </header>
       {children}
     </dialog>

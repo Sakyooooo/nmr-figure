@@ -46,7 +46,8 @@ export function Dock() {
         <IconButton icon="undo" label="元に戻す" shortcut="Ctrl+Z" onClick={undo} disabled={!canUndo} className="tool" />
         <IconButton icon="redo" label="やり直す" shortcut="Ctrl+Y" onClick={redo} disabled={!canRedo} className="tool" />
       </div>
-      <div className="bar" role="toolbar" aria-label="道具">
+      {/* 推移グラフでは道具は使わないので、元に戻す・やり直すだけ */}
+      <div className="bar" role="toolbar" aria-label="道具" hidden={onTrend}>
         {VIEW_TOOLS.map(toolButton)}
         {!is2d && (
           <>
