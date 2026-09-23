@@ -957,3 +957,43 @@ details.sub[open] > summary::before {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 選んだものの真上の操作の帯 */
+.selection-bar {
+  position: absolute;
+  z-index: 2;
+  gap: 2px;
+  padding: 2px var(--spacing-4);
+  border-radius: var(--radius-md);
+}
+.sel-label {
+  padding: 0 var(--spacing-8);
+  color: var(--color-text-secondary);
+  font: var(--type-label-strong);
+  white-space: nowrap;
+}
+.sel-field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: 0 var(--spacing-4);
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+}
+.btn.sm {
+  height: var(--size-control-sm);
+  padding: 0 var(--spacing-8);
+  font: var(--type-label);
+}
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+/* 区画の中のボタンは横いっぱいに伸ばさない */
+.section-body > button {
+  align-self: flex-start;
+}

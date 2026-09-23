@@ -10,6 +10,7 @@ import { Inspector } from './components/Inspector';
 import { Figure2dView } from './components/Figure2dView';
 import { StructureEditorHost } from './components/StructureEditorHost';
 import { PrintView } from './components/PrintView';
+import { SelectionBar } from './components/SelectionBar';
 import { SiImportDialog } from './components/SiImportDialog';
 import { Spectrum2dPanel } from './components/Plot2dPanel';
 import { LayerPanel, ViewPanel } from './components/LayerPanel';
@@ -43,6 +44,7 @@ const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5
 export default function App() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -117,7 +119,7 @@ export default function App() {
   return (
     <div className={`editor${leftShown ? ' left-open' : ''}${rightShown ? ' right-open' : ''}`} {...dropProps('add')}>
       <TopBar svgRef={svgRef} onSettings={() => setSettingsOpen(true)} onImportSi={() => openSiImport()} onCommand={() => setPaletteOpen(true)} />
-      <main className="stage">
+      <main className="stage" ref={stageRef}>
         <div className="canvas-scroll" ref={scrollRef}>
           {hasData ? (
             <div className="paper" style={{ width: paperWidth }}>
@@ -145,6 +147,7 @@ export default function App() {
         <aside className="float-panel right" aria-label="右のパネル" hidden={!rightShown}>
           <Inspector />
         </aside>
+        {hasData && !is2d && <SelectionBar stageRef={stageRef} />}
         {hasData && <ZoomControl zoom={paperWidth / w} />}
         {hasData && (
           <div className="stage-bottom">

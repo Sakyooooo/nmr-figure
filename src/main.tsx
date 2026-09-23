@@ -6,7 +6,7 @@ import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
-import { useEditor } from './state/store';
+import { autoDetectSignals, select, useEditor } from './state/store';
 import './styles/tokens.css';
 import './styles.css';
 import './styles/editor.css';
@@ -48,6 +48,12 @@ async function openDemo() {
   useEditor.setState({ screen: demo === 'home' ? 'home' : 'editor' });
   if (demo === 'palette') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
   if (demo === 'integral') useEditor.setState({ tool: 'integral' });
+  if (demo === 'selected') {
+    const { activeLayerId } = useEditor.getState();
+    if (activeLayerId) autoDetectSignals(activeLayerId, 0.03, false);
+    const x = useEditor.getState().doc.integrals.find((i) => i.layerId === activeLayerId);
+    if (x) select({ kind: 'integral', id: x.id });
+  }
   // scripts/ui-shots.mjs はこれを待ってから撮る
   Object.assign(window, { __demoReady: true });
 }

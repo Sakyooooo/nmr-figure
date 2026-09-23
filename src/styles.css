@@ -153,6 +153,114 @@ input[type='radio'] {
   accent-color: var(--color-accent-default);
 }
 
+/* 図の上の操作 (カーソル・選択の印・つまみ・範囲の帯)。書き出す図には入らない (data-ui) */
+.figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+}
+.figure.tool-select {
+  cursor: grab;
+}
+.figure.tool-zoom {
+  cursor: zoom-in;
+}
+.figure.tool-height {
+  cursor: ns-resize;
+}
+.figure.tool-ellipse,
+.figure.tool-rect,
+.figure.tool-arrow,
+.figure.tool-line {
+  cursor: crosshair;
+}
+.figure.tool-text {
+  cursor: text;
+}
+.figure.tool-peak,
+.figure.tool-marker,
+.figure.tool-reference {
+  cursor: pointer;
+}
+.figure .hit {
+  cursor: move;
+}
+.figure .sel-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+.figure .handle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+.handle-nw,
+.handle-se {
+  cursor: nwse-resize;
+}
+.handle-ne,
+.handle-sw {
+  cursor: nesw-resize;
+}
+.handle-n,
+.handle-s {
+  cursor: ns-resize;
+}
+.handle-e,
+.handle-w {
+  cursor: ew-resize;
+}
+.handle-p1,
+.handle-p2 {
+  cursor: crosshair;
+}
+.figure .integral-band {
+  fill: rgba(0, 0, 0, 0.06);
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-dasharray: 4 3;
+}
+.figure .sel-curve {
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.figure .hit.pointer {
+  cursor: pointer;
+}
+.figure.tool-integral {
+  cursor: col-resize;
+}
+.figure .region-band {
+  fill: rgba(209, 43, 43, 0.12);
+  stroke: rgba(209, 43, 43, 0.6);
+  stroke-dasharray: 4 3;
+}
+.figure .zoom-band {
+  fill: rgba(26, 111, 214, 0.1);
+  stroke: rgba(26, 111, 214, 0.6);
+  stroke-dasharray: 4 3;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 12px;
+  border: 3px dashed var(--accent);
+  border-radius: 14px;
+  background: rgba(230, 240, 252, 0.85);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  color: var(--accent);
+  pointer-events: none;
+  z-index: 20;
+}
+
 /* パネルの中身 */
 .section-wrap {
   position: relative;
@@ -426,36 +534,49 @@ details.sub[open] {
   padding: 0;
 }
 .table {
-  border-collapse: collapse;
   width: 100%;
+  border-collapse: collapse;
 }
 .table th,
 .table td {
-  padding: 3px 6px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--spacing-4) var(--spacing-8);
+  border-bottom: 1px solid var(--color-border-subtle);
   text-align: left;
+}
+.table th {
+  color: var(--color-text-secondary);
+  font: var(--type-label);
 }
 .table td input[type='text'] {
   width: 100%;
 }
 
+/* 数字の表 (積分・ピーク値・推移の範囲): 13px の等幅の数字で詰める */
 .table.compact th,
 .table.compact td {
-  padding: 2px 4px;
-  font-size: 12px;
+  padding: 2px var(--spacing-4);
+  font: var(--type-numeric);
+  font-variant-numeric: tabular-nums;
+}
+.table.compact input[type='text'],
+.table.compact input[type='number'] {
+  min-height: 24px;
+  padding: 0 var(--spacing-4);
+  font: var(--type-numeric);
   font-variant-numeric: tabular-nums;
 }
 .table.compact th {
   position: sticky;
   top: 0;
-  background: #f5f7fa;
+  z-index: 1;
+  background: var(--color-bg-subtle);
 }
 .table.regions td input[type='text'] {
   width: 100%;
 }
 
 .table tr.selected td {
-  background: var(--accent-soft);
+  background: var(--color-bg-selected);
 }
 
 /* ホーム画面 */

@@ -20,6 +20,7 @@ const SHOTS = [
   ['empty-1440', 'empty', 1440, 900],
   ['palette-1440', 'palette', 1440, 900],
   ['integral-1440', 'integral', 1440, 900],
+  ['selected-1440', 'selected', 1440, 900],
   ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"]').click()`],
   ['figure-tab-1440', 'spectra', 1440, 900, `document.querySelector('#inspector-tab-figure').click()`],
   ['home-1440', 'home', 1440, 900],
