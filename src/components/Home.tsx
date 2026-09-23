@@ -29,7 +29,9 @@ import {
 } from '../state/library';
 import { setHomeSort, notify, useEditor } from '../state/store';
 import type { HomeSort } from '../lib/settings';
+import { Icon } from './Icon';
 import { RichHtml } from './RichText';
+import { IconButton } from './ui';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const FILTER_LABEL: Record<NucleusFilter, string> = { '1H': '^{1}H', '13C': '^{13}C', '19F': '^{19}F', '31P': '^{31}P', '2D': '2D', other: 'その他' };
@@ -50,10 +52,14 @@ export function Home() {
         <h1>NMR Figure Editor</h1>
         <FolderStatus />
         <div className="spacer" />
-        <button onClick={() => void openDialog('new')}>ファイルを開く</button>
+        <button className="btn" onClick={() => void openDialog('new')}>
+          <Icon name="folder-open" size={16} />
+          ファイルを開く
+        </button>
         {hasDoc && (
-          <button className="primary" onClick={() => useEditor.setState({ screen: 'editor' })}>
-            編集中の図に戻る →
+          <button className="btn" onClick={() => useEditor.setState({ screen: 'editor' })}>
+            編集中の図に戻る
+            <Icon name="arrow-right" size={16} />
           </button>
         )}
       </header>
@@ -71,9 +77,11 @@ export function Home() {
                   {formatDay(g.day)} <span className="muted">{g.samples.reduce((n, s) => n + s.items.length, 0)} 測定</span>
                 </h2>
               )}
-              {g.samples.map((s) => (
-                <SampleCard key={s.sampleKey} sampleKey={s.sampleKey} items={s.items} showDay={!g.day} />
-              ))}
+              <div className="day-samples">
+                {g.samples.map((s) => (
+                  <SampleCard key={s.sampleKey} sampleKey={s.sampleKey} items={s.items} showDay={!g.day} />
+                ))}
+              </div>
             </section>
           ))}
           {lib.failed.length > 0 && (
@@ -105,19 +113,21 @@ function FolderStatus() {
     <div className="folder">
       {status === 'loading' && <span className="muted">読み込み中…</span>}
       {status === 'no-folder' && (
-        <button className="primary" onClick={() => void pickFolder()}>
+        <button className="btn primary" onClick={() => void pickFolder()}>
+          <Icon name="folder-open" size={16} />
           データフォルダを選ぶ
         </button>
       )}
       {folderName && status !== 'no-folder' && (
         <>
+          <Icon name="folder-open" size={16} />
           <span className="folder-name" title="データフォルダ">
-            📁 {folderName}
+            {folderName}
             {temporary && <span className="muted"> (今回だけ)</span>}
           </span>
           {status === 'need-permission' && (
             <button
-              className="primary"
+              className="btn primary"
               onClick={() => void grantPermission()}
               title={
                 denied
@@ -133,12 +143,10 @@ function FolderStatus() {
               読み込み中 {progress.done}/{progress.total}
             </span>
           )}
-          {status === 'ready' && !temporary && (
-            <button onClick={() => void scanFolder()} title="新しく測定したファイルを読み込む">
-              更新
-            </button>
-          )}
-          <button onClick={() => void pickFolder()}>変更</button>
+          {status === 'ready' && !temporary && <IconButton icon="refresh" size="sm" label="読み込み直す (新しく測定したファイル)" onClick={() => void scanFolder()} />}
+          <button className="btn ghost sm" onClick={() => void pickFolder()}>
+            フォルダを変更
+          </button>
         </>
       )}
     </div>
@@ -157,13 +165,16 @@ function Filters() {
   const set = useLibrary.setState;
   return (
     <div className="home-filters">
-      <input
-        type="search"
-        className="search"
-        placeholder="サンプル名・ファイル名・メモ・タグで検索"
-        value={query}
-        onChange={(e) => set({ query: e.target.value })}
-      />
+      <label className="home-search">
+        <Icon name="search" size={16} />
+        <input
+          type="search"
+          placeholder="サンプル名・ファイル名・メモ・タグで検索"
+          aria-label="検索"
+          value={query}
+          onChange={(e) => set({ query: e.target.value })}
+        />
+      </label>
       <div className="chips">
         {NUCLEUS_FILTERS.filter((n) => present.has(n)).map((n) => (
           <button
@@ -176,7 +187,7 @@ function Filters() {
         ))}
       </div>
       <SortControl />
-      <select value={solvent} onChange={(e) => set({ solvent: e.target.value })}>
+      <select value={solvent} aria-label="溶媒" onChange={(e) => set({ solvent: e.target.value })}>
         <option value="">すべての溶媒</option>
         {solvents.map((s) => (
           <option key={s} value={s}>
@@ -224,7 +235,8 @@ function SortControl() {
         onClick={() => setHomeSort({ desc: !sort.desc })}
         title={`今は${sort.desc ? descLabel : ascLabel}。押すと${sort.desc ? ascLabel : descLabel}になります`}
       >
-        {sort.desc ? '↓' : '↑'} {sort.desc ? descLabel : ascLabel}
+        <Icon name={sort.desc ? 'arrow-down' : 'arrow-up'} size={16} />
+        {sort.desc ? descLabel : ascLabel}
       </button>
     </div>
   );
@@ -248,7 +260,11 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
       onClick={() => useLibrary.setState({ focus: chosenFile(items[0], choice).key })}
       onPointerUp={(ev) => tap(ev, `card:${sampleKey}`, () => openMeasurement(target, choice))}
     >
-      <div className="scheme-thumb">{note?.scheme ? <BlobImage blob={note.scheme} alt="" /> : <span className="muted">スキームなし</span>}</div>
+      {note?.scheme && (
+        <div className="scheme-thumb">
+          <BlobImage blob={note.scheme} alt="" />
+        </div>
+      )}
       <div className="sample-body">
         <div className="sample-title" title={sampleKey}>
           {sampleKey}
@@ -286,7 +302,7 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
 let lastTap: { id: string; t: number; x: number; y: number } | null = null;
 function useDoubleTap() {
   return (ev: React.PointerEvent, id: string, action: () => void) => {
-    if (ev.button !== 0 || (ev.target as Element).closest('input, button, textarea')) return;
+    if (ev.button !== 0 || (ev.target as Element).closest('input, textarea, .exp.figure button')) return;
     const now = performance.now();
     const prev = lastTap;
     if (prev && prev.id === id && now - prev.t < 500 && Math.hypot(ev.clientX - prev.x, ev.clientY - prev.y) < 24) {
@@ -313,46 +329,54 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
   const openable = canOpen(file);
   const processed = m.files.filter(canOpen).length;
   const tap = useDoubleTap();
+  const label = `${file.fileName} (${formatTime(file.measuredAt)})`;
   return (
-    <div
-      className={`exp${focused ? ' focused' : ''}${checked ? ' checked' : ''}${openable ? '' : ' disabled'}`}
-      onClick={(ev) => {
-        ev.stopPropagation();
-        useLibrary.setState({ focus: file.key });
-      }}
-      onPointerUp={(ev) => {
-        // 後ろのカードにも届くと、ダブルタップの記録が上書きされる
-        ev.stopPropagation();
-        tap(ev, `exp:${m.id}`, () => openMeasurement(m, choice));
-      }}
-      title={`${file.fileName}\nダブルクリック (ダブルタップ) で開く`}
-    >
+    <div className={`exp${focused ? ' focused' : ''}${checked ? ' checked' : ''}${openable ? '' : ' disabled'}`} onClick={(ev) => ev.stopPropagation()}>
       <input
         type="checkbox"
         checked={checked}
         disabled={!openable}
-        aria-label={`${file.fileName} を選ぶ`}
-        onClick={(ev) => ev.stopPropagation()}
+        aria-label={`${label} を選ぶ (まとめて開く)`}
         onChange={(ev) => {
           for (const f of m.files) if (f.key !== file.key) toggleSelected(f.key, false);
           toggleSelected(file.key, ev.target.checked);
         }}
       />
-      <span className="exp-nuc">
-        <RichHtml text={experimentLabel(file)} />
-      </span>
-      <span className="exp-time">{formatTime(file.measuredAt)}</span>
-      {file.dimension >= 2 && (
-        <span className="badge fid" title="2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します">
-          2D
+      <button
+        type="button"
+        className="exp-open"
+        aria-pressed={focused}
+        aria-label={`${label}。Enter で開く`}
+        title={`${file.fileName}\nクリックで右に内容、ダブルクリック (ダブルタップ) か Enter で開く`}
+        onClick={() => useLibrary.setState({ focus: file.key })}
+        onKeyDown={(ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            openMeasurement(m, choice);
+          }
+        }}
+        onPointerUp={(ev) => {
+          // 後ろのカードにも届くと、ダブルタップの記録が上書きされる
+          ev.stopPropagation();
+          tap(ev, `exp:${m.id}`, () => openMeasurement(m, choice));
+        }}
+      >
+        <span className="exp-nuc">
+          <RichHtml text={experimentLabel(file)} />
         </span>
-      )}
-      {file.dimension === 1 && !file.processed && (
-        <span className="badge fid" title="Delta で処理していない生データです。開くとこのアプリで FT・位相補正します">
-          FID
-        </span>
-      )}
-      {processed > 1 && <span className="badge">{processed} 版</span>}
+        <span className="exp-time">{formatTime(file.measuredAt)}</span>
+        {file.dimension >= 2 && (
+          <span className="badge fid" title="2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します">
+            2D
+          </span>
+        )}
+        {file.dimension === 1 && !file.processed && (
+          <span className="badge fid" title="Delta で処理していない生データです。開くとこのアプリで FT・位相補正します">
+            FID
+          </span>
+        )}
+        {processed > 1 && <span className="badge">{processed} 版</span>}
+      </button>
     </div>
   );
 }
@@ -360,32 +384,22 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
 /** 保存した図 (比較) のチップ。クリックで開く */
 function FigureChip({ figure }: { figure: SavedFigure }) {
   return (
-    <div
-      className="exp figure"
-      title={`${figure.name}
-${figure.layers} 本を重ねた図 (${formatStamp(figure.savedAt)})
-クリックで開く`}
-      onClick={(ev) => {
-        ev.stopPropagation();
-        void openSavedFigure(figure.id);
-      }}
-      onPointerUp={(ev) => ev.stopPropagation()}
-    >
-      <span className="exp-nuc">
-        図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
-      </span>
-      <span className="exp-time">{formatTime(figure.savedAt)}</span>
-      {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
+    <div className="exp figure" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
       <button
-        className="mini danger"
-        title="この図をホーム画面から消す (測定データは消えません)"
-        onClick={(ev) => {
-          ev.stopPropagation();
-          void deleteFigure(figure.id);
-        }}
+        type="button"
+        className="exp-open"
+        title={`${figure.name}\n${figure.layers} 本を重ねた図 (${formatStamp(figure.savedAt)})`}
+        aria-label={`保存した図 ${figure.name} を開く`}
+        onClick={() => void openSavedFigure(figure.id)}
       >
-        ×
+        <Icon name="file-text" size={16} />
+        <span className="exp-nuc">
+          図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
+        </span>
+        <span className="exp-time">{formatTime(figure.savedAt)}</span>
+        {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
       </button>
+      <IconButton icon="x" size="sm" label={`${figure.name} をホーム画面から消す (測定データは消えません)`} onClick={() => void deleteFigure(figure.id)} />
     </div>
   );
 }
@@ -400,6 +414,7 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
   const sampleKey = sampleKeyOf(e);
   const note = useLibrary((s) => s.notes[sampleKey]);
   const hasDoc = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
+  const selecting = useLibrary((s) => s.selected.length > 0);
   const openable = canOpen(e);
   const choose = (key: string) =>
     useLibrary.setState((s) => ({
@@ -441,11 +456,11 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
         <Fact label="ファイル">{e.fileName}</Fact>
       </dl>
       <div className="row wrap">
-        <button className="primary" disabled={!openable} onClick={() => void openExperiments([e.key], 'new')}>
+        <button className={`btn${selecting ? '' : ' primary'}`} disabled={!openable} onClick={() => void openExperiments([e.key], 'new')}>
           この実験を開く
         </button>
         {hasDoc && (
-          <button disabled={!openable} onClick={() => void openExperiments([e.key], 'add')}>
+          <button className="btn" disabled={!openable} onClick={() => void openExperiments([e.key], 'add')}>
             編集中の図に追加
           </button>
         )}
@@ -531,7 +546,7 @@ function SchemeBox({ sampleKey, scheme, schemeSource }: { sampleKey: string; sch
     >
       {scheme ? <BlobImage blob={scheme} alt="スキーム" /> : <span className="muted">「描く」か、画像を貼り付け (Ctrl+V)・ドロップ</span>}
       <div className="scheme-actions">
-        <button className="mini primary" onClick={() => setDrawing(true)} title="構造式や反応式をこのアプリで描きます">
+        <button className="mini" onClick={() => setDrawing(true)} title="構造式や反応式をこのアプリで描きます">
           {schemeSource ? '描き直す' : '描く'}
         </button>
         <button className="mini" onClick={choose}>
@@ -654,21 +669,30 @@ function previewPath(first: number, last: number, data: Float32Array) {
   const span = first - last;
   const step = span > 100 ? 50 : span > 30 ? 20 : 2;
   const ticks: { x: number; label: string }[] = [];
-  for (let v = Math.ceil(last / step) * step; v <= first; v += step) ticks.push({ x: ((first - v) / span) * PW, label: String(v) });
+  for (let v = Math.ceil(last / step) * step; v <= first; v += step) {
+    const x = ((first - v) / span) * PW;
+    // 端に掛かる目盛りは文字が切れるので出さない
+    if (x > 12 && x < PW - 12) ticks.push({ x, label: String(v) });
+  }
   return { path: parts.join(''), ticks };
 }
 
+/** チェックを付けた測定をまとめて開く帯 (下に浮かぶ) */
 function SelectionBar() {
   const selected = useLibrary((s) => s.selected);
   const hasDoc = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
   return (
-    <div className="selection-bar">
-      <span>{selected.length} 件を選択中</span>
-      <button className="primary" onClick={() => void openExperiments(selected, 'new')}>
+    <div className="home-select-bar bar" role="region" aria-label="選んだ測定">
+      <span className="count">{selected.length} 件を選択中</span>
+      <button className="btn primary" onClick={() => void openExperiments(selected, 'new')}>
         新しい図で開く
       </button>
-      {hasDoc && <button onClick={() => void openExperiments(selected, 'add')}>編集中の図に追加</button>}
-      <button onClick={() => useLibrary.setState({ selected: [] })}>選択を解除</button>
+      {hasDoc && (
+        <button className="btn" onClick={() => void openExperiments(selected, 'add')}>
+          編集中の図に追加
+        </button>
+      )}
+      <IconButton icon="x" size="sm" label="選択を解除" onClick={() => useLibrary.setState({ selected: [] })} />
     </div>
   );
 }

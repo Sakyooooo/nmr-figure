@@ -959,7 +959,7 @@ details.sub[open] > summary::before {
 }
 
 /* 選んだものの真上の操作の帯 */
-.selection-bar {
+.sel-bar {
   position: absolute;
   z-index: 2;
   gap: 2px;

@@ -135,7 +135,7 @@ export function SelectionBar({ stageRef }: { stageRef: RefObject<HTMLElement | n
   return (
     <div
       ref={barRef}
-      className="selection-bar bar"
+      className="sel-bar bar"
       role="toolbar"
       aria-label="選んだものの操作"
       style={pos && !dragging ? { left: pos.x, top: pos.y } : { visibility: 'hidden', left: 0, top: 0 }}

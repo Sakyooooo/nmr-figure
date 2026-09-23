@@ -45,6 +45,15 @@ async function openDemo() {
     await load('/samples/sample-c6d6-1h.jdf');
     await load('/samples/sample-c6d6-1h-b.jdf');
   }
+  if (demo === 'home') {
+    const names = ['sample-c6d6-1h.jdf', 'sample-c6d6-1h-b.jdf', 'fid-c6d6-1h.jdf', 'fid-c6d6-31p.jdf', 'fid-13c.jdf', 'fid-19f.jdf', 'delta-13c.jdf', 'cosy-2d.jdf'];
+    const files = await Promise.all(
+      names.map(async (n) => new File([await (await fetch(`/samples/${n}`)).arrayBuffer()], n, { lastModified: Date.now() })),
+    );
+    await loadLibraryFiles(files, 'samples (開発用)');
+    const first = useLibrary.getState().experiments[0];
+    if (first) useLibrary.setState({ focus: first.key });
+  }
   useEditor.setState({ screen: demo === 'home' ? 'home' : 'editor' });
   if (demo === 'palette') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
   if (demo === 'integral') useEditor.setState({ tool: 'integral' });
