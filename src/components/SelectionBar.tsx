@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { integralValues } from '../lib/integrals';
-import { deleteSelection, edit, openStructureEditor, pasteAnnotation, reorderAnnotation, setIntegralValue, useEditor } from '../state/store';
+import { deleteSelection, edit, editAnnotationText, openStructureEditor, pasteAnnotation, reorderAnnotation, setIntegralValue, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { IconButton } from './ui';
 
@@ -124,6 +124,11 @@ export function SelectionBar({ stageRef }: { stageRef: RefObject<HTMLElement | n
     body = (
       <>
         <span className="sel-label">{KIND[a.kind]}</span>
+        {a.kind === 'text' && (
+          <button type="button" className="btn ghost sm" onClick={editAnnotationText} title="文字を書き換える (図の上の文字をダブルクリックでも)">
+            文字を直す
+          </button>
+        )}
         <IconButton icon="arrow-up" size="sm" label="前面へ" onClick={() => reorderAnnotation(a.id, true)} />
         <IconButton icon="arrow-down" size="sm" label="背面へ" onClick={() => reorderAnnotation(a.id, false)} />
         <IconButton icon="copy" size="sm" label="複製" shortcut="Ctrl+D" onClick={() => pasteAnnotation(a)} />

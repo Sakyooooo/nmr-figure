@@ -863,6 +863,20 @@ export function togglePanel(side: 'left' | 'right') {
   });
 }
 
+/** 選んでいる文字の図形を書き換える: 右のパネル (図のタブ) を開いて、文字の欄に入る */
+export function editAnnotationText() {
+  const { settings } = get();
+  if (!settings.ui.rightOpen) togglePanel('right');
+  set({ inspectorTab: 'figure' });
+  // パネルが描かれてから欄に入る
+  setTimeout(() => {
+    const el = document.getElementById('annotation-text') as HTMLTextAreaElement | HTMLInputElement | null;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange?.(el.value.length, el.value.length);
+  }, 0);
+}
+
 /** ホーム画面の並び順 */
 export function setHomeSort(patch: Partial<HomeSort>) {
   updateSettings((s) => {

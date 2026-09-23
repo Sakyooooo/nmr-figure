@@ -6,7 +6,8 @@ import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
-import { autoDetectSignals, select, useEditor } from './state/store';
+import { addAnnotation, autoDetectSignals, select, useEditor } from './state/store';
+import { annotationDefaults } from './state/types';
 import './styles/tokens.css';
 import './styles.css';
 import './styles/editor.css';
@@ -59,6 +60,10 @@ async function openDemo() {
   useEditor.setState({ screen: demo === 'home' ? 'home' : 'editor' });
   if (demo === 'palette') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
   if (demo === 'integral') useEditor.setState({ tool: 'integral' });
+  if (demo === 'text') {
+    const { activeLayerId } = useEditor.getState();
+    if (activeLayerId) addAnnotation({ ...annotationDefaults('text'), layerId: activeLayerId, x1: 6, y1: 0.5, x2: 6, y2: 0.5, text: '生成物' });
+  }
   if (demo === 'selected') {
     const { activeLayerId } = useEditor.getState();
     if (activeLayerId) autoDetectSignals(activeLayerId, 0.03, false);

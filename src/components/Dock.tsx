@@ -6,7 +6,7 @@ import { IconButton, MenuButton } from './ui';
 /** 道具。hint の [ ] で囲んだ所はキーとして枠付きで出す */
 export const TOOLS: { id: Tool; label: string; key: string; icon: IconName; hint: string }[] = [
   { id: 'select', label: '選択・移動', key: 'V', icon: 'pointer', hint: '選択: 選んで動かす · 背景を左右にドラッグで移動、上下で高さ ([Shift] で全体)' },
-  { id: 'zoom', label: '範囲を拡大', key: 'Z', icon: 'zoom-in', hint: '拡大: ドラッグした範囲を拡大 · ダブルクリックで全体' },
+  { id: 'zoom', label: '範囲を拡大', key: 'Z', icon: 'zoom-in', hint: '拡大: 四角で囲んだ所を拡大 (縦は四角の上端まで) · ダブルクリックで全体' },
   { id: 'height', label: 'ピークの高さ', key: 'H', icon: 'nmr-height', hint: '高さ: 上下にドラッグ ([Shift] でそのスペクトルだけ)' },
   { id: 'peak', label: 'ピーク値', key: 'P', icon: 'nmr-peak', hint: 'ピーク値: クリックで付け外し' },
   { id: 'integral', label: '積分', key: 'I', icon: 'nmr-integral', hint: '積分: 左右にドラッグして範囲を選ぶ · 続けて何本でも · [Esc] で終わる' },

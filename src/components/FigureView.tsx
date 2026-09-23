@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { layerAt, toData, type LayerGeom } from '../lib/layout';
+import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
 import { annotationBox, buildScene, type PlacedAnnotation, type Scene } from '../lib/scene';
 import { snapToPeak } from '../lib/spectrum';
 import {
+  editAnnotationText,
   addAnnotation,
   addIntegral,
   addRegion,
@@ -47,7 +48,8 @@ type Gesture =
     }
   | { type: 'integral'; g: LayerGeom; x0: number; x1: number }
   | { type: 'integralEdge'; id: string; side: 'from' | 'to'; g: LayerGeom; token: number }
-  | { type: 'zoom' | 'region'; x0: number; x1: number }
+  | { type: 'zoom'; x0: number; x1: number; y0: number; y1: number }
+  | { type: 'region'; x0: number; x1: number }
   | { type: 'create'; kind: AnnotationKind; g: LayerGeom; x0: number; y0: number; x1: number; y1: number }
   | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; g: LayerGeom; token: number }
   | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; g: LayerGeom; token: number }
@@ -204,8 +206,14 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       return;
     }
 
-    if (tool === 'zoom' || tool === 'region') {
-      gesture.current = { type: tool, x0: x, x1: x };
+    if (tool === 'zoom') {
+      gesture.current = { type: 'zoom', x0: x, x1: x, y0: y, y1: y };
+      setDraft(gesture.current);
+      capture();
+      return;
+    }
+    if (tool === 'region') {
+      gesture.current = { type: 'region', x0: x, x1: x };
       setDraft(gesture.current);
       capture();
       return;
@@ -289,6 +297,10 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
         break;
       }
       case 'zoom':
+        cur.x1 = x;
+        cur.y1 = y;
+        setDraft({ ...cur });
+        break;
       case 'region':
         cur.x1 = x;
         setDraft({ ...cur });
@@ -342,10 +354,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     setDraft(null);
     if (!cur) return;
     if (cur.type === 'zoom') {
-      if (Math.abs(cur.x1 - cur.x0) > 4) {
-        setView({ xMax: layout.pxToX(Math.min(cur.x0, cur.x1)), xMin: layout.pxToX(Math.max(cur.x0, cur.x1)) });
-        fitY();
-      }
+      if (Math.abs(cur.x1 - cur.x0) > 4) zoomToBox(cur, layout, doc.view.yZoom);
     } else if (cur.type === 'drag') {
       if (cur.token !== null) endGesture(cur.token);
     } else if (cur.type === 'integralEdge') {
@@ -374,10 +383,15 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
   };
 
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const hit = (e.target as Element).closest('[data-hit]');
+    // ドラッグのためにポインタを図全体で受けているので、ダブルクリックの対象は図全体になる。場所から探し直す
+    const under = document.elementFromPoint(e.clientX, e.clientY) ?? (e.target as Element);
+    const hit = under.closest('[data-hit]') ?? (e.target as Element).closest('[data-hit]');
     if (hit) {
       const value = hit.getAttribute('data-hit') ?? '';
-      if (value.startsWith('annotation:')) document.getElementById('annotation-text')?.focus();
+      if (value.startsWith('annotation:')) {
+        const a = doc.annotations.find((x) => x.id === value.slice('annotation:'.length));
+        if (a?.kind === 'text') editAnnotationText();
+      }
       // アプリで描いた構造式は、ダブルクリックで描き直せる
       if (value.startsWith('image:')) {
         const image = doc.figureImages.find((x) => x.id === value.slice('image:'.length));
@@ -413,6 +427,28 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       {draft && <DraftOverlay draft={draft} scene={scene} />}
     </svg>
   );
+}
+
+/**
+ * 四角で拡大: 横は四角の範囲。縦は四角の上端が帯の上 (自動のときと同じ 95%) にくるように拡大し、下は基線のまま。
+ * 四角が薄い (左右になぞっただけ) か上端が基線より下なら、縦は今までどおり範囲の一番高いピークに合わせる
+ */
+function zoomToBox(box: { x0: number; x1: number; y0: number; y1: number }, layout: Layout, yZoom: number) {
+  const left = Math.min(box.x0, box.x1);
+  const right = Math.max(box.x0, box.x1);
+  const top = Math.min(box.y0, box.y1);
+  const bottom = Math.max(box.y0, box.y1);
+  const x = { xMax: layout.pxToX(left), xMin: layout.pxToX(right) };
+  const g = layerAt(layout, (left + right) / 2, bottom);
+  const above = g ? g.baseY - top : 0;
+  if (!g || bottom - top < 6 || above < 4) {
+    setView(x);
+    fitY();
+    return;
+  }
+  // 帯の高さ (縦倍率 1・倍率 1 のときの 1 の高さ)
+  const band = g.unit / (yZoom * g.layer.scale);
+  setView({ ...x, yZoom: (yZoom * 0.95 * band) / above });
 }
 
 function constrain(c: Extract<Gesture, { type: 'create' }>) {
@@ -655,7 +691,22 @@ function DraftOverlay({ draft, scene }: { draft: Gesture; scene: Scene }) {
     const x = Math.min(draft.x0, draft.x1);
     return <rect data-ui="draft" x={x} y={draft.g.bandTop} width={Math.abs(draft.x1 - draft.x0)} height={draft.g.baseY - draft.g.bandTop} className="integral-band" />;
   }
-  if (draft.type === 'zoom' || draft.type === 'region') {
+  if (draft.type === 'zoom') {
+    // 上下も自由な四角 (図の枠の中に収める)
+    const top = Math.max(plot.y, Math.min(draft.y0, draft.y1));
+    const bottom = Math.min(plot.y + plot.h, Math.max(draft.y0, draft.y1));
+    return (
+      <rect
+        data-ui="draft"
+        x={Math.min(draft.x0, draft.x1)}
+        y={top}
+        width={Math.abs(draft.x1 - draft.x0)}
+        height={Math.max(0, bottom - top)}
+        className="zoom-band"
+      />
+    );
+  }
+  if (draft.type === 'region') {
     const x = Math.min(draft.x0, draft.x1);
     return (
       <rect
@@ -664,7 +715,7 @@ function DraftOverlay({ draft, scene }: { draft: Gesture; scene: Scene }) {
         y={plot.y}
         width={Math.abs(draft.x1 - draft.x0)}
         height={plot.h}
-        className={draft.type === 'zoom' ? 'zoom-band' : 'region-band'}
+        className="region-band"
       />
     );
   }
