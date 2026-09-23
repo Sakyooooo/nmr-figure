@@ -79,6 +79,8 @@ interface EditorState {
   /** 画面の表示倍率。'fit' は枠に合わせる */
   viewZoom: number | 'fit';
   canvasTab: 'spectrum' | 'trend';
+  /** 右のパネル (インスペクター) のタブ */
+  inspectorTab: InspectorTab;
   /** home: 実験を選ぶ画面 / editor: 図を作る画面 */
   screen: 'home' | 'editor';
 }
@@ -112,6 +114,7 @@ export const useEditor = create<EditorState>(() => ({
   printRequest: 0,
   viewZoom: 'fit',
   canvasTab: 'spectrum',
+  inspectorTab: 'analysis',
   screen: 'home',
 }));
 
@@ -229,7 +232,14 @@ export function setTool(tool: Tool) {
 }
 
 export function select(selection: Selection) {
-  set({ selection });
+  // 選んだものの設定が見えるタブに切り替える (積分・ピーク値・マーカーは解析、図形・画像・凡例は図)
+  const tab = selection ? (selection.kind === 'integral' || selection.kind === 'peakLabel' || selection.kind === 'marker' ? 'analysis' : 'figure') : null;
+  set(tab ? { selection, inspectorTab: tab } : { selection });
+}
+
+export type InspectorTab = 'analysis' | 'figure' | 'record';
+export function setInspectorTab(tab: InspectorTab) {
+  set({ inspectorTab: tab });
 }
 
 /** 表示範囲の変更は履歴に積まない (拡大縮小のたびに履歴が埋まるため) */
@@ -662,7 +672,7 @@ export function addAnnotation(a: Omit<Annotation, 'id'>) {
   edit((d) => {
     d.annotations.push({ ...a, id });
   });
-  set({ selection: { kind: 'annotation', id }, tool: 'select' });
+  set({ selection: { kind: 'annotation', id }, tool: 'select', inspectorTab: 'figure' });
   return id;
 }
 
@@ -693,7 +703,7 @@ export function addFigureImage(item: { svg?: string | null; href?: string | null
       ratio: item.ratio || 0.7,
     });
   });
-  set({ selection: { kind: 'image', id }, tool: 'select' });
+  set({ selection: { kind: 'image', id }, tool: 'select', inspectorTab: 'figure' });
   return id;
 }
 
@@ -863,7 +873,7 @@ export function addIntegral(layerId: string, a: number, b: number) {
   edit((d) => {
     d.integrals.push({ id, layerId, from: Math.max(a, b), to: Math.min(a, b) });
   });
-  set({ selection: { kind: 'integral', id } });
+  set({ selection: { kind: 'integral', id }, inspectorTab: 'analysis' });
   return id;
 }
 

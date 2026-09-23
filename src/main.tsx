@@ -7,7 +7,9 @@ import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
 import { useEditor } from './state/store';
+import './styles/tokens.css';
 import './styles.css';
+import './styles/editor.css';
 
 // 古い版のタブがブラウザの保存領域を使ったままだと、閉じられるまで先に進めない。閉じてもらうまで上に出しておく
 window.addEventListener('nmr-db-blocked', () => {

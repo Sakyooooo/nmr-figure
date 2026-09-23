@@ -1,0 +1,110 @@
+/* 自動生成: npm run tokens (元: design/figma-plugin/code.js)。手で直さない */
+:root {
+  --font-ui: 'BIZ UDPGothic', 'BIZ UDPゴシック', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+
+  /* Color: 画面 (UI) の色 */
+  --color-bg-canvas: #ECEEF1; /* gray/100 · キャンバス (図の後ろ) とホームの背景 */
+  --color-bg-surface: #FFFFFF; /* gray/0 · パネル・ツールバー・ステータスバー */
+  --color-bg-raised: #FFFFFF; /* gray/0 · メニュー・ダイアログ・通知 (影と組み合わせる) */
+  --color-bg-subtle: #F4F5F7; /* gray/50 · 表の見出し・ツールのまとまり・無効な入力欄 */
+  --color-bg-hover: #ECEEF1; /* gray/100 · ホバーした行・ボタン */
+  --color-bg-selected: #EDF3FD; /* blue/50 · 選択中の行・ツール・チップ */
+  --color-bg-inverse: #282D34; /* gray/800 · ツールチップ */
+  --color-text-primary: #1A1E23; /* gray/900 · 本文。どの背景でも 14:1 以上 */
+  --color-text-secondary: #4F5661; /* gray/600 · 補足・ラベル。どの背景でも 6:1 以上 */
+  --color-text-tertiary: #646C78; /* gray/500 · 単位・件数・プレースホルダー。どの背景でも 4.5:1 以上 */
+  --color-text-disabled: #B4BBC4; /* gray/300 · 無効な文字だけ (コントラストの例外) */
+  --color-text-on-accent: #FFFFFF; /* gray/0 · 主色の上の文字 */
+  --color-text-accent: #1559B0; /* blue/700 · 選択中の文字・リンク (薄い青の上でも 6:1) */
+  --color-text-inverse: #FFFFFF; /* gray/0 · 暗い背景の上の文字 */
+  --color-border-subtle: #E2E5E9; /* gray/150 · 区切り線 (飾り) */
+  --color-border-default: #D3D8DE; /* gray/200 · パネル・紙の縁 */
+  --color-border-control: #858D99; /* gray/400 · 入力欄・チェックの境界。3:1 以上 */
+  --color-border-focus: #1A6FD6; /* blue/600 · フォーカスの輪 */
+  --color-accent-default: #1A6FD6; /* blue/600 · 一番の操作 (1 画面に 1 つ)・選択の印 */
+  --color-accent-hover: #1559B0; /* blue/700 · 主色のホバー */
+  --color-accent-pressed: #114890; /* blue/800 · 主色を押しているとき */
+  --color-accent-subtle: #DCE8FB; /* blue/100 · 選択中のホバー */
+  --color-danger-default: #C4271C; /* red/600 · 取り消せない操作の確認ボタン */
+  --color-danger-text: #B42318; /* red/700 · 削除などの文字 */
+  --color-status-success-fg: #1B7340; /* green/700 · 成功・同期中 */
+  --color-status-success-bg: #E8F5EC; /* green/50 */
+  --color-status-warning-fg: #8A5100; /* amber/700 · 注意・許可が必要 */
+  --color-status-warning-bg: #FFF3DC; /* amber/50 */
+  --color-status-error-fg: #B42318; /* red/700 · エラー */
+  --color-status-error-bg: #FDECEA; /* red/50 */
+  --color-status-info-fg: #1559B0; /* blue/700 · お知らせ */
+  --color-status-info-bg: #EDF3FD; /* blue/50 */
+  --color-status-literature-fg: #5B3AA6; /* purple/700 · 文献値から作図したスペクトルの印 */
+  --color-status-literature-bg: #F2EDFB; /* purple/50 */
+  --color-icon-default: #4F5661; /* gray/600 · アイコン */
+  --color-icon-subtle: #646C78; /* gray/500 · 目立たせないアイコン (開閉の矢印など) */
+
+  /* Data: 図の中身の色 (UI に使わない) */
+  --data-spectrum-1: #1F9E1F; /* スペクトル 1 本目 (Delta と同じ緑) */
+  --data-spectrum-2: #1F4FD1;
+  --data-spectrum-3: #D12B2B;
+  --data-spectrum-4: #8A2BD1;
+  --data-spectrum-5: #D17A00;
+  --data-spectrum-6: #0F8C8C;
+  --data-literature: #8A2BD1; /* 文献値から作図したスペクトル */
+  --data-ink: #000000; /* 軸・目盛り・ピーク値・積分 */
+  --data-marker-1: #C0392B; /* マーカー (6 色) */
+  --data-marker-2: #2E86C1;
+  --data-marker-3: #117A65;
+  --data-marker-4: #7D3C98;
+  --data-marker-5: #D68910;
+  --data-marker-6: #0B2A4A;
+
+  /* Spacing */
+  --spacing-2: 2px;
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-48: 48px;
+
+  /* Radius */
+  --radius-sm: 4px; /* 入力欄・チップ・バッジ */
+  --radius-md: 6px; /* ボタン・メニュー */
+  --radius-lg: 10px; /* ダイアログ */
+  --radius-full: 999px; /* トグルのつまみ・丸いチップだけ */
+
+  /* Size */
+  --size-control-sm: 28px; /* 小さい操作部品 (パネルの中) */
+  --size-control-md: 32px; /* 標準の操作部品 */
+  --size-control-lg: 40px; /* タッチ用 (最小の押せる大きさ) */
+  --size-icon-sm: 16px;
+  --size-icon-md: 20px;
+  --size-toolbar: 44px; /* ツールバーの高さ */
+  --size-statusbar: 28px; /* ステータスバーの高さ */
+  --size-panel-left: 260px; /* 左パネル (スペクトルの一覧) */
+  --size-panel-right: 320px; /* 右パネル (インスペクター) */
+
+  /* Motion (動きを減らす設定では 0) */
+  --motion-duration-fast: 120ms; /* ホバー・押す */
+  --motion-duration-normal: 200ms; /* 開閉・パネル・通知 */
+
+  /* Type: font の一括指定 (太さ 大きさ/行の高さ 字体) */
+  --type-title: 700 18px/26px var(--font-ui);
+  --type-heading: 700 14px/20px var(--font-ui);
+  --type-body: 400 14px/22px var(--font-ui);
+  --type-body-strong: 700 14px/22px var(--font-ui);
+  --type-label: 400 13px/18px var(--font-ui);
+  --type-label-strong: 700 13px/18px var(--font-ui);
+  --type-numeric: 400 13px/18px var(--font-ui);
+
+  /* Elevation (重なるものだけ) */
+  --elevation-1: 0px 1px 2px 0px rgba(16, 24, 40, 0.06), 0px 4px 12px 0px rgba(16, 24, 40, 0.1); /* メニュー・ツールチップ・通知・浮かぶパネル */
+  --elevation-2: 0px 2px 6px 0px rgba(16, 24, 40, 0.08), 0px 12px 32px 0px rgba(16, 24, 40, 0.18); /* ダイアログ */
+  --focus-ring: 0px 0px 0px 2px #FFFFFF, 0px 0px 0px 4px #1A6FD6; /* フォーカスの輪: 2px の隙間 + 2px の主色 (コードでは outline 2px + offset 2px) */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-normal: 0ms;
+  }
+}

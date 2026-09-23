@@ -1,0 +1,9 @@
+{
+  "name": "NMR Design System Builder",
+  "id": "nmr-figure-ds-builder-local",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["none"] }
+}

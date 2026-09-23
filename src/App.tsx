@@ -1,26 +1,21 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { CommandPalette } from './components/CommandPalette';
 import { ReferenceDialog, SettingsDialog } from './components/Dialogs';
 import { DialogHost } from './components/DialogHost';
+import { Dock, TOOLS, ToolHint } from './components/Dock';
 import { FigureView } from './components/FigureView';
 import { Home } from './components/Home';
-import { IntegralPanel } from './components/IntegralPanel';
-import { PeakPanel } from './components/PeakPanel';
-import { ProcessingPanel } from './components/ProcessingPanel';
-import { SiPanel } from './components/SiPanel';
-import { SyncPanel } from './components/SyncPanel';
-import { useSync } from './state/deltaSync';
-import { ImpurityPanel, MarkerPanel } from './components/ImpurityPanel';
+import { Icon } from './components/Icon';
+import { Inspector } from './components/Inspector';
 import { Figure2dView } from './components/Figure2dView';
 import { StructureEditorHost } from './components/StructureEditorHost';
 import { PrintView } from './components/PrintView';
 import { SiImportDialog } from './components/SiImportDialog';
-import { Plot2dPanel, Spectrum2dPanel } from './components/Plot2dPanel';
+import { Spectrum2dPanel } from './components/Plot2dPanel';
 import { LayerPanel, ViewPanel } from './components/LayerPanel';
-import { FigurePanel, PropertiesPanel } from './components/PropertiesPanel';
-import { TemplatePanel } from './components/TemplatePanel';
-import { TOOLS, Toolbar } from './components/Toolbar';
+import { TopBar } from './components/TopBar';
 import { TrendChart } from './components/TrendChart';
-import { TrendPanel } from './components/TrendPanel';
+import { IconButton, Kbd } from './components/ui';
 import { computeLayout } from './lib/layout';
 import { PROJECT_EXT } from './lib/projectFile';
 import { copyFigure, openDialog, openFiles, saveProject } from './state/fileOps';
@@ -35,7 +30,6 @@ import {
   pasteAnnotation,
   redo,
   select,
-  setCanvasTab,
   setTool,
   setViewZoom,
   togglePanel,
@@ -50,6 +44,7 @@ export default function App() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const is2d = useEditor((s) => !!s.doc.plot2d);
   const hasData = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
@@ -64,7 +59,7 @@ export default function App() {
   const [w, h] = tab === 'trend' ? [trend.width, trend.height] : [figure.width, figure.height];
   const paperWidth = usePaperWidth(scrollRef, w, h, `${ui.leftOpen}${ui.rightOpen}${hasData}${screen}`);
 
-  useKeyboard(svgRef, w, paperWidth);
+  useKeyboard(svgRef, w, paperWidth, () => setPaletteOpen(true));
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -79,7 +74,6 @@ export default function App() {
     document.title = `${dirty && hasData ? '● ' : ''}${projectName ?? '無題'} - NMR Figure Editor`;
   }, [dirty, hasData, projectName]);
 
-  const columns = { '--left': ui.leftOpen ? '250px' : '0px', '--right': ui.rightOpen ? '300px' : '0px' } as CSSProperties;
   const dropProps = (mode: 'add' | 'new') => ({
     onDragOver: (e: React.DragEvent) => {
       if (!e.dataTransfer.types.includes('Files')) return;
@@ -118,30 +112,12 @@ export default function App() {
     );
   }
 
+  const leftShown = ui.leftOpen && hasData;
+  const rightShown = ui.rightOpen && hasData;
   return (
-    <div className="app" style={columns} {...dropProps('add')}>
-      <Toolbar svgRef={svgRef} onSettings={() => setSettingsOpen(true)} onImportSi={() => openSiImport()} />
-      <aside className={`panel left${ui.leftOpen ? '' : ' closed'}`}>
-        {is2d ? (
-          <Spectrum2dPanel />
-        ) : (
-          <>
-            <LayerPanel />
-            <ViewPanel />
-          </>
-        )}
-      </aside>
-      <main className="canvas">
-        {hasData && !is2d && (
-          <nav className="canvas-tabs" aria-label="表示の切り替え">
-            <button className={tab === 'spectrum' ? 'active' : ''} onClick={() => setCanvasTab('spectrum')}>
-              スペクトル
-            </button>
-            <button className={tab === 'trend' ? 'active' : ''} onClick={() => setCanvasTab('trend')}>
-              推移グラフ
-            </button>
-          </nav>
-        )}
+    <div className={`editor${leftShown ? ' left-open' : ''}${rightShown ? ' right-open' : ''}`} {...dropProps('add')}>
+      <TopBar svgRef={svgRef} onSettings={() => setSettingsOpen(true)} onImportSi={() => openSiImport()} onCommand={() => setPaletteOpen(true)} />
+      <main className="stage">
         <div className="canvas-scroll" ref={scrollRef}>
           {hasData ? (
             <div className="paper" style={{ width: paperWidth }}>
@@ -151,41 +127,40 @@ export default function App() {
             <EmptyState />
           )}
         </div>
-        {hasData && <StatusBar zoom={paperWidth / w} />}
-      </main>
-      <aside className={`panel right${ui.rightOpen ? '' : ' closed'}`}>
-        {is2d ? (
-          <>
-            <Plot2dPanel />
-            <FigurePanel />
-            <TemplatePanel />
-          </>
-        ) : tab === 'trend' ? (
-          <TrendPanel />
-        ) : (
-          <>
-            <PropertiesPanel />
-            <ProcessingPanel />
-            <SyncPanel />
-            <IntegralPanel />
-            <PeakPanel />
-            <SiPanel />
-            <ImpurityPanel />
-            <MarkerPanel />
-            <FigurePanel />
-            <TemplatePanel />
-            <TrendPanel />
-          </>
+        {hasData && (
+          <div className="stage-top">
+            <ToolHint />
+          </div>
         )}
-      </aside>
+        <aside className="float-panel left" aria-label={is2d ? '2D スペクトル' : 'スペクトル'} hidden={!leftShown}>
+          {is2d ? (
+            <Spectrum2dPanel />
+          ) : (
+            <>
+              <LayerPanel />
+              <ViewPanel />
+            </>
+          )}
+        </aside>
+        <aside className="float-panel right" aria-label="右のパネル" hidden={!rightShown}>
+          <Inspector />
+        </aside>
+        {hasData && <ZoomControl zoom={paperWidth / w} />}
+        {hasData && (
+          <div className="stage-bottom">
+            <Dock />
+          </div>
+        )}
+        <Toast />
+      </main>
       <StructureEditorHost />
       {dragging && <div className="drop-overlay">ここにドロップ (.jdf は追加、{PROJECT_EXT} は開く)</div>}
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}
+      {paletteOpen && <CommandPalette svgRef={svgRef} onClose={() => setPaletteOpen(false)} onSettings={() => setSettingsOpen(true)} />}
       <PrintView svgRef={svgRef} />
       <DialogHost />
-      <Toast />
     </div>
   );
 }
@@ -197,7 +172,12 @@ function usePaperWidth(ref: RefObject<HTMLDivElement | null>, w: number, h: numb
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    // 浮かぶパネル・道具の帯の分は padding で空けてあるので、その内側に収める
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const px = (v: string) => parseFloat(v) || 0;
+      setBox({ w: el.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight), h: el.clientHeight - px(cs.paddingTop) - px(cs.paddingBottom) });
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -209,89 +189,71 @@ function usePaperWidth(ref: RefObject<HTMLDivElement | null>, w: number, h: numb
     // パネルの開閉で枠の大きさが変わるので測り直す
   }, [ref, layoutKey]);
   if (zoom !== 'fit') return Math.round(w * zoom);
-  const pad = 24;
-  return Math.max(240, Math.floor(Math.min(box.w - pad, ((box.h - pad) * w) / h)));
+  return Math.max(240, Math.floor(Math.min(box.w, (box.h * w) / h)));
 }
 
+/** 何もないとき: 何がないか → 次にやること (よく使うものにはキー) → 保存の場所 */
 function EmptyState() {
   return (
-    <div className="empty">
-      <h1>NMR Figure Editor</h1>
-      <p>Delta で処理した .jdf をここにドロップしてください。複数のファイルをまとめて重ね書きできます。</p>
-      <button className="primary big" onClick={() => void openDialog('new')}>
-        ファイルを開く
-      </button>
-      <p className="hint">データはこのパソコンの中だけで処理され、外部には送信されません。</p>
+    <div className="empty-state">
+      <span className="empty-icon" aria-hidden="true">
+        <Icon name="nmr-spectrum" size={32} />
+      </span>
+      <h1>スペクトルがありません</h1>
+      <p className="secondary">測定の .jdf をこの画面にドロップするか、下から選んでください</p>
+      <div className="empty-actions" role="group" aria-label="始め方">
+        <button type="button" className="empty-row" onClick={() => void openDialog('new')}>
+          <Icon name="folder-open" />
+          <span className="grow">ファイルを開く</span>
+          <Kbd>Ctrl+O</Kbd>
+        </button>
+        <button type="button" className="empty-row" onClick={() => useEditor.setState({ screen: 'home' })}>
+          <Icon name="house" />
+          <span className="grow">ホームの一覧から選ぶ</span>
+        </button>
+        <button type="button" className="empty-row" onClick={() => openSiImport()}>
+          <Icon name="book-open" />
+          <span className="grow">文献値から作図 (SI の文を貼る)</span>
+        </button>
+      </div>
+      <p className="tertiary">
+        データはこのパソコンの中だけで処理され、外部には送信されません。
+        <br />
+        図はこのブラウザに自動で保存されます。ほかのパソコンでは見えないので、残したい図はファイルに保存してください
+      </p>
     </div>
   );
 }
 
-/** 画面の下に、Delta との同期の様子を出す (同期しているスペクトルがあるときだけ) */
-function SyncIndicator() {
-  const links = useSync((s) => s.links);
-  const list = Object.values(links).filter((v) => v.status !== 'duplicate');
-  if (!list.length) return null;
-  const bad = list.find((v) => v.status === 'need-permission' || v.status === 'error');
-  const busy = list.some((v) => v.status === 'pending' || v.status === 'waiting');
-  const last = Math.max(0, ...list.map((v) => v.lastSyncAt ?? 0));
-  const text = bad
-    ? bad.status === 'need-permission'
-      ? 'Delta: 書き込みの許可が必要'
-      : 'Delta: エラー'
-    : busy
-      ? 'Delta と同期中…'
-      : `Delta と同期${last ? ` ${new Date(last).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
-  return (
-    <span className={`sync-indicator${bad ? ' warn' : ''}`} title={bad?.message || '右の「Delta との同期・記録」で詳しく見られます'}>
-      {text}
-    </span>
-  );
-}
-
-function StatusBar({ zoom }: { zoom: number }) {
+/** 左下: カーソルの δ・表示倍率・全体表示・縦を自動 */
+function ZoomControl({ zoom }: { zoom: number }) {
   const cursor = useEditor((s) => s.cursorPpm);
-  const autoSavedAt = useEditor((s) => s.autoSavedAt);
-  const projectName = useEditor((s) => s.projectName);
-  const dirty = useEditor((s) => s.dirty);
   const cursor2d = useEditor((s) => s.cursor2d);
-  const tool = useEditor((s) => s.tool);
   const tab = useEditor((s) => s.canvasTab);
   const is2d = useEditor((s) => !!s.doc.plot2d);
   const viewZoom = useEditor((s) => s.viewZoom);
-  const t = TOOLS.find((x) => x.id === tool);
+  const readout = is2d
+    ? cursor2d
+      ? `F2 ${cursor2d.x.toFixed(2)}, F1 ${cursor2d.y.toFixed(2)}`
+      : ''
+    : tab === 'spectrum' && cursor !== null
+      ? `δ ${cursor.toFixed(3)} ppm`
+      : '';
   return (
-    <div className="status">
-      {is2d && (
+    <div className="zoom-control bar">
+      <span className="readout num">{readout}</span>
+      <IconButton icon="minus" size="sm" label="縮小" shortcut="-" onClick={() => setViewZoom(stepZoom(zoom, -1))} />
+      <button type="button" className={`zoom-value num${viewZoom === 'fit' ? ' on' : ''}`} onClick={() => setViewZoom('fit')} title="画面に合わせる">
+        {Math.round(zoom * 100)}%
+      </button>
+      <IconButton icon="plus" size="sm" label="拡大" shortcut="+" onClick={() => setViewZoom(stepZoom(zoom, 1))} />
+      {tab === 'spectrum' && (
         <>
-          <span>{tool === 'zoom' ? '範囲を拡大 (ドラッグ)' : 'ドラッグで移動・ホイールで拡大縮小'}</span>
-          <span className="cursor">{cursor2d ? `F2 ${cursor2d.x.toFixed(2)} , F1 ${cursor2d.y.toFixed(2)} ppm` : ''}</span>
+          <span className="bar-sep" aria-hidden="true" />
+          <IconButton icon="expand" size="sm" label="全体を表示" shortcut="0" onClick={fullRange} />
+          {!is2d && <IconButton icon="fit-y" size="sm" label="縦を自動 (表示範囲の最大ピークに合わせる)" shortcut="F" onClick={fitY} />}
         </>
       )}
-      {!is2d && tab === 'spectrum' && (
-        <>
-          <span>{t?.label}</span>
-          <span className="cursor">{cursor !== null ? `δ ${cursor.toFixed(3)} ppm` : ''}</span>
-        </>
-      )}
-      <SyncIndicator />
-      <span className="saved" title="図はブラウザにも自動で保存されるので、閉じても続きから作業できます">
-        {projectName ? `${projectName}${dirty ? ' (未保存の変更あり)' : ' に保存済み'}` : 'ファイル未保存'}
-        {autoSavedAt ? ` · 自動保存 ${new Date(autoSavedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}` : ''}
-      </span>
-      <span className="keys">
-        {is2d ? 'ダブルクリック: 全体表示 · Z: 範囲を拡大 · V: 移動 · [ ]: パネル' : '背景を左右ドラッグ: 移動 · 上下ドラッグ: 高さ (Shift で全体) · Ctrl+Z: 元に戻す · [ ]: パネル'}
-      </span>
-      <span className="zoom">
-        <button className="mini" onClick={() => setViewZoom(stepZoom(zoom, -1))} title="縮小 (-)">
-          −
-        </button>
-        <button className={`mini${viewZoom === 'fit' ? ' active' : ''}`} onClick={() => setViewZoom('fit')} title="画面に合わせる">
-          {Math.round(zoom * 100)}%
-        </button>
-        <button className="mini" onClick={() => setViewZoom(stepZoom(zoom, 1))} title="拡大 (+)">
-          ＋
-        </button>
-      </span>
     </div>
   );
 }
@@ -301,22 +263,30 @@ function stepZoom(current: number, dir: 1 | -1) {
   return next ?? current;
 }
 
+/** 知らせ。エラーは閉じるまで残す。それ以外は数秒で消える */
 function Toast() {
   const message = useEditor((s) => s.message);
   useEffect(() => {
-    if (!message) return;
-    const timer = setTimeout(() => useEditor.setState({ message: null }), message.kind === 'error' ? 7000 : 3500);
+    if (!message || message.kind === 'error') return;
+    const timer = setTimeout(() => useEditor.setState({ message: null }), 4000);
     return () => clearTimeout(timer);
   }, [message]);
   if (!message) return null;
+  const error = message.kind === 'error';
   return (
-    <div className={`toast ${message.kind}`} role="status" onClick={() => useEditor.setState({ message: null })}>
-      {message.text}
+    <div className={`toast${error ? ' error' : ''}`} role={error ? 'alert' : 'status'}>
+      <span className="toast-icon" aria-hidden="true">
+        <Icon name={error ? 'circle-x' : 'circle-check'} />
+      </span>
+      <span className="grow">{message.text}</span>
+      <IconButton icon="x" size="sm" label="閉じる" onClick={() => useEditor.setState({ message: null })} />
     </div>
   );
 }
 
-function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: number, paperWidth: number) {
+function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: number, paperWidth: number, openPalette: () => void) {
+  const paletteRef = useRef(openPalette);
+  paletteRef.current = openPalette;
   const zoomRef = useRef(1);
   zoomRef.current = paperWidth / figureWidth;
   useEffect(() => {
@@ -329,6 +299,11 @@ function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: numbe
       if (ctrl && key === 's') {
         e.preventDefault();
         saveProject(e.shiftKey);
+        return;
+      }
+      if (ctrl && key === 'k' && useEditor.getState().screen === 'editor') {
+        e.preventDefault();
+        paletteRef.current();
         return;
       }
       if (ctrl && key === 'o') {

@@ -6,6 +6,7 @@ import { SOLVENTS, tableResidual } from '../lib/solvents';
 import { setReferenceOffset, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { RichHtml } from './RichText';
+import { ICON_LICENSE } from './iconPaths';
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -271,6 +272,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </label>
       </section>
       <p className="hint">設定はこのブラウザに保存されます (図のファイルには含まれません)。</p>
+      <details className="sub">
+        <summary>使っているもの (ライセンス)</summary>
+        <p className="hint" style={{ whiteSpace: 'pre-wrap' }}>
+          アイコン: {ICON_LICENSE}
+          {'\n'}構造式エディタ: Ketcher (EPAM Systems、Apache License 2.0)
+        </p>
+      </details>
     </Modal>
   );
 }

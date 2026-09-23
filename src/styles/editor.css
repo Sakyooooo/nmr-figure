@@ -1,0 +1,730 @@
+/*
+ * 編集画面 (案 B「図を最大に」) と共通の部品。値はすべて tokens.css (Figma の変数と同じ) を使う。
+ * 図の中身 (FigureView の SVG) の見た目はここでは触らない
+ */
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- 共通の部品 ---------- */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 var(--spacing-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+.kbd.inverse {
+  background: transparent;
+  border-color: var(--color-text-tertiary);
+  color: var(--color-text-inverse);
+}
+
+.ibtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-control-md);
+  height: var(--size-control-md);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-icon-default);
+}
+.ibtn.sm {
+  width: var(--size-control-sm);
+  height: var(--size-control-sm);
+}
+.ibtn.tool {
+  width: var(--size-control-lg);
+  height: var(--size-control-lg);
+}
+.ibtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+.ibtn.on {
+  background: var(--color-bg-selected);
+  color: var(--color-text-accent);
+}
+.ibtn.on:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+}
+.ibtn:disabled {
+  opacity: 1;
+  color: var(--color-text-disabled);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  flex: none;
+  height: var(--size-control-md);
+  padding: 0 var(--spacing-12);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: var(--type-body);
+}
+.btn:hover:not(:disabled),
+.btn.on {
+  background: var(--color-bg-hover);
+}
+.btn.primary {
+  border-color: var(--color-accent-default);
+  background: var(--color-accent-default);
+  color: var(--color-text-on-accent);
+}
+.btn.primary:hover:not(:disabled) {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+}
+.btn:disabled {
+  opacity: 1;
+  border-color: var(--color-border-default);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-disabled);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: var(--elevation-1);
+}
+.bar-sep {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 var(--spacing-4);
+  background: var(--color-border-default);
+}
+
+/* メニュー (書き出し・ファイル・図形) */
+.menu-root {
+  position: relative;
+  display: inline-flex;
+}
+.menu {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  box-shadow: var(--elevation-1);
+}
+.menu.bottom-start {
+  top: calc(100% + var(--spacing-4));
+  left: 0;
+}
+.menu.bottom-end {
+  top: calc(100% + var(--spacing-4));
+  right: 0;
+}
+.menu.top {
+  bottom: calc(100% + var(--spacing-12));
+  left: 50%;
+  min-width: 200px;
+  transform: translateX(-50%);
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-height: var(--size-control-md);
+  padding: var(--spacing-4) var(--spacing-12);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: var(--type-body);
+  text-align: left;
+  white-space: normal;
+}
+.menu-item:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+.menu-item:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.menu-item .icon-svg {
+  flex: none;
+  color: var(--color-icon-default);
+}
+.menu-item:disabled {
+  opacity: 1;
+  color: var(--color-text-disabled);
+}
+.menu-label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.menu-hint,
+.menu-shortcut {
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+}
+.menu-shortcut {
+  margin-left: var(--spacing-16);
+}
+.menu-divider {
+  height: 1px;
+  margin: var(--spacing-4) 0;
+  background: var(--color-border-subtle);
+}
+
+/* 右のパネルのタブ */
+.tabs {
+  display: flex;
+  flex: none;
+  gap: var(--spacing-4);
+  padding: 0 var(--spacing-8);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.tab {
+  height: 40px;
+  padding: 0 var(--spacing-12);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--type-body);
+}
+.tab:hover:not(:disabled) {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+.tab.on {
+  border-bottom-color: var(--color-accent-default);
+  color: var(--color-text-primary);
+  font: var(--type-body-strong);
+}
+
+/* ---------- 編集画面の枠 ---------- */
+.editor {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-canvas);
+}
+
+/* 上の帯 */
+.topbar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-4);
+  height: var(--size-toolbar);
+  padding: 0 var(--spacing-8);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+.topbar-sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--spacing-4);
+  background: var(--color-border-default);
+}
+.file-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: 300px;
+  height: 40px;
+  padding: 0 var(--spacing-8);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+}
+.file-menu:hover:not(:disabled),
+.file-menu.on {
+  background: var(--color-bg-hover);
+}
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--type-body-strong);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-name .icon-svg {
+  flex: none;
+  color: var(--color-icon-subtle);
+}
+.file-state {
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+  white-space: nowrap;
+}
+.segmented {
+  display: flex;
+  gap: 2px;
+  margin-left: var(--spacing-8);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+.segmented button {
+  height: var(--size-control-sm);
+  padding: 0 var(--spacing-12);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+}
+.segmented button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+.segmented button.on {
+  background: var(--color-bg-surface);
+  box-shadow: inset 0 0 0 1px var(--color-border-default);
+  color: var(--color-text-primary);
+  font: var(--type-label-strong);
+}
+.command-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  width: 280px;
+  min-width: 160px;
+  height: var(--size-control-md);
+  padding: 0 var(--spacing-8) 0 var(--spacing-12);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+  font: var(--type-body);
+  text-align: left;
+}
+.command-search:hover {
+  background: var(--color-bg-hover);
+}
+.sync-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-8);
+  height: var(--size-control-sm);
+  margin-right: var(--spacing-4);
+  padding: 0 var(--spacing-12);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-fg);
+  font: var(--type-label);
+}
+.sync-pill:hover {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.sync-pill.warn {
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-fg);
+}
+.sync-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+/* 図の場所 (ここに浮かぶパネル・道具の帯が重なる) */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.stage .canvas-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  /* 上: 使い方の一行、下: 道具の帯の分を空ける */
+  padding: 56px var(--spacing-12) 80px;
+}
+.editor.left-open .canvas-scroll {
+  padding-left: calc(var(--size-panel-left) + var(--spacing-24));
+}
+.editor.right-open .canvas-scroll {
+  padding-right: calc(var(--size-panel-right) + var(--spacing-24));
+}
+.stage .paper {
+  flex: none;
+  margin: auto;
+  background: var(--color-bg-surface);
+  outline: 1px solid var(--color-border-default);
+}
+
+.stage-top,
+.stage-bottom {
+  position: absolute;
+  right: var(--spacing-12);
+  left: var(--spacing-12);
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.stage-top {
+  top: var(--spacing-12);
+}
+.stage-bottom {
+  bottom: var(--spacing-16);
+}
+.editor.left-open .stage-top,
+.editor.left-open .stage-bottom {
+  left: calc(var(--size-panel-left) + var(--spacing-24));
+}
+.editor.right-open .stage-top,
+.editor.right-open .stage-bottom {
+  right: calc(var(--size-panel-right) + var(--spacing-24));
+}
+.stage-top > *,
+.stage-bottom > * {
+  pointer-events: auto;
+}
+.tool-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: var(--size-control-md);
+  padding: var(--spacing-4) var(--spacing-16);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font: var(--type-label);
+  text-align: center;
+  pointer-events: none !important;
+}
+.dock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+.tool-caret {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-right: 4px solid currentColor;
+}
+
+.zoom-control {
+  position: absolute;
+  bottom: var(--spacing-16);
+  left: var(--spacing-12);
+  z-index: 2;
+  padding-left: var(--spacing-8);
+  box-shadow: none;
+}
+.zoom-control .readout {
+  min-width: 108px;
+  color: var(--color-text-tertiary);
+  font: var(--type-numeric);
+  font-variant-numeric: tabular-nums;
+}
+.zoom-value {
+  min-width: 52px;
+  height: var(--size-control-sm);
+  padding: 0 var(--spacing-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+  font-variant-numeric: tabular-nums;
+}
+.zoom-value:hover {
+  background: var(--color-bg-hover);
+}
+.zoom-value.on {
+  color: var(--color-text-accent);
+}
+
+/* 浮かぶパネル */
+.float-panel {
+  position: absolute;
+  top: var(--spacing-12);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: var(--elevation-1);
+}
+.float-panel.left {
+  left: var(--spacing-12);
+  width: var(--size-panel-left);
+  /* 下に倍率の帯の分を空ける */
+  max-height: calc(100% - var(--spacing-12) - 72px);
+  overflow-y: auto;
+}
+.float-panel.right {
+  right: var(--spacing-12);
+  bottom: var(--spacing-12);
+  width: var(--size-panel-right);
+}
+.inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--spacing-24);
+}
+
+/* 知らせ (エラーは閉じるまで残る) */
+.toast {
+  position: fixed;
+  bottom: 88px;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: var(--spacing-4) var(--spacing-4) var(--spacing-4) var(--spacing-12);
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-raised);
+  box-shadow: var(--elevation-1);
+  color: var(--color-text-primary);
+  font: var(--type-body);
+}
+.home-root .toast {
+  bottom: var(--spacing-24);
+}
+.toast-icon {
+  display: flex;
+  color: var(--color-status-success-fg);
+}
+.toast.error {
+  border-color: var(--color-status-error-fg);
+}
+.toast.error .toast-icon {
+  color: var(--color-status-error-fg);
+}
+
+/* 操作を探す (Ctrl+K) */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(26, 30, 35, 0.24);
+}
+.palette {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-raised);
+  box-shadow: var(--elevation-2);
+}
+.palette-input {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-12);
+  height: 56px;
+  padding: 0 var(--spacing-16);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-icon-subtle);
+}
+.palette-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: 400 18px/26px var(--font-ui);
+}
+.palette-list {
+  overflow-y: auto;
+  padding: var(--spacing-8);
+}
+.palette-group {
+  padding: var(--spacing-8) var(--spacing-12) var(--spacing-4);
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  min-height: var(--size-control-lg);
+  padding: 0 var(--spacing-12);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.palette-item .icon-svg {
+  flex: none;
+  color: var(--color-icon-default);
+}
+.palette-item.on {
+  background: var(--color-bg-selected);
+}
+.palette-item.on .icon-svg {
+  color: var(--color-text-accent);
+}
+.palette-empty {
+  margin: 0;
+  padding: var(--spacing-24);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.palette-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-16);
+  height: 40px;
+  padding: 0 var(--spacing-16);
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+}
+
+/* 何もないとき */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-12);
+  width: min(420px, 100%);
+  margin: auto;
+  text-align: center;
+}
+.empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-subtle);
+  color: var(--color-icon-default);
+}
+.empty-state h1 {
+  margin: var(--spacing-4) 0 0;
+  font: var(--type-title);
+}
+.empty-state .secondary {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin-top: var(--spacing-8);
+}
+.empty-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  height: var(--size-control-lg);
+  padding: 0 var(--spacing-12);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: var(--type-body);
+  text-align: left;
+}
+.empty-row:hover:not(:disabled) {
+  background: var(--color-border-subtle);
+}
+.empty-row .icon-svg {
+  color: var(--color-icon-default);
+}
+.empty-state .tertiary {
+  margin: var(--spacing-16) 0 0;
+  color: var(--color-text-tertiary);
+  font: var(--type-label);
+}
+
+/* タッチでは押す所を大きく */
+@media (pointer: coarse) {
+  .ibtn,
+  .ibtn.sm {
+    width: var(--size-control-lg);
+    height: var(--size-control-lg);
+  }
+  .btn {
+    height: var(--size-control-lg);
+  }
+}
+
+/* 幅が狭いとき (1,024 未満): パネルは図に重ねて出す。図の場所は空けない */
+@media (max-width: 1023px) {
+  .editor.left-open .canvas-scroll,
+  .editor.right-open .canvas-scroll {
+    padding-right: var(--spacing-12);
+    padding-left: var(--spacing-12);
+  }
+  .editor.left-open .stage-top,
+  .editor.left-open .stage-bottom,
+  .editor.right-open .stage-top,
+  .editor.right-open .stage-bottom {
+    right: var(--spacing-12);
+    left: var(--spacing-12);
+  }
+  .command-search {
+    width: auto;
+  }
+  .command-search .grow,
+  .command-search .kbd {
+    display: none;
+  }
+}

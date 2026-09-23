@@ -13,10 +13,13 @@ import { titleText } from '../lib/layout';
 import { Check, ColorInput, NumberInput, Section, TextInput } from './inputs';
 import { RichHtml } from './RichText';
 
-export function PropertiesPanel() {
+/** 選んだものの設定。only で、右のパネルのどのタブに出すものかを絞る (解析: 積分・ピーク値・マーカー / 図: それ以外) */
+export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
   const selection = useEditor((s) => s.selection);
   const doc = useEditor((s) => s.doc);
   if (!selection) return null;
+  const analysis = selection.kind === 'integral' || selection.kind === 'marker' || selection.kind === 'peakLabel';
+  if ((only === 'analysis' && !analysis) || (only === 'figure' && analysis)) return null;
 
   if (selection.kind === 'integral') {
     return (

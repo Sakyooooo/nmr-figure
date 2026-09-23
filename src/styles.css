@@ -1,19 +1,19 @@
 :root {
-  --bg: #eef0f3;
-  --panel: #ffffff;
-  --line: #d9dde3;
-  --line-strong: #c3c9d1;
-  --text: #1f2328;
-  --muted: #667085;
-  --accent: #1a6fd6;
-  --accent-soft: #e6f0fc;
-  --danger: #c0392b;
-  --radius: 6px;
+  /* 古い名前は tokens.css (Figma と同じ) を指す。新しく書く所では tokens の名前を直接使う */
+  --bg: var(--color-bg-canvas);
+  --panel: var(--color-bg-surface);
+  --line: var(--color-border-subtle);
+  --line-strong: var(--color-border-control);
+  --text: var(--color-text-primary);
+  --muted: var(--color-text-secondary);
+  --accent: var(--color-accent-default);
+  --accent-soft: var(--color-bg-selected);
+  --danger: var(--color-danger-text);
+  --radius: var(--radius-md);
   color-scheme: light;
-  font-family: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
-  font-size: 13px;
-  color: var(--text);
-  background: var(--bg);
+  font: var(--type-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg-canvas);
 }
 
 * {
@@ -116,95 +116,6 @@ input.color {
   cursor: pointer;
 }
 
-/* レイアウト */
-.app {
-  display: grid;
-  grid-template-columns: var(--left, 250px) minmax(0, 1fr) var(--right, 300px);
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100vh;
-}
-
-.toolbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  flex-wrap: wrap;
-}
-.toolbar .group {
-  display: flex;
-  gap: 4px;
-  padding-right: 10px;
-  border-right: 1px solid var(--line);
-}
-.toolbar .group:last-of-type {
-  border-right: none;
-}
-.toolbar .spacer {
-  flex: 1;
-}
-
-.panel {
-  background: var(--panel);
-  overflow-y: auto;
-  padding-bottom: 24px;
-}
-.panel.left {
-  grid-column: 1;
-  grid-row: 2;
-  border-right: 1px solid var(--line);
-}
-.panel.right {
-  grid-column: 3;
-  grid-row: 2;
-  border-left: 1px solid var(--line);
-}
-.panel.closed {
-  display: none;
-}
-
-.canvas {
-  grid-column: 2;
-  grid-row: 2;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.canvas-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 6px 12px 0;
-}
-.canvas-tabs button {
-  border-radius: var(--radius) var(--radius) 0 0;
-  border-bottom: none;
-  background: #e2e5ea;
-  color: var(--muted);
-}
-.canvas-tabs button.active {
-  background: #fff;
-  color: var(--text);
-  font-weight: 600;
-}
-.canvas-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  padding: 12px;
-}
-.paper {
-  flex: none;
-  margin: auto;
-  background: #fff;
-  box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.08),
-    0 4px 16px rgba(16, 24, 40, 0.06);
-}
 .figure {
   display: block;
   width: 100%;
@@ -298,63 +209,7 @@ input.color {
   stroke-dasharray: 4 3;
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 3px 12px;
-  background: #fff;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.status .cursor {
-  min-width: 110px;
-  color: var(--text);
-}
-.status .saved {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
-}
-.status .keys {
-  margin-left: auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.status .zoom {
-  display: inline-flex;
-  gap: 2px;
-}
-.status .zoom button {
-  min-width: 26px;
-}
-.status .zoom button.active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 
-.empty {
-  margin: auto;
-  align-self: center;
-  max-width: 460px;
-  text-align: center;
-  padding: 40px 28px;
-  border: 2px dashed var(--line-strong);
-  border-radius: 12px;
-  background: #fff;
-}
-.empty h1 {
-  font-size: 22px;
-  margin: 0 0 10px;
-}
-.empty p {
-  color: var(--muted);
-  line-height: 1.6;
-}
 
 .drop-overlay {
   position: fixed;
@@ -370,23 +225,6 @@ input.color {
   z-index: 20;
 }
 
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 44px;
-  transform: translateX(-50%);
-  max-width: min(640px, 90vw);
-  padding: 9px 16px;
-  border-radius: 8px;
-  background: #1f2328;
-  color: #fff;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-  z-index: 30;
-  cursor: pointer;
-}
-.toast.error {
-  background: var(--danger);
-}
 
 /* パネルの中身 */
 .section {
