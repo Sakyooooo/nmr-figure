@@ -50,7 +50,7 @@ export function IntegralPanel() {
           title="溶媒の残存ピークと、不純物マーカーを付けたピークは除きます"
           onClick={() => {
             const n = autoDetectSignals(layer.id, threshold / 100, visibleOnly);
-            notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えると基準が決まります` : '新しく積分する信号はありませんでした');
+            notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えると基準が決まります` : '新しく積分する信号はありませんでした', 'info', { undo: n > 0 });
           }}
         >
           自動で積分

@@ -682,7 +682,7 @@ async function buildButton() {
 async function buildIconButton() {
   await variantSet(
     'IconButton',
-    { Style: ['Ghost', 'Selected'], Size: ['Md', 'Sm'], State: ['Default', 'Hover', 'Disabled'] },
+    { Style: ['Ghost', 'Selected'], Size: ['Lg', 'Md', 'Sm'], State: ['Default', 'Hover', 'Disabled'] },
     async (c, { Style, Size, State }) => {
       c.layoutMode = 'HORIZONTAL';
       c.counterAxisAlignItems = 'CENTER';
@@ -699,14 +699,15 @@ async function buildIconButton() {
       if (Size === 'Sm') icon.rescale(0.8);
       recolor(icon, ic);
       c.appendChild(icon);
-      const s = Size === 'Md' ? 32 : 28;
+      const s = { Lg: 40, Md: 32, Sm: 28 }[Size];
+      const token = { Lg: 'size/control/lg', Md: 'size/control/md', Sm: 'size/control/sm' }[Size];
       c.resize(s, s);
       c.primaryAxisSizingMode = 'FIXED';
       c.counterAxisSizingMode = 'FIXED';
-      c.setBoundVariable('width', V[Size === 'Md' ? 'size/control/md' : 'size/control/sm']);
-      c.setBoundVariable('height', V[Size === 'Md' ? 'size/control/md' : 'size/control/sm']);
+      c.setBoundVariable('width', V[token]);
+      c.setBoundVariable('height', V[token]);
     },
-    { description: 'アイコンだけのボタン。必ずツールチップ (名前とショートカット) と aria-label を付ける。Selected はツールの選択・パネルの開閉の状態' },
+    { width: 1100, description: 'アイコンだけのボタン。必ずツールチップ (名前とショートカット) と aria-label を付ける。Selected は道具の選択・パネルの開閉の状態。Lg は図の下の道具の帯 (タッチでも押せる 40px)' },
   );
   propOn('IconButton', 'Icon', 'INSTANCE_SWAP', ICON.pointer.id, (c, k) => {
     c.findOne((n) => n.type === 'INSTANCE' && n.name === 'Icon').componentPropertyReferences = { mainComponent: k };
@@ -1401,80 +1402,131 @@ async function patternsPage(page) {
 
 // ---- 編集画面
 async function editorScreen(page, x) {
+  // 案 B「図を最大に」: 図が画面いっぱい。一覧と右のパネルは図の上に浮かぶ。道具は図の下の中央 (アプリの App.tsx と同じ置き方)
   const W = 1440;
   const H = 900;
-  const root = box('VERTICAL', 'Screen/Editor 1D — 1440', { fill: 'color/bg/canvas' });
-  size(root, W, H);
+  const root = figma.createFrame();
+  root.name = 'Screen/Editor 1D — 1440 (案 B)';
+  root.resize(W, H);
+  fill(root, 'color/bg/canvas');
   root.clipsContent = true;
   root.x = x;
   root.y = 0;
   page.appendChild(root);
+  const floating = async (node) => node.setEffectStyleIdAsync(EFFECT['Elevation/1'].id);
+  const kbd = async (label) => {
+    const k = box('HORIZONTAL', `Kbd ${label}`, { pad: [0, 'spacing/4'], stroke: 'color/border/default', radius: 'radius/sm', fill: 'color/bg/surface', align: 'CENTER' });
+    k.appendChild(await txt(label, 'Type/Label', 'color/text/tertiary'));
+    return k;
+  };
 
-  // ツールバー
-  const tb = box('HORIZONTAL', 'Toolbar', { gap: 'spacing/4', pad: [0, 'spacing/8'], fill: 'color/bg/surface', align: 'CENTER' });
+  // 上の帯: ホーム・一覧の開閉 | 図の名前 (ファイルの操作)・表示の切り替え | 操作を探す | Delta の状態・書き出し・図をコピー・設定・右のパネル
+  const tb = box('HORIZONTAL', 'Top bar', { gap: 'spacing/4', pad: [0, 'spacing/8'], fill: 'color/bg/surface', align: 'CENTER' });
   strokeSides(tb, 'color/border/subtle', { bottom: 1 });
-  add(root, tb, { fillW: true });
+  root.appendChild(tb);
   size(tb, W, 44);
   tb.setBoundVariable('height', V['size/toolbar']);
-  tb.appendChild(iconBtn('panel-left', 'Selected', 'Md', 'Default', 'Toggle left panel'));
   tb.appendChild(iconBtn('house', 'Ghost', 'Md', 'Default', 'Home'));
+  tb.appendChild(iconBtn('panel-left', 'Selected', 'Md', 'Default', 'Toggle spectra ([)'));
   divider(tb);
-  const doc = box('HORIZONTAL', 'Document', { gap: 'spacing/8', pad: [0, 'spacing/8'], align: 'CENTER' });
-  doc.appendChild(await txt('反応追跡_サンプル A', 'Type/Body Strong', 'color/text/primary'));
-  doc.appendChild(await txt('保存済み', 'Type/Label', 'color/text/tertiary'));
+  const doc = box('VERTICAL', 'File menu (開く・保存・別名で保存・文献値から)', { pad: [0, 'spacing/8'] });
+  const dn = box('HORIZONTAL', 'Name', { gap: 'spacing/4', align: 'CENTER' });
+  dn.appendChild(await txt('反応追跡_サンプル A', 'Type/Body Strong', 'color/text/primary'));
+  const chev = ICON['chevron-down'].createInstance();
+  chev.rescale(0.8);
+  recolor(chev, 'color/icon/subtle');
+  dn.appendChild(chev);
+  doc.appendChild(dn);
+  doc.appendChild(await txt('保存済み · 自動保存 11:42', 'Type/Label', 'color/text/tertiary'));
   tb.appendChild(doc);
-  tb.appendChild(iconBtn('folder-open', 'Ghost', 'Md', 'Default', 'Open'));
-  tb.appendChild(iconBtn('save', 'Ghost', 'Md', 'Default', 'Save'));
-  divider(tb);
-  tb.appendChild(iconBtn('undo', 'Ghost', 'Md', 'Default', 'Undo'));
-  tb.appendChild(iconBtn('redo', 'Ghost', 'Md', 'Disabled', 'Redo'));
+  const seg = box('HORIZONTAL', 'View switch', { gap: 'spacing/2', pad: ['spacing/2', 'spacing/2'], fill: 'color/bg/subtle', radius: 'radius/md' });
+  for (const [l, on] of [
+    ['スペクトル', true],
+    ['推移グラフ', false],
+  ]) {
+    const b = box('HORIZONTAL', l, { pad: [0, 'spacing/12'], radius: 'radius/sm', align: 'CENTER', fill: on ? 'color/bg/surface' : null });
+    size(b, undefined, 28);
+    if (on) stroke(b, 'color/border/default');
+    b.appendChild(await txt(l, on ? 'Type/Label Strong' : 'Type/Label', on ? 'color/text/primary' : 'color/text/secondary'));
+    seg.appendChild(b);
+  }
+  tb.appendChild(seg);
   spacer(tb);
-  const tools = box('HORIZONTAL', 'Tools', { gap: 'spacing/2', pad: ['spacing/2', 'spacing/2'], fill: 'color/bg/subtle', radius: 'radius/md', align: 'CENTER' });
-  tb.appendChild(tools);
-  const tool = (icon, sel) => tools.appendChild(iconBtn(icon, sel ? 'Selected' : 'Ghost', 'Md', 'Default', `Tool: ${icon}`));
-  tool('pointer', true);
-  tool('zoom-in');
-  tool('nmr-height');
-  divider(tools, 'V', 16);
-  tool('nmr-peak');
-  tool('nmr-integral');
-  tool('nmr-marker');
-  tool('nmr-region');
-  tool('nmr-reference');
-  divider(tools, 'V', 16);
-  tool('ellipse');
-  tool('type');
-  tool('hexagon');
+  const search = box('HORIZONTAL', 'Command search (Ctrl+K)', { gap: 'spacing/8', pad: [0, 'spacing/8', 0, 'spacing/12'], fill: 'color/bg/subtle', stroke: 'color/border/default', radius: 'radius/md', align: 'CENTER' });
+  size(search, 280, 32);
+  const si = ICON.search.createInstance();
+  si.rescale(0.8);
+  recolor(si, 'color/icon/subtle');
+  search.appendChild(si);
+  add(search, await txt('操作を探す', 'Type/Body', 'color/text/tertiary'), { fillW: true });
+  search.appendChild(await kbd('Ctrl+K'));
+  tb.appendChild(search);
   spacer(tb);
-  tb.appendChild(iconBtn('expand', 'Ghost', 'Md', 'Default', 'Fit all'));
-  tb.appendChild(iconBtn('fit-y', 'Ghost', 'Md', 'Default', 'Fit height'));
-  divider(tb);
+  const sync = box('HORIZONTAL', 'Sync status', { gap: 'spacing/8', pad: [0, 'spacing/12'], fill: 'color/status/success/bg', radius: 'radius/full', align: 'CENTER' });
+  size(sync, undefined, 28);
+  const dot = figma.createEllipse();
+  dot.resize(8, 8);
+  fill(dot, 'color/status/success/fg');
+  sync.appendChild(dot);
+  sync.appendChild(await txt('Delta と同期 11:42', 'Type/Label', 'color/status/success/fg'));
+  tb.appendChild(sync);
   tb.appendChild(await btn('書き出し', 'Secondary', 'Md', 'download'));
   tb.appendChild(await btn('図をコピー', 'Primary', 'Md', 'copy'));
   tb.appendChild(iconBtn('settings', 'Ghost', 'Md', 'Default', 'Settings'));
-  tb.appendChild(iconBtn('panel-right', 'Selected', 'Md', 'Default', 'Toggle right panel'));
+  tb.appendChild(iconBtn('panel-right', 'Selected', 'Md', 'Default', 'Toggle right panel (])'));
 
-  // 本体
-  const body = box('HORIZONTAL', 'Body');
-  add(root, body, { fillW: true, fillH: true });
+  // 図 (紙): 左右のパネルのあいだの真ん中
+  const paper = await figure(760, 540);
+  paper.x = 314;
+  paper.y = 150;
+  root.appendChild(paper);
 
-  // 左: スペクトルの一覧
-  const left = box('VERTICAL', 'Left panel — Spectra', { fill: 'color/bg/surface' });
-  strokeSides(left, 'color/border/subtle', { right: 1 });
-  body.appendChild(left);
+  // 選んだ積分の真上の操作の帯
+  const selBar = box('HORIZONTAL', 'Selection bar (積分)', { gap: 'spacing/2', pad: ['spacing/2', 'spacing/4'], fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/md', align: 'CENTER' });
+  selBar.appendChild(await txt('積分', 'Type/Label Strong', 'color/text/secondary'));
+  const sv = variant('Input', { State: 'Default' });
+  setText(sv, 'Input', 'Value', '4.05');
+  setText(sv, 'Input', 'Unit', 'H');
+  sv.resize(96, sv.height);
+  selBar.appendChild(sv);
+  divider(selBar, 'V', 20);
+  selBar.appendChild(iconBtn('trash', 'Ghost', 'Sm', 'Default', 'Delete'));
+  selBar.appendChild(iconBtn('x', 'Ghost', 'Sm', 'Default', 'Deselect (Esc)'));
+  root.appendChild(selBar);
+  await floating(selBar);
+  selBar.x = paper.x + 300;
+  selBar.y = paper.y + 70;
+
+  // 使い方の一行 (道具を選ぶと出る)
+  const hint = box('HORIZONTAL', 'Tool hint', { gap: 'spacing/8', pad: [0, 'spacing/16'], fill: 'color/bg/inverse', radius: 'radius/full', align: 'CENTER' });
+  size(hint, undefined, 32);
+  hint.appendChild(await txt('積分: 左右にドラッグして範囲を選ぶ · 続けて何本でも ·', 'Type/Label', 'color/text/inverse'));
+  const hk = box('HORIZONTAL', 'Kbd Esc', { pad: [0, 'spacing/4'], stroke: 'color/text/tertiary', radius: 'radius/sm', align: 'CENTER' });
+  hk.appendChild(await txt('Esc', 'Type/Label', 'color/text/inverse'));
+  hint.appendChild(hk);
+  hint.appendChild(await txt('で終わる', 'Type/Label', 'color/text/inverse'));
+  root.appendChild(hint);
+  hint.x = Math.round(694 - hint.width / 2);
+  hint.y = 56;
+
+  // 左: スペクトルの一覧 (浮かぶパネル)
+  const left = box('VERTICAL', 'Spectra panel', { fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/lg' });
   size(left, 260, undefined);
-  left.layoutSizingVertical = 'FILL';
+  root.appendChild(left);
+  left.x = 12;
+  left.y = 56;
+  await floating(left);
   const lh = box('HORIZONTAL', 'Header', { gap: 'spacing/8', pad: [0, 'spacing/4', 0, 'spacing/12'], align: 'CENTER' });
   add(left, lh, { fillW: true });
-  size(lh, 260, 44);
+  size(lh, undefined, 44);
   lh.appendChild(await txt('スペクトル', 'Type/Heading', 'color/text/primary'));
   lh.appendChild(await txt('3', 'Type/Label', 'color/text/tertiary'));
   spacer(lh);
-  lh.appendChild(iconBtn('plus', 'Ghost', 'Sm', 'Default', 'Add spectrum (測定 / 文献値から作図)'));
+  lh.appendChild(iconBtn('plus', 'Ghost', 'Sm', 'Default', 'Add (ファイル / 文献値から作図)'));
   const names = [
-    ['0 h', '¹H · 399.8 MHz · C6D6', true],
-    ['6 h', '¹H · 399.8 MHz · C6D6', false],
-    ['24 h', '¹H · 399.8 MHz · C6D6', false],
+    ['0 h', '¹H · C6D6 · 15:42', true],
+    ['6 h', '¹H · C6D6 · 21:40', false],
+    ['24 h', '¹H · C6D6 · 15:38', false],
   ];
   for (let i = 0; i < names.length; i++) {
     const r = variant('ListRow', { Selected: names[i][2] ? 'True' : 'False' });
@@ -1484,111 +1536,75 @@ async function editorScreen(page, x) {
     if (sw) sw.fills = [paint(`data/spectrum/${i + 1}`)];
     add(left, r, { fillW: true });
   }
-  spacer(left, 'V');
-  const vr = variant('SectionHeader', { Expanded: 'True' });
-  setText(vr, 'SectionHeader', 'Title', '表示範囲');
-  hideChild(vr, 'Count');
-  setBool(vr, 'SectionHeader', 'Show action', false);
-  add(left, vr, { fillW: true });
-  const range = box('HORIZONTAL', 'Range', { gap: 'spacing/8', pad: ['spacing/4', 'spacing/12', 'spacing/16', 'spacing/12'], align: 'CENTER' });
-  add(left, range, { fillW: true });
-  const i1 = variant('Input', { State: 'Default' });
-  setText(i1, 'Input', 'Value', '12.00');
-  add(range, i1, { fillW: true });
-  range.appendChild(await txt('–', 'Type/Body', 'color/text/tertiary'));
-  const i2 = variant('Input', { State: 'Default' });
-  setText(i2, 'Input', 'Value', '-0.50');
-  add(range, i2, { fillW: true });
-
-  // 中央: キャンバス
-  const canvas = box('VERTICAL', 'Canvas', { fill: 'color/bg/canvas' });
-  add(body, canvas, { fillW: true, fillH: true });
-  const tabs = box('HORIZONTAL', 'Canvas tabs', { gap: 'spacing/4', pad: [0, 'spacing/16'] });
-  add(canvas, tabs, { fillW: true });
-  for (const [l, s] of [
-    ['スペクトル', 'True'],
-    ['推移グラフ', 'False'],
+  const det = box('VERTICAL', 'Selected spectrum', { gap: 'spacing/8', pad: ['spacing/12', 'spacing/12'] });
+  strokeSides(det, 'color/border/subtle', { top: 1 });
+  add(left, det, { fillW: true });
+  for (const [label, value, unit] of [
+    ['名前', '0 h', ''],
+    ['時間', '0', 'h'],
+    ['倍率', '1', ''],
+    ['溶媒', 'C6D6', ''],
   ]) {
-    const t = variant('Tab', { Selected: s });
-    setText(t, 'Tab', 'Label', l);
-    tabs.appendChild(t);
+    const row = box('HORIZONTAL', `Field: ${label}`, { gap: 'spacing/8', align: 'CENTER' });
+    add(det, row, { fillW: true });
+    const l = await txt(label, 'Type/Label', 'color/text/secondary');
+    l.resize(40, l.height);
+    row.appendChild(l);
+    const inp = label === '溶媒' ? variant('Select', { State: 'Default' }) : variant('Input', { State: 'Default' });
+    if (label === '溶媒') setText(inp, 'Select', 'Value', value);
+    else {
+      setText(inp, 'Input', 'Value', value);
+      if (unit) setText(inp, 'Input', 'Unit', unit);
+      else hideChild(inp, 'Unit');
+    }
+    add(row, inp, { fillW: true });
   }
-  const stage = box('VERTICAL', 'Stage', { align: 'CENTER', justify: 'CENTER' });
-  add(canvas, stage, { fillW: true, fillH: true });
-  stage.appendChild(await figure(780, 520));
 
-  // 右: インスペクター
-  const right = box('VERTICAL', 'Inspector', { fill: 'color/bg/surface' });
-  strokeSides(right, 'color/border/subtle', { left: 1 });
-  body.appendChild(right);
-  size(right, 320, undefined);
-  right.layoutSizingVertical = 'FILL';
+  // 右: インスペクター (解析 / 図 / 記録)
+  const right = box('VERTICAL', 'Inspector', { fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/lg' });
+  right.clipsContent = true;
+  size(right, 320, 832);
+  root.appendChild(right);
+  right.x = W - 12 - 320;
+  right.y = 56;
+  await floating(right);
   const rt = box('HORIZONTAL', 'Tabs', { gap: 'spacing/4', pad: [0, 'spacing/8'] });
   strokeSides(rt, 'color/border/subtle', { bottom: 1 });
   add(right, rt, { fillW: true });
   for (const [l, s] of [
     ['解析', 'True'],
     ['図', 'False'],
-    ['データ', 'False'],
+    ['記録', 'False'],
   ]) {
     const t = variant('Tab', { Selected: s });
     setText(t, 'Tab', 'Label', l);
     rt.appendChild(t);
   }
-  // 選択中の積分 (インスペクターの一番上に固定)
-  const sel = box('VERTICAL', 'Selection — Integral', { gap: 'spacing/12', pad: ['spacing/16', 'spacing/12'], fill: 'color/bg/subtle' });
+  const sel = box('VERTICAL', 'Selected integral', { gap: 'spacing/12', pad: ['spacing/16', 'spacing/12'], fill: 'color/bg/subtle' });
   strokeSides(sel, 'color/border/subtle', { bottom: 1 });
   add(right, sel, { fillW: true });
-  const sh = box('HORIZONTAL', 'Head', { gap: 'spacing/8', align: 'CENTER' });
-  add(sel, sh, { fillW: true });
-  sh.appendChild(await txt('選択中の積分', 'Type/Heading', 'color/text/primary'));
-  spacer(sh);
-  sh.appendChild(await btn('削除', 'Danger', 'Sm'));
-  const field = async (label, nodes) => {
-    const row = box('HORIZONTAL', `Field: ${label}`, { gap: 'spacing/8', align: 'CENTER' });
-    add(sel, row, { fillW: true });
-    const l = await txt(label, 'Type/Label', 'color/text/secondary');
-    l.resize(72, l.height);
-    row.appendChild(l);
-    for (const n of nodes) add(row, n, { fillW: n.type === 'INSTANCE' && n.name.startsWith('Input') });
-    return row;
-  };
-  const a = variant('Input', { State: 'Focus' });
-  setText(a, 'Input', 'Value', '3.690');
-  a.name = 'Input: from';
-  const b2 = variant('Input', { State: 'Default' });
-  setText(b2, 'Input', 'Value', '3.640');
-  b2.name = 'Input: to';
-  await field('範囲', [a, await txt('–', 'Type/Body', 'color/text/tertiary'), b2]);
-  const val = variant('Input', { State: 'Default' });
-  setText(val, 'Input', 'Value', '4.05');
-  setText(val, 'Input', 'Unit', 'H');
-  val.name = 'Input: value';
-  const refc = variant('Checkbox', { Checked: 'False', State: 'Default' });
-  setText(refc, 'Checkbox', 'Label', '基準');
-  await field('値', [val, refc]);
-  const base = variant('Select', { State: 'Default' });
-  setText(base, 'Select', 'Value', 'Delta と同じ (両端 11 点)');
-  base.name = 'Input: baseline';
-  await field('ベースライン', [base]);
-  base.layoutSizingHorizontal = 'FILL';
-
+  sel.appendChild(await txt('選択中の積分', 'Type/Heading', 'color/text/primary'));
+  const rr = box('HORIZONTAL', 'Range', { gap: 'spacing/8', align: 'CENTER' });
+  add(sel, rr, { fillW: true });
+  for (const v of ['3.690', '3.640']) {
+    const inp = variant('Input', { State: v === '3.690' ? 'Focus' : 'Default' });
+    setText(inp, 'Input', 'Value', v);
+    add(rr, inp, { fillW: true });
+  }
+  sel.appendChild(await btn('削除', 'Danger', 'Sm'));
   const ih = variant('SectionHeader', { Expanded: 'True' });
   setText(ih, 'SectionHeader', 'Title', '積分');
   setText(ih, 'SectionHeader', 'Count', '5');
   add(right, ih, { fillW: true });
-  const ib = box('VERTICAL', 'Integrals', { gap: 'spacing/12', pad: ['spacing/4', 'spacing/12', 'spacing/16', 'spacing/12'] });
+  const ib = box('VERTICAL', 'Integrals', { gap: 'spacing/8', pad: ['spacing/4', 'spacing/12', 'spacing/16', 'spacing/12'] });
   add(right, ib, { fillW: true });
   const actions = box('HORIZONTAL', 'Actions', { gap: 'spacing/8' });
   ib.appendChild(actions);
   actions.appendChild(await btn('自動で積分', 'Secondary', 'Sm'));
-  actions.appendChild(await btn('手で引く', 'Ghost', 'Sm', 'nmr-integral'));
+  actions.appendChild(await btn('手で引く', 'Secondary', 'Sm'));
+  actions.appendChild(await btn('全部消す', 'Danger', 'Sm'));
   const table = box('VERTICAL', 'Table');
   add(ib, table, { fillW: true });
-  const head = box('HORIZONTAL', 'Head', { pad: ['spacing/4', 'spacing/8'], fill: 'color/bg/subtle' });
-  add(table, head, { fillW: true });
-  add(head, await txt('範囲 (ppm)', 'Type/Label', 'color/text/secondary'), { fillW: true });
-  head.appendChild(await txt('値', 'Type/Label', 'color/text/secondary'));
   for (const [r, v, s] of [
     ['7.320 – 7.250', '2.00', false],
     ['4.120 – 4.050', '2.02', false],
@@ -1596,7 +1612,7 @@ async function editorScreen(page, x) {
     ['2.310 – 2.270', '3.01', false],
     ['1.350 – 1.300', '6.04', false],
   ]) {
-    const row = box('HORIZONTAL', `Row ${r}`, { pad: ['spacing/8', 'spacing/8'], fill: s ? 'color/bg/selected' : 'color/bg/surface' });
+    const row = box('HORIZONTAL', `Row ${r}`, { pad: ['spacing/4', 'spacing/8'], fill: s ? 'color/bg/selected' : 'color/bg/surface' });
     strokeSides(row, 'color/border/subtle', { bottom: 1 });
     add(table, row, { fillW: true });
     add(row, await txt(r, 'Type/Numeric', 'color/text/primary'), { fillW: true });
@@ -1604,6 +1620,8 @@ async function editorScreen(page, x) {
   }
   for (const [t, c] of [
     ['ピーク値', '7'],
+    ['不純物の候補', ''],
+    ['マーカー・凡例', ''],
     ['SI 用テキスト', ''],
   ]) {
     const h = variant('SectionHeader', { Expanded: 'False' });
@@ -1613,28 +1631,47 @@ async function editorScreen(page, x) {
     add(right, h, { fillW: true });
   }
 
-  // ステータスバー
-  const sb = box('HORIZONTAL', 'Status bar', { gap: 'spacing/16', pad: [0, 'spacing/12'], fill: 'color/bg/surface', align: 'CENTER' });
-  strokeSides(sb, 'color/border/subtle', { top: 1 });
-  add(root, sb, { fillW: true });
-  size(sb, W, 28);
-  sb.setBoundVariable('height', V['size/statusbar']);
-  sb.appendChild(await txt('選択', 'Type/Label', 'color/text/secondary'));
-  sb.appendChild(await txt('δ 7.262 ppm', 'Type/Numeric', 'color/text/secondary'));
-  spacer(sb);
-  const sync = box('HORIZONTAL', 'Sync', { gap: 'spacing/4', align: 'CENTER' });
-  const dot = figma.createEllipse();
-  dot.resize(8, 8);
-  fill(dot, 'color/status/success/fg');
-  sync.appendChild(dot);
-  sync.appendChild(await txt('Delta と同期 11:42', 'Type/Label', 'color/text/secondary'));
-  sb.appendChild(sync);
-  sb.appendChild(await txt('自動保存 11:42', 'Type/Label', 'color/text/secondary'));
-  const zoom = box('HORIZONTAL', 'Zoom', { gap: 'spacing/2', align: 'CENTER' });
-  zoom.appendChild(iconBtn('minus', 'Ghost', 'Sm', 'Default', 'Zoom out'));
-  zoom.appendChild(await txt('100%', 'Type/Numeric', 'color/text/secondary'));
-  zoom.appendChild(iconBtn('plus', 'Ghost', 'Sm', 'Default', 'Zoom in'));
-  sb.appendChild(zoom);
+  // 左下: カーソルの δ・倍率・全体表示・縦を自動
+  const zoom = box('HORIZONTAL', 'Zoom control', { gap: 'spacing/2', pad: ['spacing/4', 'spacing/4', 'spacing/4', 'spacing/8'], fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/lg', align: 'CENTER' });
+  const ro = await txt('δ 7.262 ppm', 'Type/Numeric', 'color/text/tertiary');
+  ro.resize(100, ro.height);
+  zoom.appendChild(ro);
+  zoom.appendChild(iconBtn('minus', 'Ghost', 'Sm', 'Default', 'Zoom out (-)'));
+  zoom.appendChild(await txt('86%', 'Type/Label', 'color/text/secondary'));
+  zoom.appendChild(iconBtn('plus', 'Ghost', 'Sm', 'Default', 'Zoom in (+)'));
+  zoom.appendChild(iconBtn('expand', 'Ghost', 'Sm', 'Default', 'Show all (0)'));
+  zoom.appendChild(iconBtn('fit-y', 'Ghost', 'Sm', 'Default', 'Fit height (F)'));
+  root.appendChild(zoom);
+  zoom.x = 12;
+  zoom.y = H - 16 - zoom.height;
+
+  // 下の中央: 元に戻す・やり直す | 道具 (見る | 解析 | 描く)
+  const dock = box('HORIZONTAL', 'Dock', { gap: 'spacing/8', align: 'CENTER' });
+  const quick = box('HORIZONTAL', 'Undo / Redo', { gap: 'spacing/2', pad: ['spacing/4', 'spacing/4'], fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/lg', align: 'CENTER' });
+  quick.appendChild(iconBtn('undo', 'Ghost', 'Lg', 'Default', 'Undo (Ctrl+Z)'));
+  quick.appendChild(iconBtn('redo', 'Ghost', 'Lg', 'Disabled', 'Redo (Ctrl+Y)'));
+  dock.appendChild(quick);
+  const tools = box('HORIZONTAL', 'Tools', { gap: 'spacing/2', pad: ['spacing/4', 'spacing/4'], fill: 'color/bg/surface', stroke: 'color/border/subtle', radius: 'radius/lg', align: 'CENTER' });
+  const tool = (icon, on, name) => tools.appendChild(iconBtn(icon, on ? 'Selected' : 'Ghost', 'Lg', 'Default', name));
+  tool('pointer', false, 'Select (V)');
+  tool('zoom-in', false, 'Zoom (Z)');
+  tool('nmr-height', false, 'Height (H)');
+  divider(tools, 'V', 24);
+  tool('nmr-peak', false, 'Peak (P)');
+  tool('nmr-integral', true, 'Integral (I)');
+  tool('nmr-marker', false, 'Marker (M)');
+  tool('nmr-region', false, 'Trend range (G)');
+  tool('nmr-reference', false, 'Reference (B)');
+  divider(tools, 'V', 24);
+  tool('ellipse', false, 'Shapes (O R A L)');
+  tool('type', false, 'Text (T)');
+  tool('hexagon', false, 'Structure');
+  dock.appendChild(tools);
+  root.appendChild(dock);
+  await floating(quick);
+  await floating(tools);
+  dock.x = Math.round(694 - dock.width / 2);
+  dock.y = H - 16 - dock.height;
   return root;
 }
 
@@ -1666,7 +1703,7 @@ async function homeScreen(page, x) {
   hd.appendChild(await btn('フォルダを変更', 'Ghost', 'Sm'));
   spacer(hd);
   hd.appendChild(await btn('ファイルを開く', 'Secondary', 'Md', 'folder-open'));
-  hd.appendChild(await btn('編集中の図に戻る', 'Primary', 'Md'));
+  hd.appendChild(await btn('編集中の図に戻る', 'Secondary', 'Md', 'arrow-right'));
 
   const fb = box('HORIZONTAL', 'Filters', { gap: 'spacing/8', pad: ['spacing/12', 'spacing/24'], align: 'CENTER' });
   strokeSides(fb, 'color/border/subtle', { bottom: 1 });

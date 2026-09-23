@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { beginGesture, edit, endGesture, loadDocument, redo, undo, useEditor } from './store';
+import { beginGesture, edit, endGesture, loadDocument, notify, redo, select, undo, useEditor } from './store';
 import { emptyDocument } from './types';
 
 const width = () => useEditor.getState().doc.figure.width;
@@ -47,5 +47,29 @@ describe('元に戻す / やり直し', () => {
     const t = beginGesture();
     endGesture(t);
     expect(useEditor.getState().past).toHaveLength(0);
+  });
+});
+
+describe('右のパネルのタブと、元に戻せる知らせ', () => {
+  beforeEach(() => loadDocument(emptyDocument(), {}, null, null));
+
+  it('選んだものに合わせてタブが切り替わる (積分は解析、図形は図)', () => {
+    select({ kind: 'integral', id: 'x' });
+    expect(useEditor.getState().inspectorTab).toBe('analysis');
+    select({ kind: 'annotation', id: 'y' });
+    expect(useEditor.getState().inspectorTab).toBe('figure');
+    // 選ぶのをやめてもタブはそのまま
+    select(null);
+    expect(useEditor.getState().inspectorTab).toBe('figure');
+  });
+
+  it('「元に戻す」付きの知らせは、そのときの履歴の深さを覚える', () => {
+    edit((d) => {
+      d.figure.width = 500;
+    });
+    notify('変えました', 'info', { undo: true });
+    expect(useEditor.getState().message?.undoDepth).toBe(1);
+    notify('ただの知らせ');
+    expect(useEditor.getState().message?.undoDepth).toBeUndefined();
   });
 });

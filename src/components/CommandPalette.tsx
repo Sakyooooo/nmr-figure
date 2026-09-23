@@ -193,7 +193,7 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
       run: () => {
         if (!activeLayerId) return;
         const n = autoDetectSignals(activeLayerId, 0.03, false);
-        notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えると基準が決まります` : '新しく積分する信号はありませんでした');
+        notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えると基準が決まります` : '新しく積分する信号はありませんでした', 'info', { undo: n > 0 });
       },
       enabled: !!layer,
     },
@@ -205,7 +205,7 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
       run: () => {
         if (!activeLayerId) return;
         const n = autoPeakLabels(activeLayerId, 0.05, false);
-        notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした');
+        notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした', 'info', { undo: n > 0 });
       },
       enabled: !!layer,
     },

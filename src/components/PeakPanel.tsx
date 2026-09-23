@@ -46,7 +46,7 @@ export function PeakPanel() {
         <button
           onClick={() => {
             const n = autoPeakLabels(layer.id, threshold / 100, !visibleOnly);
-            notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした');
+            notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした', 'info', { undo: n > 0 });
           }}
           title="溶媒や不純物のピークも拾います。いらないものは表の × で消せます"
         >

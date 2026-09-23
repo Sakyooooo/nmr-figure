@@ -131,6 +131,7 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
             allowEmpty
             step={0.5}
             width={72}
+            title={`時間 (${timeUnit})。空欄なら名前か測定時刻から`}
             placeholder={String(parseTime(layer.label) ?? (meta.acquiredAt ? '自動' : index))}
             onCommit={(time) => setLayer({ time })}
           />
@@ -139,9 +140,9 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
 
         <span>倍率</span>
         <span className="row">
-          <NumberInput value={layer.scale} step={0.1} min={0.01} width={64} onCommit={(v) => setLayer({ scale: v ?? 1 })} />
+          <NumberInput value={layer.scale} step={0.1} min={0.01} width={64} title="倍率" onCommit={(v) => setLayer({ scale: v ?? 1 })} />
           <span className="muted">線幅</span>
-          <NumberInput value={layer.lineWidth} step={0.25} min={0.25} max={5} width={56} onCommit={(v) => setLayer({ lineWidth: v ?? 1 })} />
+          <NumberInput value={layer.lineWidth} step={0.25} min={0.25} max={5} width={56} title="線幅" onCommit={(v) => setLayer({ lineWidth: v ?? 1 })} />
         </span>
 
         <span>溶媒</span>
@@ -236,7 +237,7 @@ export function ViewPanel() {
         </span>
         <span>縦倍率</span>
         <span className="row">
-          <NumberInput value={round(view.yZoom)} step={0.1} min={0.01} width={64} onCommit={(v) => v !== null && setView({ yZoom: v })} />
+          <NumberInput value={round(view.yZoom)} step={0.1} min={0.01} width={64} title="縦倍率" onCommit={(v) => v !== null && setView({ yZoom: v })} />
           <IconButton icon="arrow-up" size="sm" label="高くする (小さいピークを見やすく)" onClick={() => scaleY(1.5)} />
           <IconButton icon="arrow-down" size="sm" label="低くする" onClick={() => scaleY(1 / 1.5)} />
         </span>

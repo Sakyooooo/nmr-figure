@@ -62,7 +62,8 @@ interface EditorState {
   settings: Settings;
   fileHandle: FileHandle | null;
   projectName: string | null;
-  message: { text: string; kind: 'info' | 'error'; at: number } | null;
+  /** 知らせ。undoDepth があれば、履歴がその深さのままのあいだ「元に戻す」を出す */
+  message: { text: string; kind: 'info' | 'error'; at: number; undoDepth?: number } | null;
   pendingReference: { layerId: string; ppm: number } | null;
   clipboard: Annotation | null;
   /** ブラウザに自動保存した時刻 */
@@ -223,8 +224,8 @@ function validateSelection() {
   set(patch);
 }
 
-export function notify(text: string, kind: 'info' | 'error' = 'info') {
-  set({ message: { text, kind, at: Date.now() } });
+export function notify(text: string, kind: 'info' | 'error' = 'info', opts: { undo?: boolean } = {}) {
+  set({ message: { text, kind, at: Date.now(), undoDepth: opts.undo ? get().past.length : undefined } });
 }
 
 export function setTool(tool: Tool) {
@@ -662,9 +663,11 @@ export function deletePeakLabel(id: string) {
 }
 
 export function clearPeakLabels(layerId: string) {
+  const n = get().doc.peakLabels.filter((p) => p.layerId === layerId).length;
   edit((d) => {
     d.peakLabels = d.peakLabels.filter((p) => p.layerId !== layerId);
   });
+  if (n) notify(`ピーク値を ${n} 本消しました`, 'info', { undo: true });
 }
 
 export function addAnnotation(a: Omit<Annotation, 'id'>) {
@@ -899,11 +902,13 @@ export function setIntegralValue(id: string, value: number) {
 }
 
 export function clearIntegrals(layerId: string) {
+  const n = get().doc.integrals.filter((x) => x.layerId === layerId).length;
   edit((d) => {
     d.integrals = d.integrals.filter((x) => x.layerId !== layerId);
     const layer = d.layers.find((l) => l.id === layerId);
     if (layer) layer.integralRef = null;
   });
+  if (n) notify(`積分を ${n} 個消しました`, 'info', { undo: true });
 }
 
 /** 上下ドラッグでスペクトルの高さを変える。all のときは全体の縦倍率 */

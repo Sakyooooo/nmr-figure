@@ -136,6 +136,12 @@ export default function App() {
             <ToolHint />
           </div>
         )}
+        {hasData && (
+          <div className="stage-bottom">
+            <Dock />
+          </div>
+        )}
+        {hasData && <ZoomControl zoom={paperWidth / w} />}
         <aside className="float-panel left" aria-label={is2d ? '2D スペクトル' : 'スペクトル'} hidden={!leftShown}>
           {is2d ? (
             <Spectrum2dPanel />
@@ -150,12 +156,6 @@ export default function App() {
           <Inspector />
         </aside>
         {hasData && !is2d && <SelectionBar stageRef={stageRef} />}
-        {hasData && <ZoomControl zoom={paperWidth / w} />}
-        {hasData && (
-          <div className="stage-bottom">
-            <Dock />
-          </div>
-        )}
         <Toast />
       </main>
       <StructureEditorHost />
@@ -279,14 +279,29 @@ function Toast() {
     const timer = setTimeout(() => useEditor.setState({ message: null }), 4000);
     return () => clearTimeout(timer);
   }, [message]);
+  const depth = useEditor((s) => s.past.length);
   if (!message) return null;
   const error = message.kind === 'error';
+  // 知らせのあとにほかの変更をしていたら、元に戻すと別の変更が戻るので出さない
+  const canUndo = message.undoDepth !== undefined && message.undoDepth === depth;
   return (
     <div className={`toast${error ? ' error' : ''}`} role={error ? 'alert' : 'status'}>
       <span className="toast-icon" aria-hidden="true">
         <Icon name={error ? 'circle-x' : 'circle-check'} />
       </span>
       <span className="grow">{message.text}</span>
+      {canUndo && (
+        <button
+          type="button"
+          className="btn ghost sm"
+          onClick={() => {
+            undo();
+            useEditor.setState({ message: null });
+          }}
+        >
+          元に戻す
+        </button>
+      )}
       <IconButton icon="x" size="sm" label="閉じる" onClick={() => useEditor.setState({ message: null })} />
     </div>
   );
