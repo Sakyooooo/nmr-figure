@@ -47,6 +47,22 @@ export function signalLines(signal: ParsedSignal, freqMHz: number): { ppm: numbe
   return lines.map((l) => ({ ppm: signal.delta + l.offsetHz / freqMHz, height: area * l.weight }));
 }
 
+/**
+ * 文献の値から作ったスペクトルに付ける言葉。「文献 (著者 年)」だと論文に載っている実測スペクトルに見えるので、
+ * 書かれた値から作図したものだと分かる言い方にする (図の下の引用の行は消せない)
+ */
+export const SIMULATED_WORD = '文献値から作図';
+
+/** 文献のスペクトルの名前 (初期値)。例: 文献値から作図 (Smith 2024) */
+export function simulatedLabel(short: string | undefined) {
+  return short ? `${SIMULATED_WORD} (${short})` : SIMULATED_WORD;
+}
+
+/** 名前が自動で付けたもの (前の言い方も含む) か。自分で付け替えた名前は作り直しても変えない */
+export function isAutoSimulatedLabel(label: string) {
+  return !label || label === SIMULATED_WORD || label.startsWith(`${SIMULATED_WORD} (`) || label.startsWith('文献 (');
+}
+
 /** SI の文から、比較用のスペクトルを作る */
 export function simulateFromSi(text: string, citation: { full: string; short: string }, override?: Partial<SimulateOptions>) {
   const parsed = parseSi(text);

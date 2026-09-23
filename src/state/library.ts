@@ -276,6 +276,18 @@ export async function loadExperiment(key: string, options?: ReadOptions): Promis
   return readJdf(await file.arrayBuffer(), file.name, options);
 }
 
+/** 読み込んだフォルダから、ファイル名で .jdf の中身を取り出す (Delta へ書き戻すときに元のファイルが要る) */
+export async function readFolderFile(fileName: string): Promise<ArrayBuffer | null> {
+  const e = useLibrary.getState().experiments.find((x) => x.fileName === fileName);
+  const source = e && sources.get(e.key);
+  if (!source) return null;
+  try {
+    return await (await source()).arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
 /** 2D の実験を読む */
 export async function load2dExperiment(key: string): Promise<Loaded2dSpectrum> {
   const source = sources.get(key);

@@ -40,7 +40,12 @@ export interface SpectrumMeta {
 /** Delta が .jdf に残した注釈 (lib/jdfAnnotations.ts で読む) */
 export interface DeltaAnnotations {
   peaks: { ppm: number; height: number }[];
-  integrals: { from: number; to: number; value: number }[];
+  /** value = Delta の生の積分値、shown = Delta の画面に出ていた値 (基準でそろえたあと) */
+  integrals: { from: number; to: number; value: number; shown?: number; baseline?: IntegralBaseline }[];
+  /** 積分の基準: Delta で「この積分を value にする」と入れた値 (無ければ null) */
+  reference?: number | null;
+  /** ピーク値・積分のほかに付いていた注釈の数 (このアプリでは扱わない) */
+  others?: number;
 }
 
 export interface Simulated {
@@ -78,6 +83,15 @@ export interface Integral {
   to: number;
   /** SI テキストで自動判定を上書きする値 */
   si?: SiOverride;
+  /** Delta から取り込んだ積分のベースライン (Delta で手で直したものもそのまま使う)。範囲を変えたら消す */
+  baseline?: IntegralBaseline | null;
+}
+
+/** 積分のベースライン (Delta と同じ持ち方)。高さ = bias + slope × (ppm − 範囲の中心) */
+export interface IntegralBaseline {
+  bias: number;
+  /** 1 ppm あたりの傾き */
+  slope: number;
 }
 
 export interface SiOverride {

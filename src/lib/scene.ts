@@ -346,7 +346,7 @@ function placeIntegrals(doc: NmrDocument, dataMap: Record<string, Float32Array>,
       const lo = Math.min(x.from, x.to) + g.meta.refOffset;
       const hi = Math.max(x.from, x.to) + g.meta.refOffset;
       if (hi < xMin || lo > xMax) continue;
-      const pts = cumulative(g.data, g.meta, x.from, x.to, 240, f.integralBaseline !== false);
+      const pts = cumulative(g.data, g.meta, x.from, x.to, 240, f.integralBaseline !== false, x.baseline);
       const total = pts[pts.length - 1]?.value ?? 0;
       const height = (Math.abs(total) / maxArea) * f.integralHeight * bandH;
       const base = g.baseY - 3;

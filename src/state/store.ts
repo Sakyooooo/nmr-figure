@@ -2,6 +2,8 @@ import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { ImpurityCandidate } from '../lib/impurities';
 import type { LoadedSpectrum } from '../lib/jdf';
+import { deltaReference } from '../lib/jdfAnnotations';
+import { isAutoSimulatedLabel, simulatedLabel } from '../lib/simulate';
 import { autoYZoom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
 import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type Settings, type StyleTemplate } from '../lib/settings';
@@ -372,7 +374,7 @@ export function setProcessing2d(patch: Partial<Processing2d>) {
   });
 }
 
-/** 文献 (SI) から作ったスペクトルを図に足す。色を変えて、名前に「文献」を付ける */
+/** 文献 (SI) の取り込みダイアログを開く。spectrumId があれば、その文献スペクトルを作り直す */
 export function openSiImport(spectrumId: string | null = null) {
   set({ siImport: { spectrumId } });
 }
@@ -390,12 +392,11 @@ export function updateSimulated(spectrumId: string, meta: SpectrumMeta, data: Fl
     d.spectra[at] = { ...meta, id: spectrumId };
     // 名前を自分で付け替えていなければ、短い引用に合わせて付け直す
     const layer = d.layers.find((l) => l.spectrumId === spectrumId);
-    if (layer && (!layer.label || layer.label.startsWith('文献 ('))) {
-      layer.label = `文献 (${meta.simulated?.short ?? ''})`.replace(' ()', '');
-    }
+    if (layer && isAutoSimulatedLabel(layer.label)) layer.label = simulatedLabel(meta.simulated?.short);
   });
 }
 
+/** 文献 (SI) から作ったスペクトルを図に足す。色を変えて、名前に「文献値から作図」を付ける */
 export function addSimulated(meta: SpectrumMeta, data: Float32Array) {
   const { doc } = get();
   if (doc.plot2d) {
@@ -414,7 +415,7 @@ export function addSimulated(meta: SpectrumMeta, data: Float32Array) {
       spectrumId: meta.id,
       visible: true,
       color: SIMULATED_COLOR,
-      label: `文献 (${meta.simulated?.short ?? ''})`.replace(' ()', ''),
+      label: simulatedLabel(meta.simulated?.short),
       scale: 1,
       lineWidth: 1,
     });
@@ -615,22 +616,31 @@ export function importDeltaPeaks(layerId: string) {
   return added;
 }
 
-/** .jdf に入っていた Delta の積分を取り込む (重なる範囲はそのまま) */
+/**
+ * .jdf に入っていた Delta の積分を取り込む (重なる範囲はそのまま)。
+ * ベースラインも Delta のものを使い、まだ基準が無ければ Delta の値のそろえ方も引き継ぐので、
+ * Delta の画面と同じ数字になる。
+ */
 export function importDeltaIntegrals(layerId: string) {
   const { doc } = get();
   const layer = doc.layers.find((l) => l.id === layerId);
   const meta = layer && doc.spectra.find((s) => s.id === layer.spectrumId);
-  const ranges = meta?.delta?.integrals ?? [];
-  if (!meta || !ranges.length) return 0;
+  const delta = meta?.delta;
+  const ranges = delta?.integrals ?? [];
+  if (!layer || !meta || !delta || !ranges.length) return 0;
   const existing = doc.integrals.filter((x) => x.layerId === layerId);
+  const reference = existing.length ? null : deltaReference(delta);
   let added = 0;
   edit((d) => {
-    for (const r of ranges) {
+    ranges.forEach((r, i) => {
       const overlap = existing.some((x) => Math.max(x.to, r.to) < Math.min(x.from, r.from));
-      if (overlap) continue;
-      d.integrals.push({ id: crypto.randomUUID(), layerId, from: r.from, to: r.to });
+      if (overlap) return;
+      const id = crypto.randomUUID();
+      d.integrals.push({ id, layerId, from: r.from, to: r.to, baseline: r.baseline ?? null });
       added++;
-    }
+      const target = d.layers.find((l) => l.id === layerId);
+      if (reference && reference.index === i && target) target.integralRef = { id, value: reference.value };
+    });
   });
   return added;
 }
@@ -861,8 +871,11 @@ export function updateIntegral(id: string, patch: { from?: number; to?: number }
   edit((d) => {
     const x = d.integrals.find((i) => i.id === id);
     if (!x) return;
+    const before = [x.from, x.to];
     Object.assign(x, patch);
     if (x.from < x.to) [x.from, x.to] = [x.to, x.from];
+    // Delta から持ってきたベースラインは、その範囲のためのもの。範囲を変えたら Delta と同じ決め方に戻す
+    if (x.from !== before[0] || x.to !== before[1]) delete x.baseline;
   }, record);
 }
 

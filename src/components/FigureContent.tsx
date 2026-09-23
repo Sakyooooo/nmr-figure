@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { arrowHead, dashArray, markerPath, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { SIMULATED_WORD } from '../lib/simulate';
 import { tracePath } from '../lib/tracePath';
 import type { FigureImage, FigureStyle } from '../state/types';
 import { FigureImages } from './FigureImages';
@@ -156,7 +157,7 @@ export const FigureContent = memo(function FigureContent({
       {scene.citations.map((citation, i) => (
         <RichSvgText
           key={citation}
-          text={`文献: ${citation}`}
+          text={`${SIMULATED_WORD}: ${citation}`}
           x={layout.width / 2}
           y={layout.citationY + i * 11}
           fontSize={9}

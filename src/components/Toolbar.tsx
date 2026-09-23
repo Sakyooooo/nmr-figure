@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
-import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
+import { DELTA_EXPORT } from '../lib/features';
+import { canExportDelta, copyFigure, exportDeltaJdf, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import { fitY, fullRange, openStructureEditor, printFigure, redo, scaleY, setTool, togglePanel, undo, useEditor } from '../state/store';
 import type { Tool } from '../state/types';
 
@@ -104,6 +105,11 @@ export function Toolbar({ svgRef, onSettings, onImportSi }: { svgRef: RefObject<
   const onTrend = useEditor((s) => s.canvasTab === 'trend');
   const is2d = useEditor((s) => !!s.doc.plot2d);
   const projectName = useEditor((s) => s.projectName);
+  const activeLayerId = useEditor((s) => s.activeLayerId);
+  const activeMeta = useEditor((s) => {
+    const layer = s.doc.layers.find((l) => l.id === s.activeLayerId);
+    return layer && s.doc.spectra.find((x) => x.id === layer.spectrumId);
+  });
   // 2D で使えるのは移動と範囲の拡大だけ
   const toolAvailable = (id: Tool) => !is2d || id === 'select' || id === 'zoom';
 
@@ -214,6 +220,19 @@ export function Toolbar({ svgRef, onSettings, onImportSi }: { svgRef: RefObject<
         <button onClick={printFigure} disabled={!hasData} title="図と測定条件を印刷 (PDF で保存もできます)">
           印刷
         </button>
+        {DELTA_EXPORT && (
+          <button
+            onClick={() => activeLayerId && void exportDeltaJdf(activeLayerId)}
+            disabled={!canExportDelta(activeMeta)}
+            title={
+              canExportDelta(activeMeta)
+                ? '選んでいるスペクトルのピーク値と積分を、Delta で開ける .jdf に書き出します (元のファイルは変えません)'
+                : 'Delta で処理済みのファイル (-1-2 など) から開いたスペクトルを選んでください'
+            }
+          >
+            Delta へ
+          </button>
+        )}
       </div>
       <div className="spacer" />
       <button onClick={onSettings} title="研究室の基準値・自作の不純物など">

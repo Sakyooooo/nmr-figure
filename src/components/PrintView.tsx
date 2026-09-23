@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { figureSvgString } from '../lib/exportFigure';
 import { titleText } from '../lib/layout';
 import { title2d } from '../lib/scene2d';
+import { SIMULATED_WORD } from '../lib/simulate';
 import { solventInfo } from '../lib/solvents';
 import { useEditor } from '../state/store';
 import { RichHtml } from './RichText';
@@ -54,7 +55,7 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
                 solvent: solventInfo(m.solvent)?.label ?? m.solventRaw,
                 scans: m.scans,
                 date: m.date ?? '',
-                note: m.simulated ? `文献: ${m.simulated.citation}` : m.processing ? 'FID をこのアプリで処理' : '',
+                note: m.simulated ? `${SIMULATED_WORD}: ${m.simulated.citation}` : m.processing ? 'FID をこのアプリで処理' : '',
               }
             : null;
         })
