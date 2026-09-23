@@ -6,12 +6,19 @@ import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
-import { notify, useEditor } from './state/store';
+import { useEditor } from './state/store';
 import './styles.css';
 
-window.addEventListener('nmr-db-blocked', () =>
-  notify('ほかのタブで、このソフトの前の版が開いています。そのタブを閉じると続きが読み込まれます', 'error'),
-);
+// 古い版のタブがブラウザの保存領域を使ったままだと、閉じられるまで先に進めない。閉じてもらうまで上に出しておく
+window.addEventListener('nmr-db-blocked', () => {
+  if (document.getElementById('db-blocked')) return;
+  const el = document.createElement('div');
+  el.id = 'db-blocked';
+  el.className = 'db-blocked';
+  el.textContent = 'ほかのタブで、このソフトの前の版が開いています。そのタブを閉じる (または再読み込みする) と、ここで続きが読み込まれます。';
+  document.body.appendChild(el);
+});
+window.addEventListener('nmr-db-open', () => document.getElementById('db-blocked')?.remove());
 void initLibrary();
 // 前回の作業を読み込んでから、変更を自動で保存し始める
 void restoreWork().finally(() => {

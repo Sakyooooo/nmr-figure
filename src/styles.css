@@ -1285,3 +1285,16 @@ details.sub[open] {
 .sync-indicator.warn {
   color: #9a5b00;
 }
+.db-blocked {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 10px 16px;
+  background: #fff1d6;
+  color: #7a4700;
+  border-bottom: 1px solid #e0b060;
+  font-size: 14px;
+  text-align: center;
+}

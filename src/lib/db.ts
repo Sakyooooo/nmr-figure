@@ -24,6 +24,7 @@ function open(): Promise<IDBDatabase> {
         req.result.close();
         opening = null;
       };
+      window.dispatchEvent(new Event('nmr-db-open'));
       resolve(req.result);
     };
     req.onerror = () => reject(req.error);
