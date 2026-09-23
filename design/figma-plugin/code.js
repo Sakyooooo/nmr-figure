@@ -121,13 +121,15 @@ const DATA = [
 ];
 
 const SPACING = [2, 4, 8, 12, 16, 24, 32, 48];
-// 文字 (13px 未満は使わない。太さは regular / bold の 2 つ)。[名前, 太さ, 大きさ, 行の高さ, 説明]
+// 画面の字体: 前の版と同じ (英数字は Segoe UI、日本語は Yu Gothic UI)。本人の指定 (2026-09-23)
+const FONT_UI = "'Segoe UI', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif";
+// 文字 (13px 未満は使わない。太さは regular / bold の 2 つ)。本文は前の版と同じ 13px。[名前, 太さ, 大きさ, 行の高さ, 説明]
 const TYPE = [
-  ['Type/Title', 'bold', 18, 26, 'ホームの見出し・ダイアログの題 (--type-title)'],
-  ['Type/Heading', 'bold', 14, 20, '区画の見出し (--type-heading)'],
-  ['Type/Body', 'regular', 14, 22, '本文・ボタン・入力。基準 (--type-body)'],
-  ['Type/Body Strong', 'bold', 14, 22, '本文の強調 (--type-body-strong)'],
-  ['Type/Label', 'regular', 13, 18, 'ラベル・表・補足。下限の大きさ (--type-label)'],
+  ['Type/Title', 'bold', 16, 24, 'ホームの見出し・ダイアログの題 (--type-title)'],
+  ['Type/Heading', 'bold', 13, 20, '区画の見出し (--type-heading)'],
+  ['Type/Body', 'regular', 13, 20, '本文・ボタン・入力。基準 (--type-body)'],
+  ['Type/Body Strong', 'bold', 13, 20, '本文の強調 (--type-body-strong)'],
+  ['Type/Label', 'regular', 13, 18, 'ラベル・表・補足。下限の大きさ。本文とは色 (secondary / tertiary) で分ける (--type-label)'],
   ['Type/Label Strong', 'bold', 13, 18, 'ラベルの強調 (--type-label-strong)'],
   ['Type/Numeric', 'regular', 13, 18, 'ppm・積分値の数字。コードでは font-variant-numeric: tabular-nums (--type-numeric)'],
 ];
@@ -516,9 +518,9 @@ async function prepare() {
     }
     return { family: 'Inter', regular: { family: 'Inter', style: 'Regular' }, bold: { family: 'Inter', style: 'Bold' } };
   };
-  // UI: Windows に入っていて、Figma にもある BIZ UDPゴシック (無ければ Noto Sans JP)
+  // UI: アプリと同じ Yu Gothic UI (Windows の字体。Figma のデスクトップ版で使える)。無ければ Noto Sans JP
   UI = pick([
-    ['BIZ UDPGothic', 'Regular', 'Bold'],
+    ['Yu Gothic UI', 'Regular', 'Bold'],
     ['Noto Sans JP', 'Regular', 'Bold'],
   ]);
   // 図: Times New Roman と同じ幅の Tinos (図の設定の既定に合わせる)
@@ -1196,7 +1198,7 @@ async function coverPage(page) {
   const P = [
     ['図が主役', '画面の中心は図。UI は灰色の濃淡で静かにし、色はスペクトルと「選択・一番の操作」にだけ使う'],
     ['作業の順に並べる', '開く → 整える → 解析 (ピーク値・積分) → 仕上げ → 書き出す。パネルとツールバーはこの順'],
-    ['密度は高く、字は読める', 'UI の文字は 14px が基準、13px が下限。コントラストは WCAG AA を必ず満たす'],
+    ['密度は高く、字は読める', 'UI の文字は 13px (前の版と同じ。これより小さくしない)。字体は Segoe UI + Yu Gothic UI。コントラストは WCAG AA を必ず満たす'],
     ['同じ役割は同じ見た目', 'トークンと部品だけで作る。新しい色・角丸・影・ボタンの種類は理由を書いて決まりを広げてから'],
     ['いま必要なものだけ見せる', '選択に応じて中身が変わるインスペクター。説明文は常に出さず、必要なときに開ける'],
     ['状態はいつも見える、データは失わない', '保存・Delta 同期・処理中はステータスバーの決まった場所。解決が要るエラーは消えない'],

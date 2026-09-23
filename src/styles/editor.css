@@ -589,7 +589,7 @@
   outline: none;
   background: transparent;
   color: var(--color-text-primary);
-  font: 400 18px/26px var(--font-ui);
+  font: 400 16px/24px var(--font-ui);
 }
 .palette-list {
   overflow-y: auto;

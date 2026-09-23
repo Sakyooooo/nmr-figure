@@ -41,11 +41,11 @@ Figma の変数名の `/` を `-` にしたものが CSS の変数名です。�
 | `color/text/secondary` | `var(--color-text-secondary)` |
 | `spacing/16` | `var(--spacing-16)` |
 | `radius/md` | `var(--radius-md)` |
-| `Type/Body` | `--type-body` (14px / 22px) |
+| `Type/Body` | `--type-body` (13px / 20px) |
 
 ## 字体
 
-UI は BIZ UDPゴシック (Windows に入っていて、Figma でも使えます)。無ければ Noto Sans JP。
+UI はアプリと同じく前の版の字体: アプリでは Segoe UI + Yu Gothic UI、Figma では Yu Gothic UI (Windows に入っていて、デスクトップ版の Figma で使えます)。無ければ Noto Sans JP。
 図の見本は Tinos (Times New Roman と同じ幅)。無ければ Noto Serif。
 
 アイコンは [Lucide](https://lucide.dev) (ISC ライセンス) の形を写したものと、同じ規則 (24 の格子・線の太さ 2・丸い端) で描いた NMR 固有のもの (ピーク・積分・高さ・基準・範囲・マーカー・スペクトル) です。

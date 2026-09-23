@@ -645,7 +645,7 @@ const figma = {
     return [...styles.values()].filter((s) => s.type === 'EFFECT');
   },
   async listAvailableFontsAsync() {
-    return ['BIZ UDPGothic|Regular', 'BIZ UDPGothic|Bold', 'Tinos|Regular', 'Tinos|Bold', 'Inter|Regular', 'Inter|Bold'].map((k) => {
+    return ['Yu Gothic UI|Regular', 'Yu Gothic UI|Bold', 'BIZ UDPGothic|Regular', 'BIZ UDPGothic|Bold', 'Tinos|Regular', 'Tinos|Bold', 'Inter|Regular', 'Inter|Bold'].map((k) => {
       const [family, style] = k.split('|');
       return { fontName: { family, style } };
     });

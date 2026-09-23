@@ -14,7 +14,7 @@ export function readDefinitions() {
   const from = src.indexOf('function hex(');
   const to = src.indexOf('// ------------------------------------------------------------------ 作ったもの');
   if (from < 0 || to < 0) throw new Error('code.js の定義の場所が見つかりません');
-  return new Function(`${src.slice(from, to)}\nreturn { PRIMITIVES, SEMANTIC, DATA, SPACING, RADIUS, SIZE, MOTION, TYPE, EFFECTS };`)();
+  return new Function(`${src.slice(from, to)}\nreturn { PRIMITIVES, SEMANTIC, DATA, SPACING, RADIUS, SIZE, MOTION, TYPE, EFFECTS, FONT_UI };`)();
 }
 
 export function readIcons() {
@@ -77,7 +77,7 @@ export function buildTokensCss() {
   const line = (name, value, note) => out.push(`  ${name}: ${value};${note ? ` /* ${note} */` : ''}`);
   out.push('/* 自動生成: npm run tokens (元: design/figma-plugin/code.js)。手で直さない */');
   out.push(':root {');
-  out.push("  --font-ui: 'BIZ UDPGothic', 'BIZ UDPゴシック', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;");
+  out.push(`  --font-ui: ${d.FONT_UI};`);
   out.push('');
   out.push('  /* Color: 画面 (UI) の色 */');
   for (const [name, prim, , desc] of d.SEMANTIC) line(cssName(name), d.PRIMITIVES[prim], [prim, desc].filter(Boolean).join(' · '));

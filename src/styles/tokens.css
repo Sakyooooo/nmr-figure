@@ -1,6 +1,6 @@
 /* 自動生成: npm run tokens (元: design/figma-plugin/code.js)。手で直さない */
 :root {
-  --font-ui: 'BIZ UDPGothic', 'BIZ UDPゴシック', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+  --font-ui: 'Segoe UI', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
 
   /* Color: 画面 (UI) の色 */
   --color-bg-canvas: #ECEEF1; /* gray/100 · キャンバス (図の後ろ) とホームの背景 */
@@ -88,10 +88,10 @@
   --motion-duration-normal: 200ms; /* 開閉・パネル・通知 */
 
   /* Type: font の一括指定 (太さ 大きさ/行の高さ 字体) */
-  --type-title: 700 18px/26px var(--font-ui);
-  --type-heading: 700 14px/20px var(--font-ui);
-  --type-body: 400 14px/22px var(--font-ui);
-  --type-body-strong: 700 14px/22px var(--font-ui);
+  --type-title: 700 16px/24px var(--font-ui);
+  --type-heading: 700 13px/20px var(--font-ui);
+  --type-body: 400 13px/20px var(--font-ui);
+  --type-body-strong: 700 13px/20px var(--font-ui);
   --type-label: 400 13px/18px var(--font-ui);
   --type-label-strong: 700 13px/18px var(--font-ui);
   --type-numeric: 400 13px/18px var(--font-ui);

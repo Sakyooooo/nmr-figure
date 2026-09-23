@@ -182,7 +182,9 @@ function Filters() {
             className={`chip${nuclei.includes(n) ? ' on' : ''}`}
             onClick={() => set({ nuclei: nuclei.includes(n) ? nuclei.filter((x) => x !== n) : [...nuclei, n] })}
           >
-            <RichHtml text={FILTER_LABEL[n]} />
+            <span>
+              <RichHtml text={FILTER_LABEL[n]} />
+            </span>
           </button>
         ))}
       </div>

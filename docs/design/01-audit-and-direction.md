@@ -225,7 +225,7 @@
 
 1. **図が主役 (Figure First)** — 画面の中心は図。UI は灰色の濃淡で静かにし、色は「スペクトル (データ)」と「選択・一番の操作」にだけ使う。
 2. **作業の順に並べる (Workflow Order)** — 開く → 整える (範囲・高さ・基準) → 解析 (ピーク値・積分) → 仕上げ (見た目・注釈) → 書き出す。パネルとツールバーはこの順。
-3. **密度は高く、字は読める (Dense, not Tiny)** — プロの道具として情報量は保つ。ただし UI の文字は 14px を基準、13px を下限 (数値の表・補足)。デジタル庁 DS の 16px は採らない (パネルが長くなりすぎる)。その代わりコントラストは AA を必ず満たす。
+3. **密度は高く、字は読める (Dense, not Tiny)** — プロの道具として情報量は保つ。UI の文字は前の版と同じ 13px を基準にし、13px を下限にする (前の版の 11〜12px はなくす)。デジタル庁 DS の 16px は採らない (パネルが長くなりすぎる)。その代わりコントラストは AA を必ず満たす。**字体は前の版と同じ Segoe UI + Yu Gothic UI** (2026-09-23 本人の指定。いったん 14px・BIZ UDPゴシックにしたが「変」とのことで戻した)。
 4. **同じ役割は同じ見た目 (One Role, One Look)** — トークンと部品だけで作る。新しい色・角丸・影・ボタンの種類を足すときは、理由を書いてデザインシステムを拡張してから。
 5. **いま必要なものだけ見せる (Progressive Disclosure)** — 選択に応じて中身が変わるインスペクター。上級の設定は折りたたむ。説明文は常時出さず、必要なときに開ける。
 6. **状態はいつも見える、データは失わない (Visible State, Safe Data)** — 保存・Delta 同期・処理中はステータスバーの決まった場所。解決が要るエラーは消えずに残る。消す操作は元に戻せる。
@@ -270,15 +270,14 @@
 **Color (図・データ用) — 別コレクション「Data」。UI には使わない**
 スペクトルの色 (緑 #1f9e1f ほか)、文献の紫、マーカー 6 色、積分の色、2D の等高線。図の見た目は Word / PowerPoint との互換を確かめてあるので、このコレクションは現状の値のまま。
 
-**Typography** (書体は Windows の標準から選ぶ。Web フォントは CSP と容量のため使わない。Figma で「Yu Gothic UI」「Meiryo UI」「BIZ UDPゴシック」を並べて決める)
+**Typography** (書体は前の版と同じ `'Segoe UI', 'Yu Gothic UI', 'Meiryo', system-ui` (英数字は Segoe UI、日本語は Yu Gothic UI)。Web フォントは CSP と容量のため使わない。Figma では Yu Gothic UI。値の元は design/figma-plugin/code.js の FONT_UI と TYPE)
 | Figma | CSS | 大きさ / 行の高さ / 太さ | 用途 |
 |---|---|---|---|
-| Type/Title | `--type-title` | 18 / 26 / B | ホームの見出し、ダイアログの題 |
-| Type/Heading | `--type-heading` | 15 / 22 / B | 区画の見出し |
-| Type/Body | `--type-body` | 14 / 22 / N | 本文・ボタン・入力 (基準) |
-| Type/Label | `--type-label` | 13 / 18 / N | 入力のラベル・表 |
-| Type/Caption | `--type-caption` | 13 / 18 / N、補助色 | 補足・単位 |
-| Type/Mono | `--type-mono` | 13 / 18、tabular-nums | ppm・積分値の数字 |
+| Type/Title | `--type-title` | 16 / 24 / B | ホームの見出し、ダイアログの題 |
+| Type/Heading | `--type-heading` | 13 / 20 / B | 区画の見出し |
+| Type/Body (Strong) | `--type-body(-strong)` | 13 / 20 / N (B) | 本文・ボタン・入力 (基準) |
+| Type/Label (Strong) | `--type-label(-strong)` | 13 / 18 / N (B) | 入力のラベル・表・補足 (本文とは色で分ける) |
+| Type/Numeric | `--type-numeric` | 13 / 18、tabular-nums | ppm・積分値の数字 |
 (13px 未満は使わない。太さは N と B の 2 つだけ)
 
 **Spacing** — `Spacing/2 4 8 12 16 24 32 48` ⇔ `--spacing-2` … `--spacing-48`。部品の中は 4〜12、区画の間は 16〜24、画面の外周は 16〜24。
@@ -340,7 +339,7 @@
 |---|---|---|
 | R0 | 図の SVG の不変テスト、UI のスクリーンショット (前) を撮る | テスト |
 | R1 | トークン: `src/styles/tokens.css` に 7.2 の CSS 変数。今の 9 変数を対応づけ。生の色を検出する小さな検査 (CI) | 生の色が 0 件 |
-| R2 | 全体のスタイル: 文字の基準 14px、フォーカスの輪、コントラストの修正 (C2) | コントラストの計算 |
+| R2 | 全体のスタイル: 文字の基準 13px (下限も 13px)、フォーカスの輪、コントラストの修正 (C2) | コントラストの計算 |
 | R3 | 部品: Button・IconButton・Input・Select・Checkbox・Tabs・Section・Badge・Chip・Tooltip・Dialog・Toast/Banner・Menu | 部品ごとの見本ページ (開発時だけ) |
 | R4 | アイコン: lucide-react + NMR 固有のアイコン (同じ規則で描く)。絵文字・記号をなくす | 目視 + 一覧 |
 | R5 | 情報設計: ツールバーの整理、インスペクターのタブ、ステータスバー | 操作の手数を前後で比べる |
@@ -361,7 +360,7 @@
 |---|---|---|
 | R0 | 済 | `FigureContent.test.tsx` が図の中身 (重ね書き・ピーク値・積分・矢印・文字) を保存と比べる。作り直しの間ずっと同じ |
 | R1 | 済 | `npm run tokens` が Figma のプラグインの定義から `tokens.css` とアイコンを作る。食い違いはテストで見つかる。古い 9 変数はトークンを指す |
-| R2 | 済 | 文字は 14px (下限 13px)、字体は BIZ UDPゴシック、フォーカスの輪は 2px + 2px、入力欄の枠は 3:1、補助の文字は 4.5:1 以上 |
+| R2 | 済 | 文字は前の版と同じ 13px (11〜12px はなくした)、字体は前の版と同じ Segoe UI + Yu Gothic UI、フォーカスの輪は 2px + 2px、入力欄の枠は 3:1、補助の文字は 4.5:1 以上 |
 | R3 | 大部分 | Button / IconButton / Menu / Tabs / Section (使い方は ⓘ) / Chip / Badge / Toast / Dialog。ツールチップはまだブラウザの title (M8) |
 | R4 | 済 | Lucide + NMR 固有のアイコン (Figma と同じ形)。📁 ↑↓ × などの記号をなくした (マーカーの形の選択肢 ●■▲ は図の中の形そのものなので残す) |
 | R5・R6 | 済 | 案 B: 上の帯・浮かぶ左右のパネル・下の道具の帯・使い方の一行・選んだものの真上の帯・操作を探す (Ctrl+K)。2D・推移グラフも同じ枠 |
