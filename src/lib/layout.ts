@@ -62,7 +62,22 @@ export function integralsOnAxis(f: FigureStyle, layerIds: string[], layerId: str
   return f.integralPlacement === 'axis' && (f.mode !== 'stack' || layerIds.length <= 1 || layerIds[layerIds.length - 1] === layerId);
 }
 
-export function computeLayout(doc: NmrDocument, dataMap: Record<string, Float32Array>): Layout {
+/**
+ * 図に出すもの。ピーク値・積分は Delta と同期しているので、図から外したいときも消さずに隠す
+ * (消すと Delta のファイルからも消えるため)
+ */
+export function shownOnFigure(doc: NmrDocument): NmrDocument {
+  const f = doc.figure;
+  if (f.showPeakLabels !== false && f.showIntegrals !== false) return doc;
+  return {
+    ...doc,
+    peakLabels: f.showPeakLabels === false ? [] : doc.peakLabels,
+    integrals: f.showIntegrals === false ? [] : doc.integrals,
+  };
+}
+
+export function computeLayout(source: NmrDocument, dataMap: Record<string, Float32Array>): Layout {
+  const doc = shownOnFigure(source);
   const f = doc.figure;
   const { xMax, xMin, yZoom } = doc.view;
   const visible = visibleLayers(doc, dataMap);

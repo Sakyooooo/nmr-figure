@@ -54,6 +54,11 @@ async function flush() {
   useEditor.setState({ autoSavedAt: doc.at });
 }
 
+/** スペクトルの中身を差し替えたとき (Delta で処理し直したものを読み直したなど)。次の自動保存で中身も書き直す */
+export function invalidateSavedData() {
+  lastDataKey = null;
+}
+
 /** 変更のたびに少し待ってから書く */
 export function startAutoSave() {
   useEditor.subscribe((s, prev) => {

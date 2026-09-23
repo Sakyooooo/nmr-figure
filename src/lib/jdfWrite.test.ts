@@ -6,7 +6,7 @@ import { readJdf } from './jdf';
 import { checkAnnotationLinks } from './jdfAnnoteCheck';
 import { readAnnotations } from './jdfAnnotations';
 import { indexAt } from './spectrum';
-import { JdfWriteError, writeAnnotations } from './jdfWrite';
+import { annotationBlock, JdfWriteError, withAnnotationBlock, writeAnnotations } from './jdfWrite';
 
 const dir = join(import.meta.dirname, '../../samples');
 const has = (name: string) => existsSync(join(dir, name));
@@ -176,9 +176,30 @@ describe.skipIf(!has(PLAIN))('.jdf に書き戻す', () => {
     expect(readAnnotations(out).integrals).toHaveLength(2);
   });
 
-  it('FID や空の注釈は書かない', () => {
+  it('FID には書かない', () => {
     if (has('fid-c6d6-1h.jdf')) expect(() => writeAnnotations(buf('fid-c6d6-1h.jdf'), ann)).toThrow(JdfWriteError);
-    expect(() => writeAnnotations(buf(PLAIN), { peaks: [], integrals: [] })).toThrow(JdfWriteError);
+  });
+
+  it('全部消したときは、Delta が空の注釈を書いたときと同じ形にする', () => {
+    // 積分を付けたファイルから全部消す → 注釈なしのファイル (PLAIN) と注釈の場所がバイト単位で同じになる
+    const src = has(DELTA) ? buf(DELTA) : writeAnnotations(buf(PLAIN), ann);
+    const out = writeAnnotations(src, { peaks: [], integrals: [] });
+    expect(checkAnnotationLinks(out)).toEqual([]);
+    expect(readAnnotations(out)).toMatchObject({ peaks: [], integrals: [] });
+    const plain = annotationBlock(buf(PLAIN))!;
+    const mine = annotationBlock(out)!;
+    // 見出しの +122 (空き枠の続き番号) と積分の倍率など、前の中身が残る所は除いて比べる
+    const differ = [...mine].map((b, i) => (b !== plain[i] ? i : -1)).filter((i) => i >= 0);
+    expect(differ.filter((i) => i >= 352)).toEqual([]);
+    expect(mine.length).toBe(plain.length);
+  });
+
+  it('記録しておいた注釈の場所を、そのまま戻せる', () => {
+    const before = buf(PLAIN);
+    const block = annotationBlock(writeAnnotations(before, ann))!;
+    const back = withAnnotationBlock(before, block);
+    expect(annotationBlock(back)).toEqual(block);
+    expect(readAnnotations(back).integrals).toHaveLength(2);
   });
 });
 

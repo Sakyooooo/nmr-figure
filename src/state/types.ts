@@ -181,6 +181,9 @@ export interface FigureStyle {
   showTitle: boolean;
   showLegend: boolean;
   showLayerLabels: boolean;
+  /** ピーク値・積分を図に出すか (Delta と同期しているので、図から外すときも消さずに隠す) */
+  showPeakLabels: boolean;
+  showIntegrals: boolean;
   titleAuto: boolean;
   title: string;
   tickFontSize: number;
@@ -387,6 +390,8 @@ export function defaultFigure(): FigureStyle {
     showTitle: true,
     showLegend: true,
     showLayerLabels: true,
+    showPeakLabels: true,
+    showIntegrals: true,
     titleAuto: true,
     title: '',
     tickFontSize: 11,

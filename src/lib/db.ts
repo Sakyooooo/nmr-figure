@@ -1,11 +1,12 @@
 /**
  * ブラウザ内の保存 (IndexedDB)。データフォルダの場所、ファイル情報のキャッシュ、
- * サンプルごとのメモ・タグ・スキーム、作業中の図 (自動保存)、保存した図を置く。
+ * サンプルごとのメモ・タグ・スキーム、作業中の図 (自動保存)、保存した図、
+ * Delta との同期の記録 (history: .jdf ごとの注釈の移り変わり / originals: 初めて書き込む前のファイル / sync: 図ごとに最後に合わせた時点) を置く。
  * 使えない環境では何もしない。
  */
 const DB_NAME = 'nmr-figure-editor';
-const VERSION = 3;
-export type StoreName = 'kv' | 'meta' | 'notes' | 'work' | 'figures';
+const VERSION = 4;
+export type StoreName = 'kv' | 'meta' | 'notes' | 'work' | 'figures' | 'history' | 'originals' | 'sync';
 
 let opening: Promise<IDBDatabase> | null = null;
 
@@ -13,12 +14,21 @@ function open(): Promise<IDBDatabase> {
   opening ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => {
-      for (const name of ['kv', 'meta', 'notes', 'work', 'figures']) {
+      for (const name of ['kv', 'meta', 'notes', 'work', 'figures', 'history', 'originals', 'sync']) {
         if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // 新しい版のアプリが別のタブで開いたら、こちらは閉じて道を空ける (閉じないと向こうの更新が止まったままになる)
+      req.result.onversionchange = () => {
+        req.result.close();
+        opening = null;
+      };
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
+    // 古い版のタブが開いたままだと、閉じられるまで待たされる。画面で知らせる (main.tsx)
+    req.onblocked = () => window.dispatchEvent(new Event('nmr-db-blocked'));
   });
   return opening;
 }
@@ -48,6 +58,11 @@ export async function dbSet(store: StoreName, key: string, value: unknown): Prom
   } catch {
     // 保存できなくても動作は続ける
   }
+}
+
+/** 書けなかったときに知らせてほしい所 (Delta との同期の記録など) で使う。失敗すると例外になる */
+export async function dbPut(store: StoreName, key: string, value: unknown): Promise<void> {
+  await run(store, 'readwrite', (s) => s.put(value, key));
 }
 
 export async function dbDelete(store: StoreName, key: string): Promise<void> {

@@ -7,6 +7,8 @@ import { IntegralPanel } from './components/IntegralPanel';
 import { PeakPanel } from './components/PeakPanel';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { SiPanel } from './components/SiPanel';
+import { SyncPanel } from './components/SyncPanel';
+import { useSync } from './state/deltaSync';
 import { ImpurityPanel, MarkerPanel } from './components/ImpurityPanel';
 import { Figure2dView } from './components/Figure2dView';
 import { StructureEditorHost } from './components/StructureEditorHost';
@@ -164,6 +166,7 @@ export default function App() {
           <>
             <PropertiesPanel />
             <ProcessingPanel />
+            <SyncPanel />
             <IntegralPanel />
             <PeakPanel />
             <SiPanel />
@@ -223,6 +226,28 @@ function EmptyState() {
   );
 }
 
+/** 画面の下に、Delta との同期の様子を出す (同期しているスペクトルがあるときだけ) */
+function SyncIndicator() {
+  const links = useSync((s) => s.links);
+  const list = Object.values(links).filter((v) => v.status !== 'duplicate');
+  if (!list.length) return null;
+  const bad = list.find((v) => v.status === 'need-permission' || v.status === 'error');
+  const busy = list.some((v) => v.status === 'pending' || v.status === 'waiting');
+  const last = Math.max(0, ...list.map((v) => v.lastSyncAt ?? 0));
+  const text = bad
+    ? bad.status === 'need-permission'
+      ? 'Delta: 書き込みの許可が必要'
+      : 'Delta: エラー'
+    : busy
+      ? 'Delta と同期中…'
+      : `Delta と同期${last ? ` ${new Date(last).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
+  return (
+    <span className={`sync-indicator${bad ? ' warn' : ''}`} title={bad?.message || '右の「Delta との同期・記録」で詳しく見られます'}>
+      {text}
+    </span>
+  );
+}
+
 function StatusBar({ zoom }: { zoom: number }) {
   const cursor = useEditor((s) => s.cursorPpm);
   const autoSavedAt = useEditor((s) => s.autoSavedAt);
@@ -248,6 +273,7 @@ function StatusBar({ zoom }: { zoom: number }) {
           <span className="cursor">{cursor !== null ? `δ ${cursor.toFixed(3)} ppm` : ''}</span>
         </>
       )}
+      <SyncIndicator />
       <span className="saved" title="図はブラウザにも自動で保存されるので、閉じても続きから作業できます">
         {projectName ? `${projectName}${dirty ? ' (未保存の変更あり)' : ' に保存済み'}` : 'ファイル未保存'}
         {autoSavedAt ? ` · 自動保存 ${new Date(autoSavedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}` : ''}

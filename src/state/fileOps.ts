@@ -1,15 +1,13 @@
 import { baseName, copyFigureToClipboard, downloadBlob, figureSvgString, svgToPng } from '../lib/exportFigure';
-import { referenceOf } from '../lib/integrals';
 import { JdfError, readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
 import { readJdf2d } from '../lib/jdf2d';
-import { readAnnotations } from '../lib/jdfAnnotations';
-import { writeAnnotations, type WritableAnnotations } from '../lib/jdfWrite';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
 import { ask } from './dialog';
-import { canOpen, load2dExperiment, loadExperiment, readFolderFile, sampleKeyOf, saveFigure, useLibrary } from './library';
+import { canOpen, load2dExperiment, loadExperiment, sampleKeyOf, saveFigure, useLibrary } from './library';
+import { registerJdfHandle } from './deltaSync';
 import { addSpectra, addSpectrum2d, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
-import { emptyDocument, type NmrDocument, type SpectrumMeta } from './types';
+import { emptyDocument } from './types';
 
 type PickerOptions = {
   suggestedName?: string;
@@ -72,6 +70,8 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
           loadDocument(emptyDocument(), {}, null, null);
         }
         cleared = true;
+        // ドロップ・「開く」で開いた .jdf も、Delta と同期できるようにファイルを覚えておく
+        if (handle) registerJdfHandle(file.name, handle);
         const buffer = await file.arrayBuffer();
         if (is2d(buffer)) {
           addSpectrum2d(readJdf2d(buffer, file.name));
@@ -268,80 +268,6 @@ async function canWrite(handle: FileHandle) {
     const state = (await handle.queryPermission?.({ mode: 'readwrite' })) ?? 'granted';
     if (state === 'granted') return true;
     return ((await handle.requestPermission?.({ mode: 'readwrite' })) ?? 'granted') === 'granted';
-  } catch {
-    return false;
-  }
-}
-
-/** Delta へ書き戻せるスペクトルか (Delta で処理済みの 1D。FID をこのアプリで処理したものや文献のものは不可) */
-export function canExportDelta(meta: SpectrumMeta | undefined) {
-  return !!meta && !meta.processing && !meta.simulated && /\.jdf$/i.test(meta.fileName);
-}
-
-/**
- * 今の図のピーク値・積分を、元の .jdf に書き戻したファイルを作る (Delta で開く用)。
- * 元のファイルは変えず、コピーに書く。積分の値のそろえ方 (基準) も Delta に渡すので、Delta でも同じ数字になる。
- */
-export async function exportDeltaJdf(layerId: string) {
-  const { doc, sources } = useEditor.getState();
-  const layer = doc.layers.find((l) => l.id === layerId);
-  const meta = layer && doc.spectra.find((s) => s.id === layer.spectrumId);
-  if (!layer || !meta) return notify('スペクトルを選んでください', 'error');
-  if (!canExportDelta(meta)) {
-    return notify('Delta で処理済みのファイル (-1-2 など) から開いたスペクトルにだけ書き戻せます', 'error');
-  }
-  const payload = deltaPayload(doc, layerId);
-  if (!payload.peaks.length && !payload.integrals.length) return notify('書き戻すピーク値と積分がありません', 'error');
-
-  // 元の .jdf: 開いたときのものが無ければ (.nmrfig から開いたときなど)、データフォルダから読み直す
-  let source = sources[meta.id];
-  if (!source) {
-    const again = await readFolderFile(meta.fileName);
-    if (again && sameAxis(again, meta)) source = again;
-  }
-  if (!source) return notify(`元の ${meta.fileName} が見つかりません。ホーム画面のデータフォルダにあるか確かめてください`, 'error');
-
-  try {
-    const out = writeAnnotations(source, payload);
-    const others = readAnnotations(source).others ?? 0;
-    const note = others ? `。Delta で付けたそのほかの注釈 ${others} 件は入りません` : '';
-    const counts = `ピーク値 ${payload.peaks.length} 本 / 積分 ${payload.integrals.length} 件${note}`;
-    const name = `${baseName(meta.fileName)}-nmrfig.jdf`;
-    const blob = new Blob([out], { type: 'application/octet-stream' });
-    if (fsWindow.showSaveFilePicker) {
-      const handle = await fsWindow.showSaveFilePicker({
-        suggestedName: name,
-        types: [{ description: 'JEOL Delta', accept: { 'application/octet-stream': ['.jdf'] } }],
-      });
-      const w = await handle.createWritable();
-      await w.write(blob);
-      await w.close();
-      notify(`${handle.name} に書き出しました (${counts})`);
-    } else {
-      downloadBlob(blob, name);
-      notify(`${name} を保存しました (${counts})`);
-    }
-  } catch (e) {
-    if ((e as Error).name !== 'AbortError') notify(`書き出せませんでした: ${(e as Error).message}`, 'error');
-  }
-}
-
-/** Delta へ渡すピーク値・積分 (積分は作った順。基準の積分とその値も渡す) */
-export function deltaPayload(doc: NmrDocument, layerId: string): WritableAnnotations {
-  const integrals = doc.integrals.filter((x) => x.layerId === layerId);
-  const ref = referenceOf(doc, layerId);
-  return {
-    peaks: doc.peakLabels.filter((p) => p.layerId === layerId).map((p) => ({ ppm: p.ppm })),
-    integrals: integrals.map((x) => ({ from: x.from, to: x.to, baseline: x.baseline ?? null })),
-    reference: ref ? { index: integrals.findIndex((x) => x.id === ref.id), value: ref.value } : null,
-  };
-}
-
-/** フォルダから読み直した .jdf が、図に入っているスペクトルと同じ軸か (Delta で処理し直していないか) */
-function sameAxis(buffer: ArrayBuffer, meta: SpectrumMeta) {
-  try {
-    const again = readJdf(buffer, meta.fileName).meta;
-    return again.n === meta.n && again.first === meta.first && again.last === meta.last;
   } catch {
     return false;
   }

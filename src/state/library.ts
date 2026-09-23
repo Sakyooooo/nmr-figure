@@ -85,19 +85,21 @@ export const useLibrary = create<LibraryState>(() => ({
 const set = useLibrary.setState;
 const get = useLibrary.getState;
 
-type FileEntry = { kind: 'file'; name: string; getFile(): Promise<File> };
+type FileEntry = FileHandle & { kind: 'file' };
 type DirHandle = {
   kind: 'directory';
   name: string;
   values(): AsyncIterable<FileEntry | { kind: 'directory'; name: string }>;
-  queryPermission?(o: { mode: 'read' }): Promise<PermissionState>;
-  requestPermission?(o: { mode: 'read' }): Promise<PermissionState>;
+  queryPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  requestPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 };
 type PickerWindow = Window & { showDirectoryPicker?: (o: { id?: string; mode?: 'read'; startIn?: DirHandle }) => Promise<DirHandle> };
 
 const FOLDER_KEY = 'dataFolder';
 /** 実験のキー → ファイルの取り出し方 */
 const sources = new Map<string, () => Promise<File>>();
+/** ファイル名 → フォルダの中のファイル (Delta との同期で書き込むのに使う) */
+const handles = new Map<string, FileEntry>();
 let folder: DirHandle | null = null;
 
 export function sampleKeyOf(e: Pick<ExperimentMeta, 'title' | 'fileName'>) {
@@ -215,9 +217,13 @@ export async function scanFolder() {
   if (!folder) return;
   set({ status: 'scanning', progress: { done: 0, total: 0 } });
   const entries: { name: string; getFile: () => Promise<File> }[] = [];
+  handles.clear();
   try {
     for await (const entry of folder.values()) {
-      if (entry.kind === 'file' && /\.jdf$/i.test(entry.name)) entries.push({ name: entry.name, getFile: () => entry.getFile() });
+      if (entry.kind === 'file' && /\.jdf$/i.test(entry.name)) {
+        entries.push({ name: entry.name, getFile: () => entry.getFile() });
+        handles.set(entry.name, entry);
+      }
     }
   } catch (e) {
     // 途中で読めなくなったら (許可が切れたなど)、読み込みボタンを出し直す
@@ -276,15 +282,23 @@ export async function loadExperiment(key: string, options?: ReadOptions): Promis
   return readJdf(await file.arrayBuffer(), file.name, options);
 }
 
-/** 読み込んだフォルダから、ファイル名で .jdf の中身を取り出す (Delta へ書き戻すときに元のファイルが要る) */
-export async function readFolderFile(fileName: string): Promise<ArrayBuffer | null> {
-  const e = useLibrary.getState().experiments.find((x) => x.fileName === fileName);
-  const source = e && sources.get(e.key);
-  if (!source) return null;
+/** データフォルダの中のファイル (読み込んだフォルダにあるときだけ) */
+export function folderFileHandle(fileName: string): FileHandle | null {
+  return handles.get(fileName) ?? null;
+}
+
+/**
+ * データフォルダへの書き込みの許可 (Delta との同期で .jdf に書くため)。
+ * ask = true はボタンを押したときなど、ブラウザが確認を出してよいときだけ
+ */
+export async function folderWritePermission(ask: boolean): Promise<PermissionState> {
+  if (!folder) return 'denied';
   try {
-    return await (await source()).arrayBuffer();
+    const now = (await folder.queryPermission?.({ mode: 'readwrite' })) ?? 'granted';
+    if (now === 'granted' || !ask) return now;
+    return (await folder.requestPermission?.({ mode: 'readwrite' })) ?? 'granted';
   } catch {
-    return null;
+    return 'denied';
   }
 }
 

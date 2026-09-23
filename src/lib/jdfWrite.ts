@@ -14,7 +14,7 @@
  * Delta が固まったのはこのため (鎖をたどり終わらない)。
  */
 import type { IntegralBaseline } from '../state/types';
-import { checkAnnotationLinks } from './jdfAnnoteCheck';
+import { checkAnnotationLinks, isIntegralType, isPeakType } from './jdfAnnoteCheck';
 import { deltaBaseline, integralArea, integralRange, pointStep } from './integrals';
 
 /** ヘッダの場所 (ビッグエンディアン) */
@@ -34,6 +34,10 @@ const ALIGN = 64;
 
 /** これより近い ppm は同じ位置とみなす (データ点の間隔よりずっと小さい) */
 const SAME_PPM = 1e-9;
+/** 注釈が何もないときの空き枠の数 (Delta が空の注釈を書くときと同じ) */
+const EMPTY_SLOTS = 4;
+/** レコードの中で、ほかのレコードを指す場所 (スキップリストの各段と、積分どうしの鎖) */
+const LINK_OFFSETS = [64, 66, 68, 70, 72, 74, 152, 154];
 
 /** "z8 0102" のような書き方をバイト列に戻す (0 の連続を縮めてある) */
 function bytesOf(packed: string): Uint8Array {
@@ -95,23 +99,13 @@ interface Entry {
 /**
  * 注釈を書き込んだ .jdf を作る。元の buffer は変えない。
  * 注釈はファイルのほぼ末尾にあり、後ろは 0 埋めだけなので、そこを作り直して長さを書き換える。
+ * ピーク値・積分のほかに Delta が付けた注釈 (種類 10 / 72 / 74 など) は、中身をそのまま写して残す。
+ * それらのつながり (+64〜+74) は、それらどうしだけを指しているので、枠の番号を付け替えるだけでよい
+ * (研究室の 114 ファイルで、ピーク値・積分とは互いに指し合っていないことを確かめた)。
  */
 export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations): ArrayBuffer {
-  const src = new Uint8Array(source);
+  const { src, start, oldLength } = checkSource(source);
   const head = new DataView(source);
-  if (src.length < TOTAL_SIZE + 8 || new TextDecoder().decode(src.subarray(0, 8)) !== 'JEOL.NMR') {
-    throw new JdfWriteError('JEOL Delta のファイルではありません');
-  }
-  if (src[12] !== 1) throw new JdfWriteError('1D のスペクトルにだけ書き戻せます');
-  // 軸の単位 (26 = ppm)。FID (秒) には ppm の注釈を書いても意味がない
-  if (src[33] !== 26) throw new JdfWriteError('Delta で処理済みのスペクトル (ppm の軸) にだけ書き戻せます');
-  const start = Number(head.getBigUint64(ANNOTE_START, false));
-  const oldLength = head.getUint32(ANNOTE_LENGTH, false);
-  if (!start || start > src.length) throw new JdfWriteError('注釈の場所が分かりません');
-  // 注釈のうしろに中身がないことを確かめる (0 埋めだけのはず)
-  for (let i = start + oldLength; i < src.length; i++) {
-    if (src[i] !== 0) throw new JdfWriteError('注釈のうしろに読めない部分があるので、書き換えをやめました');
-  }
 
   const spectrum = readSpectrum(head, source);
   const { data, axis } = spectrum;
@@ -138,8 +132,9 @@ export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations):
     const raw = integralArea(data, axis, hi, lo, true, baseline) / step;
     integrals.push({ from: hi, to: lo, baseline, raw });
   });
-  const count = peaks.length + integrals.length;
-  if (!count) throw new JdfWriteError('書き戻すピーク値と積分がありません');
+  // ピーク値・積分のほかの注釈 (Delta で付けた文字など)
+  const others = otherRecords(src, start, oldLength);
+  const count = peaks.length + integrals.length + others.length;
 
   // 値のそろえ方 (Delta の画面の値 = 生の値 × 倍率)
   const refIndex = ann.reference && ann.reference.index < integrals.length ? ann.reference.index : 0;
@@ -147,7 +142,9 @@ export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations):
   const refRaw = integrals[refIndex]?.raw ?? 0;
   const scale = integrals.length && refRaw ? refValue / refRaw : oldScale(src, start, oldLength);
 
-  const body = HEAD + count * RECORD;
+  // 何もないときは、Delta が空の注釈を書くときと同じく空き枠を 4 つ置く
+  const slots = count || EMPTY_SLOTS;
+  const body = HEAD + slots * RECORD;
   const total = Math.ceil((start + body) / ALIGN) * ALIGN;
   const out = new Uint8Array(total);
   out.set(src.subarray(0, Math.min(start, src.length)));
@@ -156,8 +153,8 @@ export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations):
   // 見出し: 元のファイルのものを使い、つながりと数だけ直す
   out.set(oldLength >= HEAD ? src.subarray(start, start + HEAD) : emptyHead(step), start);
   view.setUint32(start, RECORD, true);
-  view.setUint32(start + 8, count, true);
-  view.setUint32(start + 12, (count + 1) * RECORD, true);
+  view.setUint32(start + 8, slots, true);
+  view.setUint32(start + 12, (slots + 1) * RECORD, true);
   view.setUint16(start + 20, 1, true); // スキップリストの段の数
   for (let o = 52; o <= 62; o += 2) view.setUint16(start + o, 0, true);
   view.setUint16(start + 120, 0, true); // 空き枠なし
@@ -168,13 +165,21 @@ export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations):
     view.setFloat64(start + 224, scale, true);
     view.setFloat64(start + 248, refValue, true);
   }
+  const at = (slot: number) => start + HEAD + slot * RECORD;
 
-  // 枠の並び: ピーク、積分 (古い順) の順
+  if (!count) {
+    // 空き枠の鎖: 見出し +120 が最後の枠、各枠の +0 が 1 つ前の枠 (Delta が書いた空の注釈と同じ)
+    view.setUint16(start + 120, EMPTY_SLOTS, true);
+    view.setUint16(start + 122, 1, true);
+    for (let i = 1; i < EMPTY_SLOTS; i++) view.setUint32(at(i), i, true);
+    return finish(out, view, body, total);
+  }
+
+  // 枠の並び: ピーク、積分 (古い順)、そのほかの注釈 の順
   const entries: Entry[] = [
     ...peaks.map((p, i) => ({ kind: 'peak' as const, ppm: p.ppm, slot: i })),
     ...integrals.map((x, i) => ({ kind: 'integral' as const, ppm: (x.from + x.to) / 2, slot: peaks.length + i })),
   ];
-  const at = (slot: number) => start + HEAD + slot * RECORD;
 
   const peakBytes = bytesOf(PEAK_TEMPLATE);
   peaks.forEach((p, i) => {
@@ -210,23 +215,117 @@ export function writeAnnotations(source: ArrayBuffer, ann: WritableAnnotations):
   });
   if (integrals.length) view.setUint16(start + 222, peaks.length + integrals.length, true);
 
-  // ppm の大きい順の鎖。同じ ppm は 1 つだけ入れ、ピークを優先する (Delta も同じ ppm の積分は鎖から外している)
-  const sorted = entries.slice().sort((a, b) => b.ppm - a.ppm || a.slot - b.slot);
-  const chain: Entry[] = [];
-  for (const e of sorted) {
-    const last = chain[chain.length - 1];
-    if (!last || Math.abs(last.ppm - e.ppm) >= SAME_PPM) chain.push(e);
-    else if (e.kind === 'peak' && last.kind === 'integral') chain[chain.length - 1] = e;
+  // そのほかの注釈: 中身をそのまま写し、つながりの番号だけ付け替える
+  const firstOther = peaks.length + integrals.length;
+  const moved = new Map(others.map((r, i) => [r.slot + 1, firstOther + i + 1]));
+  // まれに積分を指していることがある (研究室のデータで 3 件)。書き直したあとも同じ点・同じ範囲のものを指すようにする
+  const newSlot = new Map<string, number>();
+  peaks.forEach((p, i) => newSlot.set(`p${p.k}`, i + 1));
+  integrals.forEach((x, i) => newSlot.set(`i${spectrum.indexOf(x.from)}-${spectrum.indexOf(x.to)}`, peaks.length + i + 1));
+  for (const r of mainRecords(src, start, oldLength)) {
+    const key = r.peak ? `p${spectrum.indexOf(r.ppm)}` : `i${spectrum.indexOf(r.ppm + r.width / 2)}-${spectrum.indexOf(r.ppm - r.width / 2)}`;
+    const to = newSlot.get(key);
+    if (to) moved.set(r.slot + 1, to);
   }
-  view.setUint16(start + 52, chain[0].slot + 1, true);
-  chain.forEach((e, i) => view.setUint16(at(e.slot) + 64, i + 1 < chain.length ? chain[i + 1].slot + 1 : 0, true));
+  others.forEach((r, i) => {
+    const o = at(firstOther + i);
+    out.set(r.bytes, o);
+    for (const off of LINK_OFFSETS) {
+      const v = view.getUint16(o + off, true);
+      if (v) view.setUint16(o + off, moved.get(v) ?? 0, true);
+    }
+  });
 
+  // ppm の大きい順の鎖。同じ ppm は 1 つだけ入れ、ピークを優先する (Delta も同じ ppm の積分は鎖から外している)
+  if (entries.length) {
+    const sorted = entries.slice().sort((a, b) => b.ppm - a.ppm || a.slot - b.slot);
+    const chain: Entry[] = [];
+    for (const e of sorted) {
+      const last = chain[chain.length - 1];
+      if (!last || Math.abs(last.ppm - e.ppm) >= SAME_PPM) chain.push(e);
+      else if (e.kind === 'peak' && last.kind === 'integral') chain[chain.length - 1] = e;
+    }
+    view.setUint16(start + 52, chain[0].slot + 1, true);
+    chain.forEach((e, i) => view.setUint16(at(e.slot) + 64, i + 1 < chain.length ? chain[i + 1].slot + 1 : 0, true));
+  }
+  return finish(out, view, body, total);
+}
+
+/** 長さと全体の大きさを書き、Delta の決まりを満たすか確かめる */
+function finish(out: Uint8Array<ArrayBuffer>, view: DataView, body: number, total: number) {
   view.setUint32(ANNOTE_LENGTH, body, false);
   view.setBigUint64(TOTAL_SIZE, BigInt(total), false);
-
   const problems = checkAnnotationLinks(out.buffer);
   if (problems.length) throw new JdfWriteError(`Delta の形になっていないので書きませんでした (${problems[0]})`);
   return out.buffer;
+}
+
+/** 書き換えてよいファイルか確かめ、注釈の場所を返す */
+function checkSource(source: ArrayBuffer) {
+  const src = new Uint8Array(source);
+  const head = new DataView(source);
+  if (src.length < TOTAL_SIZE + 8 || new TextDecoder().decode(src.subarray(0, 8)) !== 'JEOL.NMR') {
+    throw new JdfWriteError('JEOL Delta のファイルではありません');
+  }
+  if (src[12] !== 1) throw new JdfWriteError('1D のスペクトルにだけ書き戻せます');
+  // 軸の単位 (26 = ppm)。FID (秒) には ppm の注釈を書いても意味がない
+  if (src[33] !== 26) throw new JdfWriteError('Delta で処理済みのスペクトル (ppm の軸) にだけ書き戻せます');
+  const start = Number(head.getBigUint64(ANNOTE_START, false));
+  const oldLength = head.getUint32(ANNOTE_LENGTH, false);
+  if (!start || start > src.length) throw new JdfWriteError('注釈の場所が分かりません');
+  // 注釈のうしろに中身がないことを確かめる (0 埋めだけのはず)
+  for (let i = start + oldLength; i < src.length; i++) {
+    if (src[i] !== 0) throw new JdfWriteError('注釈のうしろに読めない部分があるので、書き換えをやめました');
+  }
+  return { src, start, oldLength };
+}
+
+/** ピーク値・積分のほかの注釈のレコード (枠の番号と中身) */
+function otherRecords(src: Uint8Array, start: number, length: number) {
+  if (length < HEAD + RECORD) return [];
+  const slots = Math.floor((length - HEAD) / RECORD);
+  const out: { slot: number; bytes: Uint8Array }[] = [];
+  for (let i = 0; i < slots; i++) {
+    const o = start + HEAD + i * RECORD;
+    const type = src[o + 82];
+    if (type && !isPeakType(type) && !isIntegralType(type)) out.push({ slot: i, bytes: src.slice(o, o + RECORD) });
+  }
+  return out;
+}
+
+/** 元のファイルのピーク値・積分のレコード (枠の番号と位置) */
+function mainRecords(src: Uint8Array, start: number, length: number) {
+  if (length < HEAD + RECORD) return [];
+  const v = new DataView(src.buffer, src.byteOffset, src.byteLength);
+  const slots = Math.floor((length - HEAD) / RECORD);
+  const out: { slot: number; peak: boolean; ppm: number; width: number }[] = [];
+  for (let i = 0; i < slots; i++) {
+    const o = start + HEAD + i * RECORD;
+    const type = src[o + 82];
+    if (!isPeakType(type) && !isIntegralType(type)) continue;
+    out.push({ slot: i, peak: isPeakType(type), ppm: v.getFloat64(o, true), width: Math.abs(v.getFloat32(o + 96, true)) });
+  }
+  return out;
+}
+
+/** ファイルの注釈の場所をそのまま取り出す (記録に残して、あとでそのまま戻すため) */
+export function annotationBlock(source: ArrayBuffer): Uint8Array | null {
+  const v = new DataView(source);
+  if (source.byteLength < TOTAL_SIZE + 8) return null;
+  const start = Number(v.getBigUint64(ANNOTE_START, false));
+  const length = v.getUint32(ANNOTE_LENGTH, false);
+  if (!start || start + length > source.byteLength) return null;
+  return new Uint8Array(source.slice(start, start + length));
+}
+
+/** 記録しておいた注釈の場所を、今のファイルにそのまま戻す (Delta が書いたものをそのまま戻すので、ほかの注釈も戻る) */
+export function withAnnotationBlock(source: ArrayBuffer, block: Uint8Array): ArrayBuffer {
+  const { src, start } = checkSource(source);
+  const total = Math.ceil((start + block.length) / ALIGN) * ALIGN;
+  const out = new Uint8Array(total);
+  out.set(src.subarray(0, start));
+  out.set(block, start);
+  return finish(out, new DataView(out.buffer), block.length, total);
 }
 
 /** 元のファイルの積分の倍率 (無ければ 1) */

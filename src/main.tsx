@@ -4,13 +4,21 @@ import App from './App';
 import { figureSvgString, svgToPng } from './lib/exportFigure';
 import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
+import { startDeltaSync } from './state/deltaSync';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
-import { useEditor } from './state/store';
+import { notify, useEditor } from './state/store';
 import './styles.css';
 
+window.addEventListener('nmr-db-blocked', () =>
+  notify('ほかのタブで、このソフトの前の版が開いています。そのタブを閉じると続きが読み込まれます', 'error'),
+);
 void initLibrary();
 // 前回の作業を読み込んでから、変更を自動で保存し始める
-void restoreWork().finally(startAutoSave);
+void restoreWork().finally(() => {
+  startAutoSave();
+  // Delta との同期は、前回の図を読み込んでから始める (図の中の .jdf を見に行くため)
+  startDeltaSync();
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

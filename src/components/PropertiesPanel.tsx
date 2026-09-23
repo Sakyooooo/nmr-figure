@@ -216,6 +216,16 @@ export function FigurePanel() {
               <Check checked={f.showLayerLabels} onChange={(v) => set({ showLayerLabels: v })}>
                 スペクトル名
               </Check>
+              <span title="図から外しても消えません (Delta と同期しているピーク値・積分はそのまま)">
+                <Check checked={f.showPeakLabels !== false} onChange={(v) => set({ showPeakLabels: v })}>
+                  ピーク値
+                </Check>
+              </span>
+              <span title="図から外しても消えません (Delta と同期しているピーク値・積分はそのまま)">
+                <Check checked={f.showIntegrals !== false} onChange={(v) => set({ showIntegrals: v })}>
+                  積分
+                </Check>
+              </span>
             </>
           )}
         </div>

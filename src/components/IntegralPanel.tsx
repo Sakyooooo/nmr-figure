@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSync } from '../state/deltaSync';
 import { integralValues, isReference } from '../lib/integrals';
 import {
   autoDetectSignals,
@@ -21,6 +22,8 @@ export function IntegralPanel() {
   const doc = useEditor((s) => s.doc);
   const data = useEditor((s) => s.data);
   const activeLayerId = useEditor((s) => s.activeLayerId);
+  // Delta と同期しているときは自動で入るので、取り込みのボタンは出さない
+  const synced = useSync((s) => !!activeLayerId && !!s.links[activeLayerId] && s.links[activeLayerId].status !== 'duplicate');
   const selection = useEditor((s) => s.selection);
   const [threshold, setThreshold] = useState(3);
   const [visibleOnly, setVisibleOnly] = useState(false);
@@ -58,7 +61,7 @@ export function IntegralPanel() {
           全部消す
         </button>
       </div>
-      {fromDelta.length > 0 && (
+      {fromDelta.length > 0 && !synced && (
         <div className="row wrap">
           <button
             title="この .jdf に入っている、Delta で引いた積分の範囲をそのまま使います"

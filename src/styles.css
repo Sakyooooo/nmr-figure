@@ -1193,3 +1193,95 @@ details.sub[open] {
     margin: 12mm;
   }
 }
+
+/* Delta との同期・記録 */
+.badge.sync-synced {
+  background: #e3f4e8;
+  color: #1d7a3a;
+}
+.badge.sync-pending,
+.badge.sync-waiting {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge.sync-need-permission,
+.badge.sync-error {
+  background: #fff1d6;
+  color: #9a5b00;
+}
+.sync-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.history {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.history-head {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 8px;
+  background: #f6f7f9;
+  border-bottom: 1px solid var(--line);
+}
+.history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.history li + li {
+  border-top: 1px solid var(--line);
+}
+.history-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 2px 6px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.history-row:hover,
+.history li.open .history-row {
+  background: var(--accent-soft);
+}
+.history-row .muted {
+  grid-column: 2 / -1;
+}
+.history-time {
+  font-variant-numeric: tabular-nums;
+}
+.history-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge.from-delta {
+  background: #efe8fb;
+  color: #5b3aa6;
+}
+.badge.from-app {
+  background: #e3f4e8;
+  color: #1d7a3a;
+}
+.history-detail {
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sync-indicator {
+  color: #1d7a3a;
+  white-space: nowrap;
+}
+.sync-indicator.warn {
+  color: #9a5b00;
+}

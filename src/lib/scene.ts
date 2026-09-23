@@ -9,6 +9,7 @@ import {
   integralsOnAxis,
   peakLabelLength,
   peakLabelText,
+  shownOnFigure,
   titleText,
   toPx,
   type LayerGeom,
@@ -83,7 +84,8 @@ export interface Scene {
   title: string;
 }
 
-export function buildScene(doc: NmrDocument, dataMap: Record<string, Float32Array>): Scene {
+export function buildScene(source: NmrDocument, dataMap: Record<string, Float32Array>): Scene {
+  const doc = shownOnFigure(source);
   const layout = computeLayout(doc, dataMap);
   const f = doc.figure;
   const { plot } = layout;
