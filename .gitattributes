@@ -1,0 +1,4 @@
+# 生成物・テストで比べるものは改行を LF に固定する (Windows の checkout で CRLF になると比べられない)
+src/components/__snapshots__/*.svg text eol=lf
+src/styles/tokens.css text eol=lf
+src/components/iconPaths.ts text eol=lf
