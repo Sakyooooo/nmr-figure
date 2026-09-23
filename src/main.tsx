@@ -15,7 +15,7 @@ window.addEventListener('nmr-db-blocked', () => {
   const el = document.createElement('div');
   el.id = 'db-blocked';
   el.className = 'db-blocked';
-  el.textContent = 'ほかのタブで、このソフトの前の版が開いています。そのタブを閉じる (または再読み込みする) と、ここで続きが読み込まれます。';
+  el.textContent = 'ブラウザの保存領域を開けずに待っています。ほかのタブでこのソフト (前の版) が開いていたら、そのタブを閉じる (または再読み込みする) と、ここで続きが読み込まれます。';
   document.body.appendChild(el);
 });
 window.addEventListener('nmr-db-open', () => document.getElementById('db-blocked')?.remove());

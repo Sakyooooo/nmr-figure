@@ -18,7 +18,11 @@ function open(): Promise<IDBDatabase> {
         if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
       }
     };
+    // 古い版のタブが開いたままだと、閉じられるまで待たされる。画面で知らせる (main.tsx)。
+    // そのタブが裏で止まっていると blocked が来ないことがあるので、3 秒たっても開けなければ知らせる
+    const slow = setTimeout(() => window.dispatchEvent(new Event('nmr-db-blocked')), 3000);
     req.onsuccess = () => {
+      clearTimeout(slow);
       // 新しい版のアプリが別のタブで開いたら、こちらは閉じて道を空ける (閉じないと向こうの更新が止まったままになる)
       req.result.onversionchange = () => {
         req.result.close();
@@ -27,8 +31,10 @@ function open(): Promise<IDBDatabase> {
       window.dispatchEvent(new Event('nmr-db-open'));
       resolve(req.result);
     };
-    req.onerror = () => reject(req.error);
-    // 古い版のタブが開いたままだと、閉じられるまで待たされる。画面で知らせる (main.tsx)
+    req.onerror = () => {
+      clearTimeout(slow);
+      reject(req.error);
+    };
     req.onblocked = () => window.dispatchEvent(new Event('nmr-db-blocked'));
   });
   return opening;
