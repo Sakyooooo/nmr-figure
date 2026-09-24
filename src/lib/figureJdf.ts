@@ -9,7 +9,7 @@
  * 2D と、文献のスペクトルだけの図は .jdf にできない (.nmrfig で保存する)
  */
 import type { NmrDocument, SpectrumMeta } from '../state/types';
-import { layerAnnotations } from './deltaSync';
+import { layerAnnotations, shiftAnnotations } from './deltaSync';
 import type { FidData } from './fid';
 import { embedFigure, type FigureSummary } from './jdfEmbed';
 import { writeProcessedJdf } from './jdfProcessed';
@@ -56,6 +56,8 @@ export async function buildFigureJdf(template: ArrayBuffer, doc: NmrDocument, ba
   } else if (new Uint8Array(template)[HEADER.unitBase] !== UNIT_PPM) {
     throw new JdfFormatError('土台のファイルが処理済みのスペクトルではありません');
   }
-  bytes = writeAnnotations(bytes, layerAnnotations(doc, base.layerId));
+  // FID から処理して書いたファイルの軸には基準合わせのずれが入っている。図の ppm (ずれの前) をそのぶんずらして書く
+  const shift = base.meta.processing ? base.meta.refOffset : 0;
+  bytes = writeAnnotations(bytes, shiftAnnotations(layerAnnotations(doc, base.layerId), shift));
   return embedFigure(bytes, json, figureSummaryOf(doc));
 }

@@ -20,6 +20,12 @@ export function SyncPanel() {
     const meta = layer && s.doc.spectra.find((x) => x.id === layer.spectrumId);
     return meta && !meta.simulated ? syncFileOf(meta) : '';
   });
+  // FID から処理して、まだ図入りの .jdf に保存していないスペクトル (保存すると同期が始まる)
+  const fidUnsaved = useEditor((s) => {
+    const layer = s.doc.layers.find((l) => l.id === s.activeLayerId);
+    const meta = layer && s.doc.spectra.find((x) => x.id === layer.spectrumId);
+    return !!meta?.processing && !meta.syncFile;
+  });
   const synced = !!view && view.status !== 'duplicate';
   // .jdf のファイルに届いている (書き出し・最初のファイルに戻すが使える)
   const hasFile = synced && view.status !== 'waiting';
@@ -60,7 +66,9 @@ export function SyncPanel() {
       help={
         synced
           ? `ピーク値・積分を変えると ${view.fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。`
-          : '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。'
+          : fidUnsaved
+            ? '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。FID から処理したスペクトルは、図を保存すると (図入りの .jdf)、その .jdf と Delta の同期が始まります。'
+            : '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。'
       }
     >
       {synced && <SyncStatus view={view} layerId={layerId} />}

@@ -9,9 +9,23 @@
  */
 import { create } from 'zustand';
 import { dbGet, dbPut } from '../lib/db';
-import { annotationKey, applyAnnotations, canSyncDelta, fileAnnotations, layerAnnotations, shownValues, summary, syncFileOf } from '../lib/deltaSync';
+import {
+  annotationKey,
+  applyAnnotations,
+  canSyncDelta,
+  dataSignature,
+  fileAnnotations,
+  fileShift,
+  layerAnnotations,
+  sameShape,
+  shiftAnnotations,
+  shownValues,
+  summary,
+  syncFileOf,
+} from '../lib/deltaSync';
 import { downloadBlob, baseName } from '../lib/exportFigure';
 import { readJdf } from '../lib/jdf';
+import { writeProcessedJdf } from '../lib/jdfProcessed';
 import { annotationBlock, withAnnotationBlock, writeAnnotations, type WritableAnnotations } from '../lib/jdfWrite';
 import { invalidateSavedData } from './autosave';
 import { ask } from './dialog';
@@ -44,6 +58,11 @@ interface Link {
   key: string | null;
   /** このアプリで変えたのに、まだ書いていない変更の時刻 */
   localChangedAt: number | null;
+  /**
+   * FID から処理したスペクトル: ファイルのデータを作ったときの処理 (lib/deltaSync.ts の dataSignature)。
+   * 今の処理と違えば、ピーク値・積分が同じでもデータを書き直す。null はファイルのデータが今の処理と違う
+   */
+  dataKey: string | null;
   attached: boolean;
   chain: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
@@ -121,7 +140,7 @@ function reconcile() {
   for (const [layerId, w] of wanted) {
     let link = links.get(layerId);
     if (!link) {
-      link = { layerId, ...w, handle: null, mtime: null, key: null, localChangedAt: null, attached: false, chain: Promise.resolve() };
+      link = { layerId, ...w, handle: null, mtime: null, key: null, localChangedAt: null, dataKey: null, attached: false, chain: Promise.resolve() };
       links.set(layerId, link);
       const l = link;
       queue(l, () => attach(l));
@@ -185,9 +204,15 @@ function layerState(layerId: string) {
 
 type AppState = NonNullable<ReturnType<typeof layerState>>;
 
+/** ファイルのピーク値・積分を、図の軸 (基準合わせのずれの前) で */
 function fileState(bytes: ArrayBuffer, app: AppState) {
-  const ann = fileAnnotations(bytes);
+  const ann = shiftAnnotations(fileAnnotations(bytes), -fileShift(bytes, app.meta));
   return { ann, key: annotationKey(ann, app.data, app.meta) };
+}
+
+/** 図のピーク値・積分を、このファイルの軸にして書く */
+function writeLayerAnnotations(bytes: ArrayBuffer, ann: WritableAnnotations, meta: SpectrumMeta) {
+  return writeAnnotations(bytes, shiftAnnotations(ann, fileShift(bytes, meta)));
 }
 
 function entryOf(source: HistoryEntry['source'], note: string, ann: WritableAnnotations, key: string, app: AppState, block?: Uint8Array | null) {
@@ -216,6 +241,8 @@ function settle(link: Link, mtime: number, key: string, direction: LinkView['dir
   link.mtime = mtime;
   link.key = key;
   link.localChangedAt = null;
+  const app = appState(link);
+  link.dataKey = app ? dataSignature(app.meta) : null;
   void saveRecord(link);
   const now = Date.now();
   show(link, { status: 'synced', message: '', lastSyncAt: direction ? now : (useSync.getState().links[link.layerId]?.lastSyncAt ?? now), direction });
@@ -232,7 +259,8 @@ async function attach(link: Link) {
   link.handle = handle;
   const file = await handle.getFile();
   const bytes = await file.arrayBuffer();
-  await reloadIfReprocessed(link, bytes);
+  const record = await dbGet<SyncRecord>('sync', recordKey(link));
+  await reloadIfReprocessed(link, bytes, !record || file.lastModified !== record.mtime);
   const app = appState(link);
   if (!app) return;
   const fromFile = fileState(bytes, app);
@@ -241,10 +269,12 @@ async function attach(link: Link) {
     skipIfSeen: true,
   });
   link.attached = true;
-  const record = await dbGet<SyncRecord>('sync', recordKey(link));
+  // FID から処理したスペクトルで、この図を閉じている間にこのアプリで処理を変えていた (ファイルのデータが古い)
+  const dataOk = fileDataMatches(bytes, app);
 
   if (fromFile.key === app.key) {
     settle(link, file.lastModified, app.key, null);
+    if (!dataOk) await rewriteData(link);
     return;
   }
   if (record) {
@@ -279,6 +309,25 @@ async function attach(link: Link) {
     }
   }
   await pull(link, file.lastModified, fromFile, app, record ? 'Delta で保存された中身を反映' : 'Delta のピーク値・積分を読み込み');
+  if (!dataOk) await rewriteData(link);
+}
+
+/** FID から処理したスペクトル: ファイルのデータが、今の処理で作ったものと同じか (Delta で処理したスペクトルは常に true) */
+function fileDataMatches(bytes: ArrayBuffer, app: AppState) {
+  if (!app.meta.processing) return true;
+  try {
+    const loaded = readJdf(bytes, 'check.jdf');
+    return loaded.meta.n === app.meta.n && Math.abs(loaded.meta.first - (app.meta.first + app.meta.refOffset)) < 1e-6 && sameShape(loaded.data, app.data);
+  } catch {
+    return false;
+  }
+}
+
+/** ピーク値・積分は同じだが、データ (FID からの処理) だけ書き直す */
+async function rewriteData(link: Link) {
+  link.dataKey = null;
+  link.localChangedAt = Date.now();
+  await push(link);
 }
 
 /** 確認は 1 つずつ出す (同時に出すと前のものが閉じてしまう) */
@@ -313,8 +362,12 @@ async function pull(link: Link, mtime: number, fromFile: { ann: WritableAnnotati
   notify(`${message}: ${link.fileName} (${summary(fromFile.ann)})`);
 }
 
-/** Delta で処理し直して (位相など) 保存されていたら、スペクトルも読み直す */
-async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer) {
+/**
+ * Delta で処理し直して (位相など) 保存されていたら、スペクトルも読み直す。
+ * FID からこのアプリで処理したスペクトルは、ファイルのデータもこのアプリが書いたもの。ファイルが変わっていて (fileChanged)、
+ * データが今の処理と違うときだけ Delta で処理し直したとみなし、Delta のスペクトルに切り替える (このアプリの位相補正は使わなくなる)
+ */
+async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer, fileChanged = true) {
   const s = useEditor.getState();
   const meta = s.doc.spectra.find((x) => x.id === link.spectrumId);
   const data = s.data[link.spectrumId];
@@ -323,6 +376,52 @@ async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer) {
   try {
     loaded = readJdf(bytes, link.fileName);
   } catch {
+    return;
+  }
+  if (meta.processing) {
+    const app = appState(link);
+    if (!fileChanged || !app || fileDataMatches(bytes, app)) return;
+    useEditor.setState((st) => {
+      const fids = { ...st.fids };
+      delete fids[link.spectrumId];
+      return { data: { ...st.data, [link.spectrumId]: loaded.data }, sources: { ...st.sources, [link.spectrumId]: bytes }, fids };
+    });
+    applying = true;
+    try {
+      edit((d) => {
+        const m = d.spectra.find((x) => x.id === link.spectrumId);
+        if (!m) return;
+        // Delta のファイルの軸には基準合わせのずれが入っている。refOffset を 0 にするので、
+        // このスペクトルに付いているもの (ずれの前の ppm で持っている) もそのぶんずらす (表示の位置は変わらない)
+        const shift = m.refOffset;
+        const layerIds = new Set(d.layers.filter((l) => l.spectrumId === m.id).map((l) => l.id));
+        if (shift) {
+          for (const x of d.integrals) {
+            if (!layerIds.has(x.layerId)) continue;
+            x.from += shift;
+            x.to += shift;
+          }
+          for (const p of d.peakLabels) if (layerIds.has(p.layerId)) p.ppm += shift;
+          for (const k of d.markers) if (layerIds.has(k.layerId)) k.ppm += shift;
+          for (const a of d.annotations) {
+            if (!layerIds.has(a.layerId)) continue;
+            a.x1 += shift;
+            a.x2 += shift;
+          }
+        }
+        m.processing = null;
+        m.refOffset = 0;
+        m.first = loaded.meta.first;
+        m.last = loaded.meta.last;
+        m.n = loaded.meta.n;
+        m.maxAbs = loaded.meta.maxAbs;
+        m.delta = loaded.meta.delta ?? null;
+      }, false);
+    } finally {
+      applying = false;
+    }
+    invalidateSavedData();
+    notify(`Delta で処理し直したスペクトルに切り替えました: ${link.fileName} (このソフトでの位相補正などは使わなくなります)`);
     return;
   }
   if (sameSpectrum(meta, data, loaded.meta, loaded.data)) return;
@@ -358,7 +457,7 @@ function onEdited() {
     if (!link.attached) continue;
     const app = appState(link);
     if (!app) continue;
-    if (app.key === link.key) {
+    if (upToDate(link, app)) {
       // 元に戻して、合わせたときと同じ中身になった
       clearTimeout(link.timer);
       link.localChangedAt = null;
@@ -387,9 +486,14 @@ async function writable(link: Link, askUser: boolean): Promise<boolean> {
   return state === 'granted';
 }
 
+/** ファイルに書いてある中身と同じか (ピーク値・積分と、FID から処理したスペクトルならその処理) */
+function upToDate(link: Link, app: AppState) {
+  return app.key === link.key && (!app.meta.processing || link.dataKey === dataSignature(app.meta));
+}
+
 async function push(link: Link) {
   const app = appState(link);
-  if (!app || !link.handle || app.key === link.key) return;
+  if (!app || !link.handle || upToDate(link, app)) return;
   // 編集した直後ならブラウザが許可の確認を出せる
   const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive ?? false;
   if (!(await writable(link, activation))) {
@@ -417,7 +521,10 @@ async function push(link: Link) {
   await keepOriginal(link.fileName, bytes);
   // 上書きする前の中身 (直前の記録と同じなら足さない)
   await addHistory(link.fileName, entryOf('delta', '書き込む前の Delta のファイル', before.ann, before.key, current, annotationBlock(bytes)));
-  const out = writeAnnotations(bytes, current.ann);
+  // FID から処理したスペクトルは、今の処理 (位相・線幅・基準) でデータも書き直す (図の中身のパラメーターはそのまま残る)
+  const fid = current.meta.processing ? useEditor.getState().fids[current.meta.id] : undefined;
+  const base = fid && current.meta.processing ? writeProcessedJdf(bytes, fid, current.meta.processing, current.meta.refOffset) : bytes;
+  const out = writeLayerAnnotations(base, current.ann, current.meta);
   await writeFile(link.handle, out);
   const written = await link.handle.getFile();
   await addHistory(link.fileName, entryOf('app', 'このソフトで編集', current.ann, current.key, current));
@@ -508,7 +615,7 @@ export async function restoreEntry(layerId: string, entry: HistoryEntry) {
   const link = links.get(layerId);
   const time = new Date(entry.at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   if (!link?.handle) {
-    // Delta と同期していないスペクトル (FID をこのソフトで処理したものなど): 図だけ戻す (元に戻すで戻せる)
+    // Delta と同期していないスペクトル (FID から処理して、まだ図入りの .jdf に保存していないものなど): 図だけ戻す (元に戻すで戻せる)
     const ok = await ask('この時点に戻す', `${time} の中身 (${summary(entry.annotations)}) に、図のピーク値・積分を戻します。`, [
       { label: '戻す', value: 'ok', kind: 'primary' },
     ]);
@@ -530,7 +637,7 @@ export async function restoreEntry(layerId: string, entry: HistoryEntry) {
     const now = fileState(bytes, before);
     await keepOriginal(link.fileName, bytes);
     await addHistory(link.fileName, entryOf('delta', '戻す前の Delta のファイル', now.ann, now.key, before, annotationBlock(bytes)));
-    const out = entry.block ? withAnnotationBlock(bytes, entry.block) : writeAnnotations(bytes, entry.annotations);
+    const out = entry.block ? withAnnotationBlock(bytes, entry.block) : writeLayerAnnotations(bytes, entry.annotations, before.meta);
     await writeFile(link.handle!, out);
     await applyFile(link, out, `${time} の記録から戻した`);
   });
@@ -560,7 +667,8 @@ export async function restoreOriginal(layerId: string) {
 
 /** 書いたファイルの中身を図に入れて、記録に残す */
 async function applyFile(link: Link, bytes: ArrayBuffer, note: string) {
-  await reloadIfReprocessed(link, bytes);
+  // このアプリが書いたファイル。FID から処理したスペクトルは、処理が違っても次に書くときに直るので切り替えない
+  await reloadIfReprocessed(link, bytes, false);
   const app = appState(link)!;
   const fromFile = fileState(bytes, app);
   applying = true;
@@ -581,7 +689,8 @@ export async function exportEntry(layerId: string, entry: HistoryEntry) {
   const link = links.get(layerId);
   if (!link?.handle) return;
   const bytes = await (await link.handle.getFile()).arrayBuffer();
-  const out = entry.block ? withAnnotationBlock(bytes, entry.block) : writeAnnotations(bytes, entry.annotations);
+  const meta = appState(link)?.meta;
+  const out = entry.block ? withAnnotationBlock(bytes, entry.block) : meta ? writeLayerAnnotations(bytes, entry.annotations, meta) : writeAnnotations(bytes, entry.annotations);
   const stamp = new Date(entry.at).toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const name = `${baseName(link.fileName)}-${stamp}.jdf`;
   const picker = (window as Window & { showSaveFilePicker?: (o: object) => Promise<FileHandle> }).showSaveFilePicker;

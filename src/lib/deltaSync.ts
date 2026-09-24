@@ -13,9 +13,53 @@ import type { WritableAnnotations } from './jdfWrite';
 
 type Axis = Pick<SpectrumMeta, 'first' | 'last' | 'n' | 'refOffset'>;
 
-/** Delta と行き来できるスペクトルか (Delta で処理済みの 1D。FID をこのアプリで処理したものや文献のものは不可) */
+/**
+ * Delta と行き来できるスペクトルか。Delta で処理済みの 1D と、FID からこのアプリで処理して図入りの .jdf に保存したもの
+ * (そのファイルは Delta の処理済みの形で書いてある)。まだ保存していない FID と、文献のものは不可
+ */
 export function canSyncDelta(meta: SpectrumMeta | undefined): meta is SpectrumMeta {
-  return !!meta && !meta.processing && !meta.simulated && /\.jdf$/i.test(syncFileOf(meta));
+  if (!meta || meta.simulated) return false;
+  if (meta.processing) return !!meta.syncFile && /\.jdf$/i.test(meta.syncFile);
+  return /\.jdf$/i.test(syncFileOf(meta));
+}
+
+/**
+ * ファイルの軸と図の軸 (データの軸。表示はこれに refOffset を足したもの) のずれ。
+ * FID から処理して書いた .jdf は基準合わせのずれを軸に入れてあるので、そのぶんずれている。Delta で処理したものは 0
+ */
+export function fileShift(bytes: ArrayBuffer, meta: SpectrumMeta): number {
+  if (!meta.processing || bytes.byteLength < 400) return 0;
+  return new DataView(bytes).getFloat64(272, false) - meta.first;
+}
+
+/** ピーク値・積分の ppm をずらす (図の軸 → ファイルの軸は +shift、戻すときは −shift) */
+export function shiftAnnotations(ann: WritableAnnotations, shift: number): WritableAnnotations {
+  if (!shift) return ann;
+  return {
+    ...ann,
+    peaks: ann.peaks.map((p) => ({ ppm: p.ppm + shift })),
+    integrals: ann.integrals.map((x) => ({ ...x, from: x.from + shift, to: x.to + shift })),
+  };
+}
+
+/** FID から処理したスペクトルの「データの作り方」(これが変わったら、同期している .jdf のデータも書き直す)。Delta で処理したものは空 */
+export function dataSignature(meta: SpectrumMeta): string {
+  return meta.processing ? JSON.stringify([meta.processing, meta.refOffset, meta.n]) : '';
+}
+
+/** 2 つのスペクトルの形が同じか (強度の倍率の違いは見ない) */
+export function sameShape(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length || !a.length) return false;
+  let ma = 0;
+  let mb = 0;
+  for (let i = 0; i < a.length; i++) {
+    ma = Math.max(ma, Math.abs(a[i]));
+    mb = Math.max(mb, Math.abs(b[i]));
+  }
+  if (!ma || !mb) return ma === mb;
+  const s = ma / mb;
+  for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i] * s) > 1e-5 * ma) return false;
+  return true;
 }
 
 /** 同期する .jdf の名前 (図を .jdf に保存したあとの土台のスペクトルは、その図のファイル) */

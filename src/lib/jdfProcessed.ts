@@ -8,7 +8,8 @@
  * - base_freq = 基準を合わせたあとの観測中心の周波数 = 0 ppm の周波数 × (1 + (x_offset − ずらした ppm) × 10⁻⁶)
  * - zero_point = 基準合わせでずらした量 (Hz) = ずらした ppm × base_freq
  * - 文脈から「これから当てる処理」(UNAPPLIED_PROCESSING_LIST) を外す (Delta の処理済みのファイルにはない)
- * - 強度は一番大きい点を 1 にそろえる (Delta も normalized = TRUE で、最大が 1 前後)
+ * 強度はこのアプリと同じ値のまま書く (Delta は最大 1 前後にそろえるが、そろえると Delta と行き来する積分のベースラインの単位が図と合わなくなる)。
+ * 軸には基準合わせのずれ (refOffset) を入れるので、図のピーク値・積分 (ずれの前の軸) は +refOffset して書く (lib/deltaSync.ts の shiftAnnotations)。
  * 注釈は空。ピーク値・積分は lib/jdfWrite.ts で足す。
  */
 import { finish, phaseImag, transform, type FidData, type Processing } from './fid';
@@ -33,15 +34,12 @@ export function writeProcessedJdf(template: ArrayBuffer, fid: FidData, processin
   const n = real.length;
   const points = Math.ceil(n / POINT_ALIGN) * POINT_ALIGN;
   const offset = Math.ceil((points - n) / 2);
-  let max = 0;
-  for (const v of real) max = Math.max(max, Math.abs(v));
-  const scale = max > 0 ? 1 / max : 1;
 
   const data = new Uint8Array(points * 2 * 8);
   const dv = new DataView(data.buffer);
   for (let k = 0; k < n; k++) {
-    dv.setFloat64((offset + k) * 8, real[k] * scale, true);
-    dv.setFloat64((points + offset + k) * 8, imag[k] * scale, true);
+    dv.setFloat64((offset + k) * 8, real[k], true);
+    dv.setFloat64((points + offset + k) * 8, imag[k], true);
   }
   parts.data = data;
 

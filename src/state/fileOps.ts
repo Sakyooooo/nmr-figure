@@ -1,4 +1,4 @@
-import { annotationKey, applyAnnotations, fileAnnotations, layerAnnotations, summary, syncFileOf } from '../lib/deltaSync';
+import { annotationKey, applyAnnotations, fileAnnotations, fileShift, layerAnnotations, shiftAnnotations, summary, syncFileOf } from '../lib/deltaSync';
 import { baseName, copyFigureToClipboard, downloadBlob, figureSvgString, svgToPng } from '../lib/exportFigure';
 import { buildFigureJdf, figureBaseOf, type FigureBase } from '../lib/figureJdf';
 import { JdfError, readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
@@ -144,13 +144,14 @@ async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: File
   }
   const { doc, data, fids, fids2d, data2d, jdfBase } = project;
   const base = doc.spectra.find((s) => s.id === jdfBase);
-  if (base && !base.processing) base.syncFile = fileName;
+  if (base) base.syncFile = fileName;
   if (handle) registerJdfHandle(fileName, handle);
   loadDocument(doc, data, fileName, handle, fids, { data2d, fids2d });
   if (base) useEditor.setState((s) => ({ sources: { ...s.sources, [base.id]: buffer } }));
   notify(`${fileName} (図) を開きました`);
-  // FID から処理した土台は自動では同期しないので、Delta で変えたピーク値・積分があれば、入れるか聞く
-  if (base?.processing) await offerDeltaChanges(buffer, fileName, base);
+  // ふつうは Delta との同期 (state/deltaSync.ts) がファイルの中身と合わせる。ファイルに書けない開き方
+  // (ファイルを選ぶ画面のない古いブラウザなど) のときだけ、Delta で変えたピーク値・積分を入れるかここで聞く
+  if (base && !jdfHandle(fileName)) await offerDeltaChanges(buffer, fileName, base);
 }
 
 async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: SpectrumMeta) {
@@ -158,7 +159,7 @@ async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: Sp
   const layer = doc.layers.find((l) => l.spectrumId === base.id);
   const values = data[base.id];
   if (!layer || !values) return;
-  const fromFile = fileAnnotations(buffer);
+  const fromFile = shiftAnnotations(fileAnnotations(buffer), -fileShift(buffer, base));
   const inFigure = layerAnnotations(doc, layer.id);
   if (annotationKey(fromFile, values, base) === annotationKey(inFigure, values, base)) return;
   const choice = await ask(
@@ -359,10 +360,9 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
       handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultJdfName(base), types: JDF_TYPES, ...(near ? { startIn: near } : {}) });
     }
     const name = handle?.name ?? defaultJdfName(base);
-    // 土台のスペクトル (Delta で処理したもの) は、保存したあとこのファイルと同期する。図の中身にもそう書いておく
-    const syncable = !base.meta.processing;
+    // 土台のスペクトルは、保存したあとこのファイルと同期する (FID から処理したものも)。図の中身にもそう書いておく
     const s = useEditor.getState();
-    const doc = syncable ? { ...s.doc, spectra: s.doc.spectra.map((m) => (m.id === base.meta.id ? { ...m, syncFile: name } : m)) } : s.doc;
+    const doc = { ...s.doc, spectra: s.doc.spectra.map((m) => (m.id === base.meta.id ? { ...m, syncFile: name } : m)) };
     const json = serializeProject(doc, s.data, s.fids, s.fids2d, { jdfBase: base.meta.id });
     let bytes: ArrayBuffer;
     try {
@@ -384,7 +384,7 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
       // 書けてから、同期の相手をこのファイルにする (先に変えると、まだ空のファイルを読みに行ってしまう)
       registerJdfHandle(name, handle);
       useEditor.setState((st) => ({ sources: { ...st.sources, [base.meta.id]: bytes } }));
-      if (syncable && base.meta.syncFile !== name) {
+      if (base.meta.syncFile !== name) {
         edit((d) => {
           const m = d.spectra.find((x) => x.id === base.meta.id);
           if (m) m.syncFile = name;

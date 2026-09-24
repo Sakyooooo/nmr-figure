@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { addSpectra, edit, loadDocument, useEditor } from '../state/store';
 import { emptyDocument } from '../state/types';
-import { layerAnnotations } from './deltaSync';
+import { annotationKey, canSyncDelta, fileAnnotations, fileShift, layerAnnotations, sameShape, shiftAnnotations } from './deltaSync';
+import { writeProcessedJdf } from './jdfProcessed';
+import { writeAnnotations } from './jdfWrite';
 import { buildFigureJdf, figureBaseOf } from './figureJdf';
 import { readJdf, type LoadedSpectrum } from './jdf';
 import { readAnnotations } from './jdfAnnotations';
@@ -79,6 +81,37 @@ describe.skipIf(!has(DELTA) || !has(DELTA_B) || !has(FID))('図を .jdf にす�
     const again = await buildFigureJdf(out, back.doc, figureBaseOf(back.doc)!, json, back.fids[base.meta.id]);
     expect([...readJdf(again, 'again.jdf').data]).toEqual([...asDelta.data]);
     expect(await readEmbeddedFigure(again)).toBe(json);
+  });
+
+  it('FID の土台も保存したあとは同期できる。保存した直後はファイルと図が同じ中身で、位相を変えるとデータの違いが分かる', async () => {
+    const s = open([read(FID)]);
+    const base = figureBaseOf(s.doc)!;
+    expect(canSyncDelta(base.meta)).toBe(false); // まだ .jdf に保存していない
+    expect(canSyncDelta({ ...base.meta, syncFile: 'fig.jdf' })).toBe(true);
+    const layer = base.layerId;
+    edit((d) => {
+      d.peakLabels.push({ id: 'p', layerId: layer, ppm: 7.15 });
+      d.integrals.push({ id: 'i', layerId: layer, from: 7.3, to: 7.0 });
+    });
+    const st = useEditor.getState();
+    const meta = st.doc.spectra[0];
+    const json = serializeProject(st.doc, st.data, st.fids, st.fids2d, { jdfBase: meta.id });
+    const out = await buildFigureJdf(buf(FID), st.doc, base, json, st.fids[meta.id]);
+    // 注釈の鍵 (同期で比べるもの) が図と同じ = 保存した直後に読み直しや確認が起きない
+    const app = layerAnnotations(st.doc, layer);
+    expect(annotationKey(shiftAnnotations(fileAnnotations(out), -fileShift(out, meta)), st.data[meta.id], meta)).toBe(annotationKey(app, st.data[meta.id], meta));
+    // Delta では、図に出ている ppm (基準合わせのあと) の所にピーク値が出る
+    expect(meta.refOffset).not.toBe(0);
+    expect(Math.abs(readAnnotations(out).peaks[0].ppm - (7.15 + meta.refOffset))).toBeLessThan(0.001);
+    // ファイルのデータは今の処理と同じ (強度もこのアプリと同じ)
+    const inFile = readJdf(out, 'fig.jdf').data;
+    expect(sameShape(inFile, st.data[meta.id])).toBe(true);
+    // 位相を変えると形が違う → 同期でデータを書き直す。書き直しても図の中身は残る
+    const turned = { ...meta.processing!, ph0: meta.processing!.ph0 + 40 };
+    const rewritten = writeAnnotations(writeProcessedJdf(out, st.fids[meta.id], turned, meta.refOffset), shiftAnnotations(app, meta.refOffset));
+    expect(sameShape(readJdf(rewritten, 'fig.jdf').data, st.data[meta.id])).toBe(false);
+    expect(await readEmbeddedFigure(rewritten)).toBe(json);
+    expect(annotationKey(shiftAnnotations(fileAnnotations(rewritten), -fileShift(rewritten, meta)), st.data[meta.id], meta)).toBe(annotationKey(app, st.data[meta.id], meta));
   });
 
   it('土台が処理済みでも FID でもないファイルなら作らない', async () => {
