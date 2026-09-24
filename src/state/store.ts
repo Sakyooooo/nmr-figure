@@ -691,7 +691,7 @@ export function updateAnnotation(id: string, patch: Partial<Annotation>, record 
  * 図に構造式・画像を置く。位置は図の左上からの割合。
  * ratio (高さ÷幅) は、SVG の viewBox や画像の大きさから計算して渡す
  */
-export function addFigureImage(item: { svg?: string | null; href?: string | null; source?: string | null; ratio: number }) {
+export function addFigureImage(item: { svg?: string | null; href?: string | null; source?: string | null; cdxml?: string | null; ratio: number; w?: number }) {
   const id = crypto.randomUUID();
   edit((d) => {
     // 少しずつずらして置く (重ならないように)
@@ -701,9 +701,10 @@ export function addFigureImage(item: { svg?: string | null; href?: string | null
       svg: item.svg ?? null,
       href: item.href ?? null,
       source: item.source ?? null,
+      ...(item.cdxml ? { cdxml: item.cdxml } : {}),
       x: 0.08 + 0.03 * (k % 5),
       y: 0.08 + 0.03 * (k % 5),
-      w: 0.26,
+      w: item.w ?? 0.26,
       ratio: item.ratio || 0.7,
     });
   });
@@ -752,7 +753,11 @@ export function deleteSelection() {
     if (selection.kind === 'marker') d.markers = d.markers.filter((m) => m.id !== selection.id);
     if (selection.kind === 'peakLabel') d.peakLabels = d.peakLabels.filter((p) => p.id !== selection.id);
     if (selection.kind === 'integral') d.integrals = d.integrals.filter((x) => x.id !== selection.id);
-    if (selection.kind === 'image') d.figureImages = d.figureImages.filter((x) => x.id !== selection.id);
+    if (selection.kind === 'image') {
+      d.figureImages = d.figureImages.filter((x) => x.id !== selection.id);
+      // 構造式に固定した印も一緒に消す
+      d.annotations = d.annotations.filter((a) => a.imageId !== selection.id);
+    }
     if (selection.kind === 'legend') d.figure.showLegend = false;
     pruneStyles(d);
   });
@@ -772,8 +777,12 @@ export function pasteAnnotation(source?: Annotation) {
   const a = source ?? get().clipboard;
   if (!a) return false;
   const { doc } = get();
-  const dx = (doc.view.xMax - doc.view.xMin) * 0.015;
-  const copy: Omit<Annotation, 'id'> & { id?: string } = { ...a, x1: a.x1 - dx, x2: a.x2 - dx, y1: a.y1 - 0.03, y2: a.y2 - 0.03 };
+  // 構造式に固定したものは枠に対する割合で、スペクトルに固定したものは ppm と強度でずらす
+  const onImage = !!a.imageId && doc.figureImages.some((x) => x.id === a.imageId);
+  const dx = onImage ? -0.04 : (doc.view.xMax - doc.view.xMin) * 0.015;
+  const dy = onImage ? -0.04 : 0.03;
+  const copy: Omit<Annotation, 'id'> & { id?: string } = { ...a, x1: a.x1 - dx, x2: a.x2 - dx, y1: a.y1 - dy, y2: a.y2 - dy };
+  if (a.imageId && !onImage) return false;
   delete copy.id;
   addAnnotation(copy);
   return true;

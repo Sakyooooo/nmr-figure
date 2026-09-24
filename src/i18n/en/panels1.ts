@@ -194,4 +194,7 @@ export const EN_PANELS1: Record<string, string> = {
   '縦方向 (F1) のゼロ詰め。増やすと縦に滑らかになります': 'Zero filling in F1 (vertical). More makes it smoother vertically',
   'F1 ゼロ詰め': 'F1 zero filling',
   '点の数: F2': 'Points: F2',
+  '選択中の構造式 (ChemDraw)': 'Selected structure (ChemDraw)',
+  'ChemDraw で直す': 'Edit in ChemDraw',
+  'ChemDraw で直したら「Edit > Copy As > CDXML Text」でコピーし、この構造式を選んだまま貼ると置き換わります。上に置いた文字は構造式と一緒に動きます。「書き出し > ChemDraw で開く」から Word に貼ると、Word の上でも ChemDraw で直せます。': 'After editing in ChemDraw, copy it with Edit > Copy As > CDXML Text and paste while this structure is selected to replace it. Text you put on the structure moves with it. Paste into Word through Export > Open in ChemDraw to keep it editable in ChemDraw there too.',
 };

@@ -1,4 +1,4 @@
-import type { Annotation, Dash, MarkerStyle, NmrDocument } from '../state/types';
+import type { Annotation, Dash, FigureImage, MarkerStyle, NmrDocument } from '../state/types';
 import { decimalsFor, niceStep, spreadLabels, ticks } from './labels';
 import { cumulative, integralValues } from './integrals';
 import {
@@ -221,6 +221,13 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
 
   const annotations: PlacedAnnotation[] = [];
   for (const a of doc.annotations) {
+    if (a.imageId) {
+      // 構造式に固定した印: 構造式の枠に対する割合
+      const image = doc.figureImages.find((x) => x.id === a.imageId);
+      if (!image) continue;
+      annotations.push({ a, ...imageAnchorToPx(a, imageRect(image, layout)) });
+      continue;
+    }
     const g = geomById.get(a.layerId);
     if (!g) continue;
     annotations.push({ a, p1: toPx(g, layout, a.x1, a.y1), p2: toPx(g, layout, a.x2, a.y2) });
@@ -250,6 +257,26 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
 }
 
 /** 注釈の枠 (px)。テキストは文字幅から概算 */
+/** 図の座標 (Word の 96 dpi の px) と pt の比。ChemDraw の構造式は pt で描いてから合わせる */
+export const PX_PER_PT = 4 / 3;
+
+/** 図に置いた構造式・画像の枠 (図の座標) */
+export function imageRect(image: FigureImage, figure: { width: number; height: number }) {
+  const w = image.w * figure.width;
+  return { x: image.x * figure.width, y: image.y * figure.height, w, h: w * image.ratio };
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+
+export function imageAnchorToPx(a: Pick<Annotation, 'x1' | 'y1' | 'x2' | 'y2'>, r: Box) {
+  return { p1: { px: r.x + a.x1 * r.w, py: r.y + a.y1 * r.h }, p2: { px: r.x + a.x2 * r.w, py: r.y + a.y2 * r.h } };
+}
+
+/** 図の座標 → 構造式の枠に対する割合 */
+export function pxToImageAnchor(px: number, py: number, r: Box) {
+  return { x: (px - r.x) / (r.w || 1), y: (py - r.y) / (r.h || 1) };
+}
+
 export function annotationBox(pa: PlacedAnnotation) {
   const { a, p1, p2 } = pa;
   if (a.kind === 'text') {

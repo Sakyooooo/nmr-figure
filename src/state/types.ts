@@ -153,11 +153,15 @@ export type Dash = 'solid' | 'dashed' | 'dotted';
  * パワポ風の図形。座標はスペクトルに固定する:
  * x = 基準合わせ前の ppm、y = そのスペクトルの正規化強度 (最大ピーク = 1)。
  * 拡大・並べ替え・基準合わせをしてもピークからずれない。
+ * 構造式の上に置いたもの (帰属の印など) は構造式に固定する: imageId があれば、x, y は構造式の枠に対する割合
+ * (layerId は空)。構造式を動かす・大きさを変えると一緒に動く。
  */
 export interface Annotation {
   id: string;
   kind: AnnotationKind;
   layerId: string;
+  /** 構造式に固定しているとき、その構造式 (FigureImage) の id */
+  imageId?: string;
   x1: number;
   y1: number;
   x2: number;
@@ -328,6 +332,11 @@ export interface FigureImage {
   href: string | null;
   /** 描き直すための元データ (MOL / RXN)。アプリで描いたものだけ */
   source: string | null;
+  /**
+   * ChemDraw の構造式 (CDXML)。あれば、これから描く (svg は倍率 1 で描いたもの)。
+   * 「ChemDraw で開く」で ChemDraw のデータのまま戻すので、Word に貼ったあとも ChemDraw で直せる
+   */
+  cdxml?: string | null;
   /** 図の左上を 0,0 とした割合 */
   x: number;
   y: number;

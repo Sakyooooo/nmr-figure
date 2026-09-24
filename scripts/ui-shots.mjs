@@ -1,5 +1,5 @@
 // 開発用: 開発サーバーの画面を決まった大きさで撮る (npm run dev -- --port 5180 を起こしておく)
-//   node scripts/ui-shots.mjs [出力先]            既定の一揃いを撮る
+//   node scripts/ui-shots.mjs [出力先]            既定の一揃いを撮る (UI_ONLY=正規表現 で絞る)
 // Edge (無ければ Chrome) を使い捨てのプロフィールで、画面を出さずに動かす。普段のブラウザ・本人のデータには触らない。
 // ?demo=… で決まった状態を開き (main.tsx の openDemo)、__demoReady を待ってから撮る。
 import { spawn } from 'node:child_process';
@@ -11,6 +11,8 @@ const BASE = process.env.UI_BASE ?? 'http://localhost:5180';
 const OUT = resolve(process.argv[2] ?? '.dev-output/shots');
 /** 画面の言語 (UI_LANG=en で英語の画面を撮る。名前の末尾に -en が付く) */
 const LANG = process.env.UI_LANG;
+/** 撮るものを絞る (UI_ONLY=chemdraw なら名前に chemdraw を含むものだけ) */
+const ONLY = process.env.UI_ONLY ? new RegExp(process.env.UI_ONLY) : null;
 const PORT = 9333;
 
 /** [名前, ?demo, 幅, 高さ, 撮る前にページで動かす式 (任意)] */
@@ -25,6 +27,8 @@ const SHOTS = [
   ['selected-1440', 'selected', 1440, 900],
   ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"], .topbar [aria-label="Export"]').click()`],
   ['figure-tab-1440', 'spectra', 1440, 900, `document.querySelector('#inspector-tab-figure').click()`],
+  ['chemdraw-1440', 'chemdraw', 1440, 900],
+  ['chemdraw-export-1440', 'chemdraw', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"], .topbar [aria-label="Export"]').click()`],
   ['2d-1440', '2d', 1440, 900],
   ['trend-1440', 'trend', 1440, 900],
   ['home-1440', 'home', 1440, 900],
@@ -58,6 +62,7 @@ async function main() {
     if (!version) throw new Error('ブラウザにつながりません');
     const cdp = await connect(version.webSocketDebuggerUrl);
     for (const [name, demo, w, h, before] of SHOTS) {
+      if (ONLY && !ONLY.test(name)) continue;
       // 1 枚ごとに新しい保存領域 (前の図が戻らないように)
       const { browserContextId } = await cdp.send('Target.createBrowserContext');
       const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', browserContextId });

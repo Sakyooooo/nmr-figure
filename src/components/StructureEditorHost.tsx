@@ -4,6 +4,8 @@
  */
 import { tr } from '../i18n';
 import { lazy, Suspense, useEffect } from 'react';
+import { looksLikeCdxml } from '../lib/cdxml';
+import { explainChemDrawPaste, placeCdxml } from '../state/chemdraw';
 import { addFigureImage, closeStructureEditor, notify, updateFigureImage, useEditor } from '../state/store';
 import { svgRatio } from './FigureImages';
 
@@ -23,24 +25,32 @@ export function StructureEditorHost() {
   const screen = useEditor((s) => s.screen);
   const hasData = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
 
-  // 図の上で Ctrl+V: 画像はそのまま置き、構造式の文字はエディタで開く
+  // 図の上で Ctrl+V: ChemDraw の CDXML は ChemDraw の構造式として置き、画像はそのまま置き、構造式の文字はエディタで開く
   useEffect(() => {
     if (screen !== 'editor') return;
     const onPaste = async (ev: ClipboardEvent) => {
       const target = ev.target as HTMLElement;
       if (target.closest?.('input, textarea, .scheme-editor')) return;
       if (!hasData) return;
+      const text = ev.clipboardData?.getData('text/plain') ?? '';
+      if (looksLikeCdxml(text)) {
+        ev.preventDefault();
+        placeCdxml(text);
+        return;
+      }
       const file = [...(ev.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
       if (file) {
         ev.preventDefault();
         await placePastedImage(file);
         return;
       }
-      const text = ev.clipboardData?.getData('text/plain') ?? '';
       if (looksLikeStructure(text)) {
         ev.preventDefault();
         useEditor.setState({ structureEditor: { imageId: null, source: text } });
+        return;
       }
+      // ChemDraw でふつうにコピーしたものは、ブラウザで読める形がない (画像も文字もない)
+      if (!text && !ev.clipboardData?.types.length) explainChemDrawPaste();
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);

@@ -7,6 +7,7 @@ import { readJdf2d } from '../lib/jdf2d';
 import { hasEmbeddedFigure, readEmbeddedFigure } from '../lib/jdfEmbed';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
+import { placeCdxml } from './chemdraw';
 import { ask } from './dialog';
 import {
   canOpen,
@@ -111,6 +112,13 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
           continue;
         }
         spectra.push(readJdf(buffer, file.name, readOptions()));
+      } else if (name.endsWith('.cdxml')) {
+        // ChemDraw の構造式: 開いている図に置く
+        const st = useEditor.getState();
+        if (st.screen === 'editor' && (st.doc.layers.length || st.doc.plot2d)) placeCdxml(await file.text());
+        else notify(tr('{name}: 構造式は、スペクトルを開いた図にドロップしてください', { name: file.name }), 'error');
+      } else if (name.endsWith('.cdx')) {
+        notify(tr('{name}: ChemDraw で .cdxml の形で保存し直すか、「Edit > Copy As > CDXML Text」でコピーして貼ってください', { name: file.name }), 'error');
       } else {
         notify(tr('{name}: .jdf か {PROJECT_EXT} を選んでください', { name: file.name, PROJECT_EXT }), 'error');
       }

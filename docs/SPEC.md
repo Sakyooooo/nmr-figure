@@ -60,11 +60,45 @@ x(i) = axisStart + (i - offsetStart) * (axisStop - axisStart) / (offsetStop - of
 - アプリで描いた構造式は SVG の中身をそのまま図に埋め込む (`<g transform>` で拡大縮小)。
   Word / PowerPoint で「図形に変換」すると編集できる。描き直せるように MOL / RXN も残す
 - 貼り付けた画像は data URL の `<image>` として置く (Word では編集できない旨をパネルに出す)
-- 図の上で Ctrl+V: 画像はそのまま置き、SMILES / MOL らしき文字は構造式エディタで開く
+- 図の上で Ctrl+V: ChemDraw の CDXML は ChemDraw の構造式として置き、画像はそのまま置き、SMILES / MOL らしき文字は構造式エディタで開く
+
+## ChemDraw の構造式 (lib/cdxml.ts, state/chemdraw.ts, lib/chemdrawExport.ts, lib/svgToEmf.ts, lib/emf.ts)
+目的: 構造式と帰属を載せた図を Word に貼り、Word の上で構造式を ChemDraw で直せるようにする (本人の指定 2026-09-24)。
+スペクトルは今の見た目のまま (絵) でよい。
+- 取り込み: ChemDraw の「Edit > Copy As > CDXML Text」を図の上で貼る、または .cdxml をドロップ → `FigureImage.cdxml` に持つ
+  - ChemDraw でふつうに Ctrl+C したものは、ブラウザで読める形がない (ChemDraw 25 で確認: CDX・OLE・EMF・SMILES などの独自の形だけで、
+    文字も画像もない)。貼っても何も来ないので、Copy As > CDXML Text を案内する。.cdx (バイナリ) は読まない
+  - ChemDraw の構造式を選んだまま貼ると置き換える。CDXML の座標が図の同じ位置に来るように置くので、直していない原子と帰属の印はずれない
+  - 置くときは ChemDraw と同じ大きさ (Word の 96 dpi の px = 4/3 pt)
+- 表示 (lib/cdxml.ts): CDXML を自前で SVG に描く。最終的に Word に入る図は ChemDraw 自身が描くので、画面で見分けがつかない程度に似せる。
+  ChemDraw に描かせた画像と重ねて確かめた (scripts/cdxml-compare.mjs)
+  - 拡大縮小しても線の太さ・くさびの幅・二重線の間隔は ChemDraw の書式のまま (ChemDraw で大きさを変えたときと同じ)。字は倍率に合わせる
+  - 原子の文字: ChemDraw が書いた位置 (t の p) と揃え方。右揃え (LabelJustification Right) は並びを逆にする (OH → HO、NH2 → H2N)。
+    Above / Below は縦に並べる。face 96 (化学式) は数字を下付き、+ - を上付き
+  - 結合は文字の形の枠 (電荷の上付きは除く) + MarginWidth で止める。文字のない 2 本の結合は折れ線にして角をとがらせる
+  - 二重結合の 2 本目 (DoublePosition がないとき): 環の内側 → 末端の文字の原子 (C=O) は中央 → 置換基の多い側 → 同じなら B→E の左
+  - くさび: 細い側は線の太さ、太い側は BoldWidth の 1.5 倍。破線のくさびは細い側の原子から HashSpacing + 0.7×線の太さ ごと、
+    長さは原子からの距離に比例 (太い側 1.8×BoldWidth)、両端の原子の上には引かない
+  - すべて 1.5 の環は円。反応の矢印 (arrow)・古い形の graphic (SupersededBy のあるものは描かない)・文字・曲線・画像も描く
+- 帰属の印: 構造式の上に置いた文字・丸・四角は構造式に固定する (`Annotation.imageId`、x, y は構造式の枠に対する割合、layerId は空)。
+  構造式を動かす・大きさを変えると一緒に動く。構造式の外へ動かすとスペクトルに、上へ動かすと構造式に付け直す (見た目の位置は変えない)。
+  線・矢印は両端が同じ構造式の上のときだけ構造式に固定する。構造式を消すと印も消す
+- 書き出し「ChemDraw で開く」: 図を .cdxml にして保存する。開くと ChemDraw が起動し、Ctrl+A → Ctrl+C で Word に貼ると
+  Word の上でダブルクリックして ChemDraw で直せる (ブラウザからは ChemDraw の図 (OLE) をクリップボードに置けないので、ChemDraw を 1 回通す)
+  - 構造式以外 (スペクトル・軸・ピーク値など) は、画面の SVG を EMF に書き写して embeddedobject (EnhancedMetafile、16 進) に入れる。
+    線のまま Word に入る (PNG だと ChemDraw が Word に渡すデータが 1 枚 10 MB ほどになる。EMF なら 1D で 700 KB ほど)。
+    PNG は 16 進で入れれば読めるが base64 は読めない (ChemDraw 25 で確認)
+  - ChemDraw の構造式はデータのまま、図の上と同じ位置・大きさへ移す。id は構造式ごとにずらし、色・字体は書き出す表に付け直す。
+    元の文書と書式 (線の太さなど) が違えば、結合ごとに書く
+  - 構造式に固定した文字は ChemDraw の文字 (InterpretChemically="no") にして、構造式と group にまとめる
+  - 色の番号: 0 = 黒、1 = 白、colortable の 1 つ目が 2
+- 1 つの構造式だけ直すとき: 「ChemDraw で直す」(ダブルクリック) で structure.cdxml を保存 → ChemDraw で直して Copy As > CDXML Text →
+  構造式を選んだまま貼る
 
 ## 注釈 (パワポ風の図形)
 - 種類: 楕円・四角・矢印・線・テキスト。色・線幅・破線・塗りを変更できる
 - 位置は「どのスペクトルの何ppm・どの高さ」で保存する → 拡大・並べ替え・基準合わせをしてもピークからずれない
+  (構造式の上に置いたものは構造式に固定する。上の「ChemDraw の構造式」)
 - マーカー: 凡例の項目 (不純物・生成物など) を選んで、ピークをクリックして付ける
 
 ## ピーク値 (ピークピックアップ)

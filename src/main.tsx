@@ -9,7 +9,7 @@ import { startDeltaSync } from './state/deltaSync';
 import { openOnboarding } from './components/Onboarding';
 import { startFileLaunch } from './state/launch';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
-import { addAnnotation, autoDetectSignals, select, useEditor } from './state/store';
+import { addAnnotation, autoDetectSignals, select, updateFigureImage, useEditor } from './state/store';
 import { annotationDefaults } from './state/types';
 import './styles/tokens.css';
 import './styles.css';
@@ -75,6 +75,23 @@ async function openDemo() {
   if (demo === 'text') {
     const { activeLayerId } = useEditor.getState();
     if (activeLayerId) addAnnotation({ ...annotationDefaults('text'), layerId: activeLayerId, x1: 6, y1: 0.5, x2: 6, y2: 0.5, text: tr('生成物') });
+  }
+  if (demo === 'chemdraw') {
+    // ChemDraw の構造式を置き、帰属の印を付ける
+    const { DEMO_CDXML } = await import('./demoCdxml');
+    const { placeCdxml } = await import('./state/chemdraw');
+    placeCdxml(DEMO_CDXML);
+    const image = useEditor.getState().doc.figureImages[0];
+    if (image) {
+      updateFigureImage(image.id, { x: 0.56, y: 0.08, w: image.w * 1.4 });
+      for (const [text, x, y, color] of [
+        ['a', 0.12, 0.45, '#d12b2b'],
+        ['b', 0.3, 0.95, '#1f5fd1'],
+        ['c', 0.88, 0.5, '#1a8a3a'],
+      ] as const)
+        addAnnotation({ ...annotationDefaults('text'), layerId: '', imageId: image.id, x1: x, y1: y, x2: x, y2: y, text, stroke: color, fontSize: 12 });
+      select({ kind: 'image', id: image.id });
+    }
   }
   if (demo === 'selected') {
     const { activeLayerId } = useEditor.getState();

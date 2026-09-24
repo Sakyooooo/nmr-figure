@@ -1,5 +1,6 @@
 import { currentLang, tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { openInChemDraw } from '../state/chemdrawExport';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import {
   autoDetectSignals,
@@ -216,6 +217,14 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
     { group: tr('書き出し'), label: tr('図をコピー (Word / PowerPoint に貼る)'), icon: 'copy', shortcut: 'Ctrl+Shift+C', run: withSvg(copyFigure), enabled: hasData },
     { group: tr('書き出し'), label: tr('SVG で保存'), icon: 'download', keywords: 'svg ベクター 図形に変換', run: withSvg(exportSvg), enabled: hasData },
     { group: tr('書き出し'), label: tr('PNG で保存'), icon: 'image', keywords: 'png 画像', run: withSvg(exportPng), enabled: hasData },
+    {
+      group: tr('書き出し'),
+      label: tr('ChemDraw で開く'),
+      icon: 'hexagon',
+      keywords: 'chemdraw cdxml word 構造式 ケムドロー',
+      run: withSvg(openInChemDraw),
+      enabled: hasData,
+    },
     { group: tr('書き出し'), label: tr('印刷 (図と測定条件)'), icon: 'printer', keywords: 'pdf', run: printFigure, enabled: hasData },
 
     { group: tr('ファイル'), label: tr('開く'), icon: 'folder-open', shortcut: 'Ctrl+O', keywords: 'jdf', run: () => void openDialog(), enabled: true },

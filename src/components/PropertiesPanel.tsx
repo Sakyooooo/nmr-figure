@@ -9,6 +9,7 @@ import {
   updateFigureImage,
   useEditor,
 } from '../state/store';
+import { editInChemDraw } from '../state/chemdraw';
 import type { Annotation, Dash, FigureStyle } from '../state/types';
 import { titleText } from '../lib/layout';
 import { Check, ColorInput, NumberInput, Section, TextInput } from './inputs';
@@ -52,7 +53,7 @@ export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
     const image = doc.figureImages.find((x) => x.id === selection.id);
     if (!image) return null;
     return (
-      <Section title={image.svg ? tr('選択中の構造式') : tr('選択中の画像')}>
+      <Section title={image.cdxml ? tr('選択中の構造式 (ChemDraw)') : image.svg ? tr('選択中の構造式') : tr('選択中の画像')}>
         <p className="hint">{tr('ドラッグで移動、右下の角で大きさを変えられます。')}</p>
         <div className="row">
           <label className="field">
@@ -69,12 +70,17 @@ export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
           </label>
         </div>
         <div className="row wrap">
-          {image.source && <button onClick={() => openStructureEditor(image.id)}>{tr('描き直す')}</button>}
+          {image.cdxml && <button onClick={() => editInChemDraw(image.id)}>{tr('ChemDraw で直す')}</button>}
+          {!image.cdxml && image.source && <button onClick={() => openStructureEditor(image.id)}>{tr('描き直す')}</button>}
           <button className="danger" onClick={deleteSelection}>
             {tr('削除 (Delete)')}
           </button>
         </div>
-        {image.svg ? (
+        {image.cdxml ? (
+          <p className="hint">
+            {tr('ChemDraw で直したら「Edit > Copy As > CDXML Text」でコピーし、この構造式を選んだまま貼ると置き換わります。上に置いた文字は構造式と一緒に動きます。「書き出し > ChemDraw で開く」から Word に貼ると、Word の上でも ChemDraw で直せます。')}
+          </p>
+        ) : image.svg ? (
           <p className="hint">{tr('ベクターで入っているので、Word / PowerPoint に貼って「図形に変換」すると編集できます。')}</p>
         ) : (
           <p className="hint warn">{tr('貼り付けた画像です。Word では編集できません。編集したいときは、構造式ボタンから描き直してください。')}</p>

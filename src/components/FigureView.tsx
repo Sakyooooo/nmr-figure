@@ -2,7 +2,7 @@ import { tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
-import { annotationBox, buildScene, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { annotationBox, buildScene, pxToImageAnchor, type PlacedAnnotation, type Scene } from '../lib/scene';
 import { snapToPeak } from '../lib/spectrum';
 import {
   editAnnotationText,
@@ -28,6 +28,7 @@ import {
   updateIntegral,
   useEditor,
 } from '../state/store';
+import { editInChemDraw } from '../state/chemdraw';
 import { annotationDefaults, type AnnotationKind, type NmrDocument, type ViewState } from '../state/types';
 import { AnnotationShape, FigureContent } from './FigureContent';
 import { imageRect } from './FigureImages';
@@ -51,12 +52,15 @@ type Gesture =
   | { type: 'integralEdge'; id: string; side: 'from' | 'to'; g: LayerGeom; token: number }
   | { type: 'zoom'; x0: number; x1: number; y0: number; y1: number }
   | { type: 'region'; x0: number; x1: number }
-  | { type: 'create'; kind: AnnotationKind; g: LayerGeom; x0: number; y0: number; x1: number; y1: number }
-  | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; g: LayerGeom; token: number }
-  | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; g: LayerGeom; token: number }
+  | { type: 'create'; kind: AnnotationKind; at: Anchor; x0: number; y0: number; x1: number; y1: number }
+  | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; at: Anchor; token: number }
+  | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; at: Anchor; token: number }
   | { type: 'legend'; x0: number; y0: number; lx: number; ly: number; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
   | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
+
+/** 図形の固定先: スペクトル (ppm・強度) か、構造式の枠 (割合)。構造式の上に置いた帰属の印は構造式と一緒に動く */
+type Anchor = { kind: 'layer'; g: LayerGeom } | { kind: 'image'; id: string };
 
 const SHAPE_TOOLS: AnnotationKind[] = ['ellipse', 'rect', 'arrow', 'line'];
 
@@ -103,6 +107,34 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     return Math.max(pxWin, Math.min(nucleusDefaults(g.meta.nucleus).snapPpm, pxWin * 3));
   };
 
+  /** その場所にある構造式・画像 (後から置いたものが上) */
+  const imageAt = (x: number, y: number) => {
+    for (let i = doc.figureImages.length - 1; i >= 0; i--) {
+      const r = imageRect(doc.figureImages[i], layout);
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return doc.figureImages[i].id;
+    }
+    return null;
+  };
+  /** 図形の固定先。preferImage なら、構造式の上では構造式に固定する */
+  const anchorAt = (x: number, y: number, preferImage: boolean): Anchor | null => {
+    const id = imageAt(x, y);
+    if (id && preferImage) return { kind: 'image', id };
+    const g = layerAt(layout, x, y);
+    if (g) return { kind: 'layer', g };
+    return id ? { kind: 'image', id } : null;
+  };
+  const anchorOf = (a: { layerId: string; imageId?: string }): Anchor | null => {
+    if (a.imageId) return doc.figureImages.some((x) => x.id === a.imageId) ? { kind: 'image', id: a.imageId } : null;
+    const g = layout.layers.find((l) => l.layer.id === a.layerId);
+    return g ? { kind: 'layer', g } : null;
+  };
+  const fromPx = (at: Anchor, px: number, py: number) => {
+    if (at.kind === 'layer') return toData(at.g, layout, px, py);
+    const image = doc.figureImages.find((x) => x.id === at.id);
+    return image ? pxToImageAnchor(px, py, imageRect(image, layout)) : { x: 0, y: 0 };
+  };
+  const anchorFields = (at: Anchor) => (at.kind === 'layer' ? { layerId: at.g.layer.id, imageId: undefined } : { layerId: '', imageId: at.id });
+
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 || !doc.layers.length) return;
     const { x, y } = toSvg(e);
@@ -132,14 +164,14 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     if (tool === 'select') {
       if (hitKind === 'handle' || hitKind === 'annotation') {
         const pa = scene.annotations.find((p) => p.a.id === hitId);
-        const ag = pa && layout.layers.find((l) => l.layer.id === pa.a.layerId);
-        if (!pa || !ag) return;
+        const at = pa && anchorOf(pa.a);
+        if (!pa || !at) return;
         select({ kind: 'annotation', id: pa.a.id });
         const token = beginGesture();
         gesture.current =
           hitKind === 'handle'
-            ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, g: ag, token }
-            : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa, g: ag, token };
+            ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, at, token }
+            : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa, at, token };
         capture();
         return;
       }
@@ -220,21 +252,23 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       return;
     }
 
-    if (!g) return;
-
-    if (SHAPE_TOOLS.includes(tool as AnnotationKind)) {
-      gesture.current = { type: 'create', kind: tool as AnnotationKind, g, x0: x, y0: y, x1: x, y1: y };
+    if (SHAPE_TOOLS.includes(tool as AnnotationKind) || tool === 'text') {
+      // 構造式の上なら構造式に固定する (帰属の印など)。線・矢印は、両端が同じ構造式の上のときだけ (作り終えたときに決める)
+      const at = anchorAt(x, y, tool !== 'line' && tool !== 'arrow');
+      if (!at) return;
+      if (tool === 'text') {
+        const p = fromPx(at, x, y);
+        addAnnotation({ ...annotationDefaults('text'), ...anchorFields(at), x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+        requestAnimationFrame(() => document.getElementById('annotation-text')?.focus());
+        return;
+      }
+      gesture.current = { type: 'create', kind: tool as AnnotationKind, at, x0: x, y0: y, x1: x, y1: y };
       setDraft(gesture.current);
       capture();
       return;
     }
 
-    if (tool === 'text') {
-      const p = toData(g, layout, x, y);
-      addAnnotation({ ...annotationDefaults('text'), layerId: g.layer.id, x1: p.x, y1: p.y, x2: p.x, y2: p.y });
-      requestAnimationFrame(() => document.getElementById('annotation-text')?.focus());
-      return;
-    }
+    if (!g) return;
 
     const win = snapWindow(g);
     const peak = snapToPeak(g.data, g.meta, layout.pxToX(x), win);
@@ -316,15 +350,15 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
         const dx = x - cur.x0;
         const dy = y - cur.y0;
         const { p1, p2 } = cur.orig;
-        const q1 = toData(cur.g, layout, p1.px + dx, p1.py + dy);
-        const q2 = toData(cur.g, layout, p2.px + dx, p2.py + dy);
+        const q1 = fromPx(cur.at, p1.px + dx, p1.py + dy);
+        const q2 = fromPx(cur.at, p2.px + dx, p2.py + dy);
         updateAnnotation(cur.id, { x1: q1.x, y1: q1.y, x2: q2.x, y2: q2.y }, false);
         break;
       }
       case 'resize': {
         const next = resizePoints(cur.orig, cur.handle, x, y, e.shiftKey);
-        const q1 = toData(cur.g, layout, next.p1.px, next.p1.py);
-        const q2 = toData(cur.g, layout, next.p2.px, next.p2.py);
+        const q1 = fromPx(cur.at, next.p1.px, next.p1.py);
+        const q2 = fromPx(cur.at, next.p2.px, next.p2.py);
         updateAnnotation(cur.id, { x1: q1.x, y1: q1.y, x2: q2.x, y2: q2.y }, false);
         break;
       }
@@ -375,12 +409,35 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       // クリックだけのときは既定の大きさで作る
       const x1 = tiny ? cur.x0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 40) : cur.x1;
       const y1 = tiny ? cur.y0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 0) : cur.y1;
-      const p = toData(cur.g, layout, cur.x0, cur.y0);
-      const q = toData(cur.g, layout, x1, y1);
-      addAnnotation({ ...annotationDefaults(cur.kind), layerId: cur.g.layer.id, x1: p.x, y1: p.y, x2: q.x, y2: q.y });
-    } else if (cur.type === 'move' || cur.type === 'resize' || cur.type === 'legend' || cur.type === 'imageMove' || cur.type === 'imageResize') {
+      let at = cur.at;
+      if (cur.kind === 'line' || cur.kind === 'arrow') {
+        const id = imageAt(cur.x0, cur.y0);
+        if (id && id === imageAt(x1, y1)) at = { kind: 'image', id };
+      }
+      const p = fromPx(at, cur.x0, cur.y0);
+      const q = fromPx(at, x1, y1);
+      addAnnotation({ ...annotationDefaults(cur.kind), ...anchorFields(at), x1: p.x, y1: p.y, x2: q.x, y2: q.y });
+    } else if (cur.type === 'move') {
+      reanchor(cur.id);
+      endGesture(cur.token);
+    } else if (cur.type === 'resize' || cur.type === 'legend' || cur.type === 'imageMove' || cur.type === 'imageResize') {
       endGesture(cur.token);
     }
+  };
+
+  /** 文字・丸・四角を構造式の上へ動かしたら構造式に、外へ出したらスペクトルに固定し直す (見た目の位置は変えない) */
+  const reanchor = (id: string) => {
+    const state = useEditor.getState();
+    const now = buildScene(state.doc, state.data).annotations.find((p) => p.a.id === id);
+    if (!now || now.a.kind === 'line' || now.a.kind === 'arrow') return;
+    const box = annotationBox(now);
+    const at = anchorAt(box.x + box.w / 2, box.y + box.h / 2, true);
+    if (!at) return;
+    const same = at.kind === 'image' ? now.a.imageId === at.id : !now.a.imageId && now.a.layerId === at.g.layer.id;
+    if (same) return;
+    const q1 = fromPx(at, now.p1.px, now.p1.py);
+    const q2 = fromPx(at, now.p2.px, now.p2.py);
+    updateAnnotation(id, { ...anchorFields(at), x1: q1.x, y1: q1.y, x2: q2.x, y2: q2.y }, false);
   };
 
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -396,7 +453,8 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       // アプリで描いた構造式は、ダブルクリックで描き直せる
       if (value.startsWith('image:')) {
         const image = doc.figureImages.find((x) => x.id === value.slice('image:'.length));
-        if (image?.source) openStructureEditor(image.id);
+        if (image?.cdxml) editInChemDraw(image.id);
+        else if (image?.source) openStructureEditor(image.id);
       }
       return;
     }
@@ -722,7 +780,7 @@ function DraftOverlay({ draft, scene }: { draft: Gesture; scene: Scene }) {
   }
   if (draft.type !== 'create') return null;
   const pa: PlacedAnnotation = {
-    a: { ...annotationDefaults(draft.kind), id: 'draft', layerId: draft.g.layer.id, x1: 0, y1: 0, x2: 0, y2: 0 },
+    a: { ...annotationDefaults(draft.kind), id: 'draft', layerId: '', x1: 0, y1: 0, x2: 0, y2: 0 },
     p1: { px: draft.x0, py: draft.y0 },
     p2: { px: draft.x1, py: draft.y1 },
   };

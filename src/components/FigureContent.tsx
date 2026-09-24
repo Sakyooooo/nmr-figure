@@ -145,9 +145,16 @@ export const FigureContent = memo(function FigureContent({
         </g>
       )}
 
-      {scene.annotations.map((pa) => (
-        <AnnotationShape key={pa.a.id} pa={pa} />
-      ))}
+      {scene.annotations.map((pa) =>
+        // 構造式に固定した印は data-mark-of を付ける (「ChemDraw で開く」では ChemDraw の文字にする)
+        pa.a.imageId ? (
+          <g key={pa.a.id} data-mark-of={pa.a.imageId} data-annotation={pa.a.id}>
+            <AnnotationShape pa={pa} />
+          </g>
+        ) : (
+          <AnnotationShape key={pa.a.id} pa={pa} />
+        ),
+      )}
 
       {figure.showXCaption && (
         <text x={plot.x} y={layout.captionY} fontSize={9} fill={INK}>

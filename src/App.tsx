@@ -162,7 +162,7 @@ export default function App() {
         <Toast />
       </main>
       <StructureEditorHost />
-      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く)', { ext: PROJECT_EXT })}</div>}
+      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く、ChemDraw の .cdxml は構造式を置く)', { ext: PROJECT_EXT })}</div>}
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}

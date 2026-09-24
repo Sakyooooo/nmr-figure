@@ -1,6 +1,7 @@
 import { tr, trk } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { integralValues } from '../lib/integrals';
+import { editInChemDraw } from '../state/chemdraw';
 import { deleteSelection, edit, editAnnotationText, openStructureEditor, pasteAnnotation, reorderAnnotation, setIntegralValue, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { IconButton } from './ui';
@@ -94,10 +95,16 @@ export function SelectionBar({ stageRef }: { stageRef: RefObject<HTMLElement | n
     body = (
       <>
         <span className="sel-label">{image?.svg ? tr('構造式') : tr('画像')}</span>
-        {image?.source && (
-          <button type="button" className="btn ghost sm" onClick={() => openStructureEditor(image.id)}>
-            {tr('描き直す')}
+        {image?.cdxml ? (
+          <button type="button" className="btn ghost sm" onClick={() => editInChemDraw(image.id)}>
+            {tr('ChemDraw で直す')}
           </button>
+        ) : (
+          image?.source && (
+            <button type="button" className="btn ghost sm" onClick={() => openStructureEditor(image.id)}>
+              {tr('描き直す')}
+            </button>
+          )
         )}
         {del}
       </>

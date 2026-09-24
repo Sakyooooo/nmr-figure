@@ -7,7 +7,7 @@ export const EN_EDITOR: Record<string, string> = {
   '2D スペクトル': '2D spectrum',
   スペクトル: 'Spectra',
   右のパネル: 'Right panel',
-  'ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く)': 'Drop here (.jdf is added; a .jdf with a figure and {ext} open that figure)',
+  'ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く、ChemDraw の .cdxml は構造式を置く)': 'Drop here (.jdf is added; a .jdf with a figure and {ext} open that figure; a ChemDraw .cdxml places the structure)',
   スペクトルがありません: 'No spectra yet',
   '測定の .jdf をこの画面にドロップするか、下から選んでください': 'Drop a .jdf measurement on this screen, or choose one below',
   始め方: 'Get started',
@@ -200,4 +200,6 @@ export const EN_EDITOR: Record<string, string> = {
   備考: 'Notes',
   未保存の図: 'Unsaved figure',
   '印刷: {time}': 'Printed: {time}',
+  'ChemDraw で開く': 'Open in ChemDraw',
+  'ChemDraw でコピーして Word に貼ると、Word の上で構造式を ChemDraw で直せます': 'Copy it in ChemDraw and paste into Word to keep the structure editable in ChemDraw',
 };

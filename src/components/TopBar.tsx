@@ -1,6 +1,7 @@
 import { locale, tr } from '../i18n';
 import type { RefObject } from 'react';
 import { useSync } from '../state/deltaSync';
+import { openInChemDraw } from '../state/chemdrawExport';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import { printFigure, setCanvasTab, togglePanel, useEditor } from '../state/store';
 import { Icon } from './Icon';
@@ -61,6 +62,12 @@ export function TopBar({
         items={[
           { label: tr('SVG で保存'), icon: 'download', hint: tr('PowerPoint で「図形に変換」すると線や文字を直せます'), onSelect: withSvg(exportSvg) },
           { label: tr('PNG で保存'), icon: 'image', onSelect: withSvg(exportPng) },
+          {
+            label: tr('ChemDraw で開く'),
+            icon: 'hexagon',
+            hint: tr('ChemDraw でコピーして Word に貼ると、Word の上で構造式を ChemDraw で直せます'),
+            onSelect: withSvg(openInChemDraw),
+          },
           'divider',
           { label: tr('印刷 (図と測定条件)'), icon: 'printer', hint: tr('PDF で保存もできます'), onSelect: printFigure },
         ]}
