@@ -7,7 +7,18 @@ import { hasEmbeddedFigure, readEmbeddedFigure } from '../lib/jdfEmbed';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
 import { ask } from './dialog';
-import { canOpen, load2dExperiment, loadExperiment, refreshIfInFolder, sampleKeyOf, saveFigure, useLibrary } from './library';
+import {
+  canOpen,
+  figureFileOf,
+  listedFiles,
+  load2dExperiment,
+  loadExperiment,
+  refreshIfInFolder,
+  sampleKeyOf,
+  saveFigure,
+  savedFileName,
+  useLibrary,
+} from './library';
 import { jdfHandle, registerJdfHandle } from './deltaSync';
 import { addSpectra, addSpectrum2d, edit, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
 import { emptyDocument, type SpectrumMeta } from './types';
@@ -175,13 +186,26 @@ async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: Sp
 
 /** ホーム画面で選んだ実験を開く。new は新しい図、add は編集中の図に追加 (測定順に並べる) */
 export async function openExperiments(keys: string[], mode: 'new' | 'add') {
-  const lib = useLibrary.getState();
+  const files = listedFiles(useLibrary.getState());
   const metas = keys
-    .map((k) => lib.experiments.find((e) => e.key === k))
+    .map((k) => files.find((e) => e.key === k))
     .filter((e): e is NonNullable<typeof e> => !!e && canOpen(e))
     .sort((a, b) => a.measuredAt - b.measuredAt);
   if (!metas.length) {
     notify('選んだ実験は開けません', 'error');
+    return;
+  }
+  // このソフトで編集して保存した版 (図) は、図ごと開く (ほかの測定とは重ねない)
+  const figure = metas.find((m) => m.figure);
+  if (figure) {
+    if (metas.length > 1) notify(`${figure.fileName} (編集した版) だけを開きます。編集した版はほかの測定と一緒には開けません`);
+    useLibrary.setState({ selected: [] });
+    try {
+      if (figure.savedFigureId) await openSavedFigure(figure.savedFigureId);
+      else await openFiles([await figureFileOf(figure.key)], mode);
+    } catch (e) {
+      notify(`${figure.fileName}: ${(e as Error).message}`, 'error');
+    }
     return;
   }
   // 2D は 1つの図に 1本 (1D と混ぜない)
@@ -253,9 +277,13 @@ async function rememberFigure(json: string, fileName: string, handle: FileHandle
   const nuclei = doc.plot2d
     ? [...new Set(doc.spectra2d.map((m) => `${m.x.nucleus}/${m.y.nucleus}`))]
     : [...new Set(doc.spectra.map((m) => m.nucleus))];
+  // ホーム画面では、土台のスペクトルの測定の「編集した版」として出す
+  const baseFile = doc.plot2d ? doc.spectra2d[0]?.fileName : (figureBaseOf(doc)?.meta.fileName ?? real[0]?.fileName);
   const figure = {
     id: doc.id,
     name: baseName(fileName),
+    fileName,
+    base: baseFile ? { fileName: baseFile } : null,
     sampleKeys,
     nuclei,
     layers: doc.plot2d ? doc.spectra2d.length : doc.layers.length,
@@ -291,7 +319,7 @@ export async function openSavedFigure(id: string) {
     const handle = figure.handle ?? null;
     // 図入りの .jdf に保存した図は、そのファイルと同期できるように覚えておく
     if (handle && isJdfName(handle.name)) registerJdfHandle(handle.name, handle);
-    loadDocument(doc, data, handle?.name ?? `${figure.name}${PROJECT_EXT}`, handle, fids, { data2d, fids2d });
+    loadDocument(doc, data, handle?.name ?? savedFileName(figure), handle, fids, { data2d, fids2d });
     useEditor.setState({ screen: 'editor' });
     notify(`${figure.name} を開きました`);
   } catch (e) {

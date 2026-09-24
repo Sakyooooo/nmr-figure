@@ -26,8 +26,14 @@ export interface ExperimentMeta {
   measuredAt: number;
   /** FT 済みか (未処理の FID は開けない) */
   processed: boolean;
-  /** このソフトで保存した図入りの .jdf なら、その本数と核種 (測定ではなく図として並べる) */
+  /** このソフトで保存した図入りの .jdf なら、その本数と核種 (元の測定の「編集した版」として並べる) */
   figure?: FigureSummary | null;
+  /**
+   * ブラウザの中に残した図 (.nmrfig など、データフォルダにないもの) を、元の測定の版として一覧に出すときだけ付く
+   * (ファイルからは読まない。state/library.ts の listedFiles が作る)。baseKey は元の測定のファイル (プレビューに使う)
+   */
+  savedFigureId?: string;
+  baseKey?: string;
 }
 
 export function experimentKey(file: { name: string; size: number; lastModified: number }) {

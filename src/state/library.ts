@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { dbDelete, dbEntries, dbGet, dbSet } from '../lib/db';
 import { readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
 import { readJdf2d, type Loaded2dSpectrum } from '../lib/jdf2d';
+import { figureBaseOf } from '../lib/figureJdf';
 import { experimentKey, readJdfMeta, type ExperimentMeta } from '../lib/jdfMeta';
 import { notify, type FileHandle } from './store';
+import type { NmrDocument } from './types';
 import type { HomeSort } from '../lib/settings';
 
 /** サンプル (Delta のタイトル) ごとのメモ。同じサンプルの測定で共通 */
@@ -33,6 +35,10 @@ export interface SavedFigure {
   json: string;
   /** 保存先のファイル。開き直したあとも「上書き保存」できるように覚えておく */
   handle?: FileHandle | null;
+  /** 保存したファイルの名前 (拡張子つき。古い図は無い = .nmrfig) */
+  fileName?: string;
+  /** 土台のスペクトルの元の .jdf の名前。ホーム画面で、その測定の「編集した版」として出す (古い図は読み込み時に中身から補う) */
+  base?: { fileName: string } | null;
 }
 
 export type NucleusFilter = '1H' | '13C' | '19F' | '31P' | '2D' | 'other';
@@ -45,9 +51,8 @@ interface LibraryState {
   temporary: boolean;
   /** 覚えているフォルダの読み取り許可。denied はブラウザが拒否を覚えている (選び直しが要る) */
   folderPermission: PermissionState | null;
+  /** データフォルダの .jdf (このソフトで保存した図入りの .jdf も。元の測定の版としてまとめて出す) */
   experiments: ExperimentMeta[];
-  /** データフォルダの中の、このソフトで保存した図入りの .jdf (測定とは別に、サンプルのカードに図として出す) */
-  figureFiles: ExperimentMeta[];
   failed: { fileName: string; message: string }[];
   progress: { done: number; total: number } | null;
   notes: Record<string, SampleNote>;
@@ -71,7 +76,6 @@ export const useLibrary = create<LibraryState>(() => ({
   temporary: false,
   folderPermission: null,
   experiments: [],
-  figureFiles: [],
   failed: [],
   progress: null,
   notes: {},
@@ -245,7 +249,6 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
   const cache = await dbEntries<ExperimentMeta>('meta');
   const seen = new Set<string>();
   const experiments: ExperimentMeta[] = [];
-  const figureFiles: ExperimentMeta[] = [];
   const failed: LibraryState['failed'] = [];
   sources.clear();
   let done = 0;
@@ -259,8 +262,7 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
         meta = await readJdfMeta(file);
         if (persist) await dbSet('meta', key, meta);
       }
-      // このソフトで保存した図入りの .jdf は、測定ではなく図として並べる
-      (meta.figure ? figureFiles : experiments).push(meta);
+      experiments.push(meta);
       sources.set(key, entry.getFile);
     } catch (e) {
       failed.push({ fileName: entry.name, message: (e as Error).message });
@@ -271,13 +273,11 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
   // 消えたファイルのキャッシュは捨てる
   if (persist) for (const key of cache.keys()) if (!seen.has(key)) await dbDelete('meta', key);
   experiments.sort((a, b) => b.measuredAt - a.measuredAt);
-  figureFiles.sort((a, b) => b.lastModified - a.lastModified);
   const alive = new Set(experiments.map((e) => e.key));
   set((s) => ({
     status: 'ready',
     progress: null,
     experiments,
-    figureFiles,
     failed,
     selected: s.selected.filter((k) => alive.has(k)),
     focus: s.focus && alive.has(s.focus) ? s.focus : null,
@@ -347,10 +347,68 @@ export async function saveNote(sampleKey: string, patch: Partial<SampleNote>) {
   else await dbSet('notes', sampleKey, next);
 }
 
-/** 保存した図をブラウザから読み直す */
+/** 保存した図をブラウザから読み直す。土台の .jdf の名前が無い古い図は、中身から補って残し直す */
 export async function loadFigures() {
-  const list = await dbEntries<SavedFigure>('figures');
-  set({ figures: [...list.values()].sort((a, b) => b.savedAt - a.savedAt) });
+  const list = [...(await dbEntries<SavedFigure>('figures')).values()];
+  for (const figure of list) {
+    if (figure.base !== undefined) continue;
+    figure.base = baseOfJson(figure.json);
+    await dbSet('figures', figure.id, figure);
+  }
+  set({ figures: list.sort((a, b) => b.savedAt - a.savedAt) });
+}
+
+/** 図の中身から、土台のスペクトル (Delta で開くと見える 1 本。2D はその 2D) の元の .jdf の名前 */
+export function baseOfJson(json: string): SavedFigure['base'] {
+  try {
+    const doc = (JSON.parse(json) as { doc: NmrDocument }).doc;
+    const fileName = doc.plot2d ? doc.spectra2d?.[0]?.fileName : (figureBaseOf(doc)?.meta.fileName ?? doc.spectra.find((s) => !s.simulated)?.fileName);
+    return fileName ? { fileName } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ホーム画面に出すファイル。データフォルダの .jdf に、ブラウザの中に残した図を「元の測定の版」として足す
+ * (元の測定と同じタイトル・測定時刻・核種にするので、groupMeasurements で同じ測定にまとまる)。
+ * 同じ名前の図入りの .jdf がフォルダにあれば、そちらを出す。元の測定がフォルダにない図は出さない (unlistedFigures)
+ */
+export function listedFiles(s: Pick<LibraryState, 'experiments' | 'figures'>): ExperimentMeta[] {
+  if (listedCache?.experiments === s.experiments && listedCache.figures === s.figures) return listedCache.files;
+  const inFolder = new Set(s.experiments.filter((e) => e.figure).map((e) => e.fileName));
+  const files = [...s.experiments];
+  for (const f of s.figures) {
+    if (inFolder.has(savedFileName(f))) continue;
+    const base = f.base && s.experiments.find((e) => !e.figure && e.fileName === f.base!.fileName);
+    if (!base) continue;
+    files.push({
+      ...base,
+      key: `saved:${f.id}`,
+      fileName: savedFileName(f),
+      size: 0,
+      lastModified: f.savedAt,
+      processed: true,
+      figure: { layers: f.layers, nuclei: f.nuclei },
+      savedFigureId: f.id,
+      baseKey: base.key,
+    });
+  }
+  listedCache = { experiments: s.experiments, figures: s.figures, files };
+  return files;
+}
+let listedCache: { experiments: ExperimentMeta[]; figures: SavedFigure[]; files: ExperimentMeta[] } | null = null;
+
+/** 版として出せない (元の測定がフォルダにない) 保存した図。サンプルのカードに図のまま出す */
+export function unlistedFigures(s: Pick<LibraryState, 'experiments' | 'figures'>): SavedFigure[] {
+  const listed = new Set(listedFiles(s).map((e) => e.savedFigureId));
+  const inFolder = new Set(s.experiments.filter((e) => e.figure).map((e) => e.fileName));
+  return s.figures.filter((f) => !listed.has(f.id) && !inFolder.has(savedFileName(f)));
+}
+
+/** 保存した図のファイル名 (拡張子つき) */
+export function savedFileName(f: SavedFigure) {
+  return f.fileName ?? f.handle?.name ?? `${f.name}.nmrfig`;
 }
 
 /** 図を保存する (同じ id なら上書き) */
@@ -375,7 +433,7 @@ export function toggleSelected(key: string, on?: boolean) {
 
 export function filteredExperiments(s: LibraryState): ExperimentMeta[] {
   const q = s.query.trim().toLowerCase();
-  return s.experiments.filter((e) => {
+  return listedFiles(s).filter((e) => {
     if (s.nuclei.length && !s.nuclei.includes(nucleusFilterOf(e))) return false;
     if (s.solvent && (e.solvent ?? e.solventRaw) !== s.solvent) return false;
     const note = s.notes[sampleKeyOf(e)];
@@ -454,12 +512,12 @@ export function localDay(ms: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** 同じ測定の生データ (-1-1) と処理版 (-1-2, -1-3…) をまとめたもの */
+/** 同じ測定の生データ (-1-1)・処理版 (-1-2, -1-3…)・このソフトで編集して保存した版 (図) をまとめたもの */
 export interface Measurement {
   id: string;
-  /** 処理版 (新しい版から) → 生データ の順 */
+  /** 編集した版 (新しい順) → 処理版 (新しい版から) → 生データ の順 */
   files: ExperimentMeta[];
-  /** 一覧に出す代表。最新の処理版、なければ生データ */
+  /** 一覧に出す代表。最新の編集した版、なければ最新の処理版、なければ生データ */
   main: ExperimentMeta;
 }
 
@@ -477,10 +535,14 @@ export function groupMeasurements(list: ExperimentMeta[]): Measurement[] {
   }
   const out: Measurement[] = [];
   for (const [id, files] of byId) {
-    // Delta で処理した版を優先する (FID はこのアプリで処理するので、処理版がないときだけ)
+    // このソフトで編集して保存した版 (図) を一番に、次に Delta で処理した版 (FID はこのアプリで処理するので、処理版がないときだけ)
     files.sort(
       (a, b) =>
-        Number(b.processed) - Number(a.processed) || fileVersion(b.fileName) - fileVersion(a.fileName) || b.lastModified - a.lastModified,
+        Number(!!b.figure) - Number(!!a.figure) ||
+        (a.figure && b.figure ? b.lastModified - a.lastModified : 0) ||
+        Number(b.processed) - Number(a.processed) ||
+        fileVersion(b.fileName) - fileVersion(a.fileName) ||
+        b.lastModified - a.lastModified,
     );
     out.push({ id, files, main: files[0] });
   }

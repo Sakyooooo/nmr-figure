@@ -2,18 +2,18 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 're
 import type { ExperimentMeta } from '../lib/jdfMeta';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
-import { openDialog, openExperiments, openFiles, openSavedFigure, readOptions } from '../state/fileOps';
+import { openDialog, openExperiments, openSavedFigure, readOptions } from '../state/fileOps';
 import {
   NUCLEUS_FILTERS,
   canOpen,
   chosenFile,
   deleteFigure,
-  figureFileOf,
   fileVersion,
   filteredExperiments,
   grantPermission,
   groupList,
   groupMeasurements,
+  listedFiles,
   loadExperiment,
   localDay,
   nucleusFilterOf,
@@ -23,6 +23,7 @@ import {
   scanFolder,
   supportsFolderAccess,
   toggleSelected,
+  unlistedFigures,
   useLibrary,
   type Measurement,
   type NucleusFilter,
@@ -43,7 +44,7 @@ export function Home() {
   const sort = useEditor((s) => s.settings.ui.homeSort);
   const list = useMemo(() => filteredExperiments(lib), [lib]);
   const groups = useMemo(() => groupList(list, sort), [list, sort]);
-  const measurements = useMemo(() => groupMeasurements(lib.experiments), [lib.experiments]);
+  const measurements = useMemo(() => groupMeasurements(listedFiles(lib)), [lib]);
   const focusedM = measurements.find((m) => m.files.some((f) => f.key === lib.focus)) ?? null;
   const focused = focusedM?.files.find((f) => f.key === lib.focus) ?? null;
 
@@ -248,16 +249,12 @@ function SortControl() {
 function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: Measurement[]; showDay?: boolean }) {
   const note = useLibrary((s) => s.notes[sampleKey]);
   // セレクタで filter すると毎回別の配列になって再描画が止まらないので、取り出してから絞る
+  // 保存した図は、ふつうは元の測定の「編集した版」として札にまとまる。元の測定がフォルダにない図だけ、ここに図のまま出す
   const allFigures = useLibrary((s) => s.figures);
-  const allFigureFiles = useLibrary((s) => s.figureFiles);
-  // データフォルダの図入りの .jdf。同じファイルに保存した図 (ブラウザの中の一覧) は、ファイルの方だけ出す
-  const figureFiles = useMemo(() => allFigureFiles.filter((f) => sampleKeyOf(f) === sampleKey), [allFigureFiles, sampleKey]);
+  const experiments = useLibrary((s) => s.experiments);
   const figures = useMemo(
-    () =>
-      allFigures.filter(
-        (f) => f.sampleKeys.includes(sampleKey) && !figureFiles.some((ff) => ff.fileName === f.handle?.name || ff.fileName === `${f.name}.jdf`),
-      ),
-    [allFigures, figureFiles, sampleKey],
+    () => unlistedFigures({ experiments, figures: allFigures }).filter((f) => f.sampleKeys.includes(sampleKey)),
+    [experiments, allFigures, sampleKey],
   );
   const selected = useLibrary((s) => s.selected);
   const focus = useLibrary((s) => s.focus);
@@ -297,9 +294,6 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
               checked={m.files.some((f) => selected.includes(f.key))}
               focused={m.files.some((f) => f.key === focus)}
             />
-          ))}
-          {figureFiles.map((f) => (
-            <FigureFileChip key={f.key} file={f} />
           ))}
           {figures.map((f) => (
             <FigureChip key={f.id} figure={f} />
@@ -380,12 +374,17 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
           <RichHtml text={experimentLabel(file)} />
         </span>
         <span className="exp-time">{formatTime(file.measuredAt)}</span>
-        {file.dimension >= 2 && (
+        {file.figure && (
+          <span className="badge" title="このソフトで編集して保存した版です。開くと、ピーク値・積分・重ね書きなども含めた図ごと開きます (ほかの版は右の「ファイル」で選べます)">
+            編集
+          </span>
+        )}
+        {!file.figure && file.dimension >= 2 && (
           <span className="badge fid" title="2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します">
             2D
           </span>
         )}
-        {file.dimension === 1 && !file.processed && (
+        {!file.figure && file.dimension === 1 && !file.processed && (
           <span className="badge fid" title="Delta で処理していない生データです。開くとこのアプリで FT・位相補正します">
             FID
           </span>
@@ -415,36 +414,6 @@ function FigureChip({ figure }: { figure: SavedFigure }) {
         {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
       </button>
       <IconButton icon="x" size="sm" label={`${figure.name} をホーム画面から消す (測定データは消えません)`} onClick={() => void deleteFigure(figure.id)} />
-    </div>
-  );
-}
-
-/** データフォルダの中の、図入りの .jdf のチップ。クリックで図ごと開く (Delta ではスペクトルとして開ける) */
-function FigureFileChip({ file }: { file: ExperimentMeta }) {
-  const figure = file.figure ?? { layers: 1, nuclei: file.nuclei };
-  const open = async () => {
-    try {
-      await openFiles([await figureFileOf(file.key)], 'new');
-    } catch (e) {
-      notify(`${file.fileName}: ${(e as Error).message}`, 'error');
-    }
-  };
-  return (
-    <div className="exp figure" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
-      <button
-        type="button"
-        className="exp-open"
-        title={`${file.fileName}\n${figure.layers} 本を重ねた図 (${formatStamp(file.lastModified)})。Delta でも開けます`}
-        aria-label={`保存した図 ${file.fileName} を開く`}
-        onClick={() => void open()}
-      >
-        <Icon name="file-text" size={16} />
-        <span className="exp-nuc">
-          図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
-        </span>
-        <span className="exp-time">{formatTime(file.lastModified)}</span>
-        {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
-      </button>
     </div>
   );
 }
@@ -483,15 +452,25 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
           <select value={e.key} onChange={(ev) => choose(ev.target.value)}>
             {m.files.map((f) => (
               <option key={f.key} value={f.key}>
-                {f.dimension >= 2 ? '2D (このアプリで処理)' : f.processed ? `Delta で処理した版 ${fileVersion(f.fileName) || ''}` : '生データ (FID・このアプリで処理)'} — {f.fileName} (保存 {formatStamp(f.lastModified)})
+                {versionLabel(f)} — {f.fileName} (保存 {formatStamp(f.lastModified)})
               </option>
             ))}
           </select>
         </label>
       )}
-      {e.dimension === 1 && <SpectrumPreview e={e} />}
-      {e.dimension >= 2 && <p className="hint">2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。</p>}
-      {e.dimension === 1 && !e.processed && <p className="hint">生データ (FID) です。開くと自動で FT・位相補正・ベースライン補正・溶媒での基準合わせをします。</p>}
+      {/* ブラウザに残した図は、元の測定のファイルでプレビューする */}
+      {e.dimension === 1 && <SpectrumPreview e={e.baseKey ? { ...e, key: e.baseKey } : e} />}
+      {e.figure ? (
+        <p className="hint">
+          このソフトで編集して保存した版です{e.figure.layers > 1 ? ` (${e.figure.layers} 本を重ねた図)` : ''}。開くと、ピーク値・積分・図形なども含めた図ごと開きます。
+          {e.savedFigureId ? '' : ' Delta でもこのファイルを開けます (見えるのは一番下のスペクトル)。'}
+        </p>
+      ) : (
+        <>
+          {e.dimension >= 2 && <p className="hint">2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。</p>}
+          {e.dimension === 1 && !e.processed && <p className="hint">生データ (FID) です。開くと自動で FT・位相補正・ベースライン補正・溶媒での基準合わせをします。</p>}
+        </>
+      )}
       <dl className="facts">
         <Fact label="測定">{`${formatDay(localDay(e.measuredAt))} ${formatTime(e.measuredAt)}`}</Fact>
         <Fact label="周波数">{`${e.freqMHz.toFixed(1)} MHz`}</Fact>
@@ -502,16 +481,28 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
       </dl>
       <div className="row wrap">
         <button className={`btn${selecting ? '' : ' primary'}`} disabled={!openable} onClick={() => void openExperiments([e.key], 'new')}>
-          この実験を開く
+          {e.figure ? 'この図を開く' : 'この実験を開く'}
         </button>
-        {hasDoc && (
+        {hasDoc && !e.savedFigureId && (
           <button className="btn" disabled={!openable} onClick={() => void openExperiments([e.key], 'add')}>
             編集中の図に追加
+          </button>
+        )}
+        {e.savedFigureId && (
+          <button className="btn" onClick={() => void deleteFigure(e.savedFigureId!)} title="ブラウザの中に残した図の控えを消します (保存したファイルと測定データは消えません)">
+            この版をホーム画面から消す
           </button>
         )}
       </div>
     </div>
   );
+}
+
+/** 版の選択肢の名前 */
+function versionLabel(f: ExperimentMeta) {
+  if (f.figure) return `このソフトで編集した版${f.figure.layers > 1 ? ` (${f.figure.layers} 本を重ねた図)` : ''}`;
+  if (f.dimension >= 2) return '2D (このアプリで処理)';
+  return f.processed ? `Delta で処理した版 ${fileVersion(f.fileName) || ''}` : '生データ (FID・このアプリで処理)';
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
