@@ -3,7 +3,7 @@
  * 画面には出さず、印刷のときだけ出す (styles.css の @media print。印刷のときはこれ以外をすべて隠す)。
  */
 import { locale, tr } from '../i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { figureSvgString } from '../lib/exportFigure';
 import { titleText } from '../lib/layout';
@@ -18,9 +18,13 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
   const projectName = useEditor((s) => s.projectName);
   const printRequest = useEditor((s) => s.printRequest);
   const [svg, setSvg] = useState<string | null>(null);
+  // この部品は、ホームから図を開くたび・言語を変えるたびに作り直される。作った時点までの頼みは済んだものとし、
+  // そのあと「印刷」を押したときだけ印刷する (前に 1 度でも印刷していると、図を開いただけで印刷の画面が出ていた)
+  const handled = useRef(printRequest);
 
   useEffect(() => {
-    if (!printRequest) return;
+    if (printRequest === handled.current) return;
+    handled.current = printRequest;
     const el = svgRef.current;
     if (!el) return;
     setSvg(figureSvgString(el));
