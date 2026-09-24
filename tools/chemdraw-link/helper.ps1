@@ -2,7 +2,8 @@
 #  1. リンクの構造式を NMR の保存先の ChemDraw フォルダに書き、ChemDraw で開く (開いている ChemDraw があればその中に)
 #  2. 描いている間、1 秒ごとに ChemDraw の中身を読み、変わっていればファイルに書く (アプリがそれを読んで図を直す)。
 #     書いたら「変更あり」を消すので、閉じるときに保存を聞かれない
-#  3. 書類を閉じたら終わる (自分で起動した ChemDraw は閉じる)
+#  3. 書類を閉じたら「閉じた」の印 (structure-….closed) を置いて終わる (自分で起動した ChemDraw は閉じる)。
+#     アプリはこの印を見て、最後の中身を図に入れてからファイルを片付ける
 # リンク: nmrfig-chemdraw:open?name=structure-<16進>&data=<deflate して base64url にした CDXML>
 param([string]$Url)
 $ErrorActionPreference = 'Stop'
@@ -59,6 +60,9 @@ try {
   try { (New-Object -ComObject WScript.Shell).AppActivate('ChemDraw') | Out-Null } catch {}
   if (-not $owner) { Log "already watching $name"; exit 0 }
   Log "open $name"
+  # 前に閉じたときの印・書きかけが残っていれば消す (アプリはこの印を見てファイルを片付ける)
+  $closed = Join-Path $dir "$name.closed"
+  foreach ($old in @($closed, "$path.tmp")) { if (Test-Path $old) { Remove-Item -Force $old } }
 
   $last = $null
   try { $last = [string]$doc.Objects.Data('chemical/x-cdxml') } catch {}
@@ -79,6 +83,8 @@ try {
     try { $doc.Modified = $false } catch {}
   }
   Log "done $name"
+  # 閉じた印: アプリが最後の中身を図に入れてから、この構造式のファイルと一緒に消す
+  [IO.File]::WriteAllText($closed, (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss'), $utf8)
   if ($own) { try { if ($app.Documents.Count -eq 0) { $app.Quit() } } catch {} }
   $mutex.ReleaseMutex()
 } catch {

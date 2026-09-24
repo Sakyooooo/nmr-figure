@@ -241,5 +241,6 @@ export const EN_PANELS2: Record<string, string> = {
   "ChemDraw と連携する": "Link ChemDraw",
   "連携できています": "Linked",
   "まだ連携していません": "Not linked yet",
-  "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。": "To draw in ChemDraw, set up the ChemDraw link once on this PC. The app makes a \"{dir}\" folder in your NMR folder; just double-click the installer file in it. What you draw goes into the figure without saving.",
+  "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。要らなくなったファイルはアプリが自動で消します。": "To draw in ChemDraw, set up the ChemDraw link once on this PC. The app makes a \"{dir}\" folder in your NMR folder; just double-click the installer file in it. What you draw goes into the figure without saving. The app deletes files that are no longer needed.",
+  "前の版の連携です。連携し直すと、描き終わったファイルが自動で片付きます": "This is an older version of the link. Link again so finished files are cleaned up automatically",
 };

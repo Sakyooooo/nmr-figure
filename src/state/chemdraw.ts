@@ -16,7 +16,16 @@ import { downloadBlob } from '../lib/exportFigure';
 import { buildLinkInstaller, LINK_INSTALLER_NAME } from '../lib/linkInstaller';
 import { imageRect, PX_PER_PT } from '../lib/scene';
 import { ask } from './dialog';
-import { dataFolderName, folderChildFile, folderReadPermission, folderWriteChildFile, folderWritePermission, pickFolder } from './library';
+import {
+  dataFolderName,
+  folderChildFile,
+  folderChildNames,
+  folderReadPermission,
+  folderRemoveChildFile,
+  folderWriteChildFile,
+  folderWritePermission,
+  pickFolder,
+} from './library';
 import { addFigureImage, edit, notify, openStructureEditor, select, setStructureTool, useEditor } from './store';
 
 /** ChemDraw でふつうにコピーしたもの (ブラウザで読める形がない) を貼ったときの案内 */
@@ -110,13 +119,30 @@ export const CHEMDRAW_DIR = 'ChemDraw';
 /** 連携が入ったら、連携が ChemDraw フォルダに置く印 */
 const LINK_MARKER = '.nmrfig-link.json';
 
-/** 連携ができているか (NMR の保存先の ChemDraw フォルダに印があるか)。null = まだ調べていない */
-export const useChemDrawLink = create<{ ready: boolean | null }>(() => ({ ready: null }));
+/** 連携の版 (installer.ps1 が印に書く version と合わせる)。2 = 閉じた印を置く (アプリがファイルを片付けられる) */
+const LINK_VERSION = 2;
+
+/**
+ * 連携ができているか (NMR の保存先の ChemDraw フォルダに印があるか)。null = まだ調べていない。
+ * outdated = 前の版の連携 (動くが、描き終わったファイルが片付かない。入れ直してもらう)
+ */
+export const useChemDrawLink = create<{ ready: boolean | null; outdated: boolean }>(() => ({ ready: null, outdated: false }));
+
+async function markerVersion(): Promise<number | null> {
+  const file = dataFolderName() ? await folderChildFile(CHEMDRAW_DIR, LINK_MARKER) : null;
+  if (!file) return null;
+  try {
+    return Number(JSON.parse(await file.text()).version) || 1;
+  } catch {
+    return 1;
+  }
+}
 
 /** 連携ができているかを調べる (NMR の保存先の読み取りの許可がないときは、できていないとみなす) */
 export async function refreshLinkStatus(): Promise<boolean> {
-  const ready = !!dataFolderName() && !!(await folderChildFile(CHEMDRAW_DIR, LINK_MARKER));
-  useChemDrawLink.setState({ ready });
+  const version = await markerVersion();
+  const ready = version !== null;
+  useChemDrawLink.setState({ ready, outdated: ready && version < LINK_VERSION });
   return ready;
 }
 
@@ -236,8 +262,12 @@ function waitForLink() {
     if (fresh || Date.now() - started > 15 * 60_000) {
       window.clearInterval(linkTimer!);
       linkTimer = null;
-      useChemDrawLink.setState({ ready: !!file });
-      if (fresh) notify(tr('ChemDraw と連携できました。構造式ボタンを押すと ChemDraw が開きます'));
+      await refreshLinkStatus();
+      if (fresh) {
+        notify(tr('ChemDraw と連携できました。構造式ボタンを押すと ChemDraw が開きます'));
+        // 入れ終わったら、連携を入れるファイルは要らない
+        void sweepChemDrawFolder();
+      }
     }
   }, 2000);
 }
@@ -249,7 +279,8 @@ function waitForLink() {
 export async function drawInChemDraw(imageId: string | null) {
   const image = imageId ? useEditor.getState().doc.figureImages.find((x) => x.id === imageId) : null;
   if (imageId && !image?.cdxml) return;
-  if (!(await readyFolder())) return;
+  // 書き込みの許可: 描き終わったファイルを片付けるため
+  if (!(await readyFolder(true))) return;
   if (!(await refreshLinkStatus())) {
     const choice = await ask(tr('ChemDraw との連携がまだです'), tr('ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。'), [
       { label: tr('ChemDraw と連携する'), value: 'link', kind: 'primary' },
@@ -277,28 +308,46 @@ export async function drawInChemDraw(imageId: string | null) {
   notify(tr('ChemDraw で開いています。描いた内容はそのまま図に入ります'), 'info');
 }
 
+/** 見張りと片付けを始める (1 秒ごと。片付けは 10 秒ごと) */
 function startWatching() {
   if (timer !== null) return;
-  timer = window.setInterval(() => void pollChemDraw(), 1000);
+  let tick = 0;
+  timer = window.setInterval(() => {
+    tick++;
+    void pollChemDraw().then(() => (tick % 10 === 0 ? sweepChemDrawFolder() : undefined));
+  }, 1000);
   window.addEventListener('focus', () => void pollChemDraw());
+}
+
+/**
+ * 起動したとき: NMR の保存先を読めるなら、ChemDraw フォルダを片付け、描いている途中の構造式があれば見張り直す。
+ * そのあとも 30 秒ごと (画面を出しているとき) とアプリに戻ったときに片付ける
+ */
+export function startChemDrawHousekeeping() {
+  const run = () => {
+    if (document.visibilityState === 'visible') void sweepChemDrawFolder();
+  };
+  window.setTimeout(run, 3000);
+  window.setInterval(run, 30_000);
+  window.addEventListener('focus', run);
 }
 
 let polling = false;
 
-/** 連携が書いた構造式を読み、変わっていれば図に入れる */
+/** 連携が書いた構造式を読み、変わっていれば図に入れる。閉じた印があれば、最後の中身を入れてからファイルを片付ける */
 export async function pollChemDraw() {
   if (polling || !watches.length) return;
   polling = true;
   try {
     const { doc } = useEditor.getState();
+    const names = new Set(await folderChildNames(CHEMDRAW_DIR));
     for (const w of [...watches]) {
       // 置いた構造式を消した・別の図を開いたときは見張るのをやめる
       if (w.placed && !doc.figureImages.some((x) => x.id === w.imageId)) {
         watches.splice(watches.indexOf(w), 1);
         continue;
       }
-      const file = await folderChildFile(CHEMDRAW_DIR, `${w.name}.cdxml`);
-      if (!file) {
+      if (!names.has(`${w.name}.cdxml`)) {
         if (!w.found && !w.warned && Date.now() - w.started > 12_000) {
           w.warned = true;
           void ask(
@@ -312,26 +361,110 @@ export async function pollChemDraw() {
         continue;
       }
       w.found = true;
-      if (file.lastModified === w.seen) continue;
-      w.seen = file.lastModified;
-      const text = await file.text();
-      if (text === w.text || !looksLikeCdxml(text)) continue;
-      // 書きかけ・白紙なら、次に書かれたときに読む
-      if (!drawCdxml(text, 1)) continue;
-      w.text = text;
-      if (w.placed) {
-        // 描いている間の変化は、4 秒ごとにだけ「元に戻す」の区切りを作る
-        const record = Date.now() - w.recorded > 4000;
-        if (record) w.recorded = Date.now();
-        replaceCdxml(w.imageId, text, record);
-      } else if (addCdxml(text, w.imageId)) {
-        w.placed = true;
-        w.recorded = Date.now();
-        select({ kind: 'image', id: w.imageId });
-        notify(tr('ChemDraw で描いた構造式を図に置きました。ChemDraw で直すと、図も変わります'));
+      const closed = names.has(`${w.name}.closed`);
+      const file = await folderChildFile(CHEMDRAW_DIR, `${w.name}.cdxml`);
+      if (file && file.lastModified !== w.seen) {
+        w.seen = file.lastModified;
+        applyText(w, await file.text());
+      }
+      if (closed) {
+        // ChemDraw で閉じた: 最後の中身は入れたので、ファイルは要らない
+        watches.splice(watches.indexOf(w), 1);
+        await removeStructureFiles(w.name);
       }
     }
   } finally {
     polling = false;
+  }
+}
+
+/** 読んだ中身を図に入れる (初めてなら置き、そのあとは置き換える) */
+function applyText(w: Watch, text: string) {
+  if (text === w.text || !looksLikeCdxml(text)) return;
+  // 書きかけ・白紙なら、次に書かれたときに読む
+  if (!drawCdxml(text, 1)) return;
+  w.text = text;
+  if (w.placed) {
+    // 描いている間の変化は、4 秒ごとにだけ「元に戻す」の区切りを作る
+    const record = Date.now() - w.recorded > 4000;
+    if (record) w.recorded = Date.now();
+    replaceCdxml(w.imageId, text, record);
+  } else if (addCdxml(text, w.imageId)) {
+    w.placed = true;
+    w.recorded = Date.now();
+    select({ kind: 'image', id: w.imageId });
+    notify(tr('ChemDraw で描いた構造式を図に置きました。ChemDraw で直すと、図も変わります'));
+  }
+}
+
+/** 構造式のファイルと閉じた印を消す (書き込みの許可がなければ、次に許可があるときに消す) */
+async function removeStructureFiles(name: string) {
+  if ((await folderWritePermission(false)) !== 'granted') return;
+  await folderRemoveChildFile(CHEMDRAW_DIR, `${name}.cdxml`);
+  await folderRemoveChildFile(CHEMDRAW_DIR, `${name}.closed`);
+}
+
+/** 閉じた印のない構造式のファイルでも、これより長く書かれていなければ要らない (連携は 12 時間で見張りをやめる) */
+const STALE_MS = 12 * 3600_000;
+let sweeping = false;
+
+/**
+ * ChemDraw フォルダの片付け (本人の希望 2026-09-24「要らなくなったファイルは随時消す」)。
+ *  - 連携が入ったあとの ChemDraw連携を入れる.cmd、書きかけ (.tmp)、ファイルのない閉じた印
+ *  - 閉じた構造式のファイル (開いている図の構造式なら、最後の中身を図に入れてから)
+ *  - 見張っていない構造式のファイル: 開いている図の構造式なら見張り直す (アプリを開き直しても描いている途中を拾う)。
+ *    ほかの図のものは、その図を開き直したときに拾えるよう 12 時間残してから消す
+ * 消すのは書き込みの許可があるときだけ (ここでは許可を聞かない)。連携の印 (.nmrfig-link.json) は残す
+ */
+export async function sweepChemDrawFolder() {
+  if (sweeping || !dataFolderName() || (await folderReadPermission(false)) !== 'granted') return;
+  sweeping = true;
+  try {
+    const names = await folderChildNames(CHEMDRAW_DIR);
+    if (!names.length) return;
+    const canDelete = (await folderWritePermission(false)) === 'granted';
+    const remove = (name: string) => (canDelete ? folderRemoveChildFile(CHEMDRAW_DIR, name) : Promise.resolve(false));
+    const version = await markerVersion();
+    const { doc } = useEditor.getState();
+    const now = Date.now();
+    for (const name of names) {
+      if (name === LINK_INSTALLER_NAME) {
+        if (version !== null && version >= LINK_VERSION) await remove(name);
+        continue;
+      }
+      if (name.endsWith('.tmp')) {
+        const file = await folderChildFile(CHEMDRAW_DIR, name);
+        if (file && now - file.lastModified > 60_000) await remove(name);
+        continue;
+      }
+      const closed = /^(structure-[0-9a-f]+)\.closed$/.exec(name);
+      if (closed && !names.includes(`${closed[1]}.cdxml`)) {
+        await remove(name);
+        continue;
+      }
+      const m = /^(structure-[0-9a-f]+)\.cdxml$/.exec(name);
+      if (!m || watches.some((w) => w.name === m[1])) continue;
+      const base = m[1];
+      const image = doc.figureImages.find((x) => x.cdxml && fileKey(x.id) === base);
+      const file = await folderChildFile(CHEMDRAW_DIR, name);
+      if (!file) continue;
+      const isClosed = names.includes(`${base}.closed`);
+      if (image) {
+        // 開いている図の構造式: 最後の中身を入れる。まだ描いている途中なら見張り直す
+        const w: Watch = { name: base, imageId: image.id, placed: true, seen: file.lastModified, text: image.cdxml!, started: now, found: true, warned: false, recorded: 0 };
+        applyText(w, await file.text());
+        if (isClosed) await removeStructureFiles(base);
+        else if (!watches.some((x) => x.name === base)) {
+          watches.push(w);
+          startWatching();
+        }
+      } else if (now - file.lastModified > STALE_MS) {
+        // ほかの図の構造式は、その図を開き直したときに最後の中身を拾えるよう、しばらく残す
+        await remove(name);
+        if (isClosed) await remove(`${base}.closed`);
+      }
+    }
+  } finally {
+    sweeping = false;
   }
 }

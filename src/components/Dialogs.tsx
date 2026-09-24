@@ -81,6 +81,7 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useEditor((s) => s.settings);
   const linkReady = useChemDrawLink((s) => s.ready);
+  const linkOutdated = useChemDrawLink((s) => s.outdated);
   useEffect(() => {
     void refreshLinkStatus();
   }, []);
@@ -123,10 +124,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <button className="btn" onClick={() => void setupChemDrawLink()}>
             {linkReady ? tr('ChemDraw と連携し直す') : tr('ChemDraw と連携する')}
           </button>
-          <span className="muted">{linkReady ? tr('連携できています') : tr('まだ連携していません')}</span>
+          <span className="muted">
+            {linkOutdated ? tr('前の版の連携です。連携し直すと、描き終わったファイルが自動で片付きます') : linkReady ? tr('連携できています') : tr('まだ連携していません')}
+          </span>
         </div>
         <p className="hint">
-          {tr('ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。', {
+          {tr('ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。要らなくなったファイルはアプリが自動で消します。', {
             dir: CHEMDRAW_DIR,
           })}
         </p>

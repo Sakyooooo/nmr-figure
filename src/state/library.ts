@@ -360,6 +360,36 @@ export async function folderChildFile(dir: string, name: string): Promise<File |
   }
 }
 
+type SubDir = {
+  values(): AsyncIterable<{ kind: 'file' | 'directory'; name: string }>;
+  removeEntry(name: string): Promise<void>;
+};
+
+/** データフォルダの中の子フォルダのファイルの名前。フォルダがなければ空 */
+export async function folderChildNames(dir: string): Promise<string[]> {
+  if (!folder?.getDirectoryHandle) return [];
+  try {
+    const sub = (await folder.getDirectoryHandle(dir)) as unknown as SubDir;
+    const out: string[] = [];
+    for await (const e of sub.values()) if (e.kind === 'file') out.push(e.name);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** データフォルダの中の子フォルダのファイルを消す。消せたら true (書き込みの許可は先に取っておく) */
+export async function folderRemoveChildFile(dir: string, name: string): Promise<boolean> {
+  if (!folder?.getDirectoryHandle) return false;
+  try {
+    const sub = (await folder.getDirectoryHandle(dir)) as unknown as SubDir;
+    await sub.removeEntry(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** データフォルダの中の子フォルダ (なければ作る) にファイルを書く。書き込みの許可は先に取っておく */
 export async function folderWriteChildFile(dir: string, name: string, text: string) {
   if (!folder?.getDirectoryHandle) throw new Error(tr('フォルダが開かれていません'));
