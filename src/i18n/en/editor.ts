@@ -199,4 +199,5 @@ export const EN_EDITOR: Record<string, string> = {
   'FID をこのアプリで処理': 'FID processed in this app',
   備考: 'Notes',
   未保存の図: 'Unsaved figure',
+  '印刷: {time}': 'Printed: {time}',
 };

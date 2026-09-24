@@ -1,6 +1,6 @@
 /**
- * 印刷。今の図と、測定条件の表を 1枚にまとめる。
- * 画面には出さず、印刷のときだけ出す (styles.css の @media print)。
+ * 印刷。縦の用紙 1 枚に、上に図だけ、下に説明 (図の名前・測定条件の表・印刷した日時) をまとめる (本人の指定 2026-09-24)。
+ * 画面には出さず、印刷のときだけ出す (styles.css の @media print。印刷のときはこれ以外をすべて隠す)。
  */
 import { locale, tr } from '../i18n';
 import { useEffect, useState } from 'react';
@@ -34,6 +34,7 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
 
   if (!svg) return null;
   const title = doc.plot2d ? title2d(doc) : titleText(doc);
+  const name = projectName ?? tr('未保存の図');
   const rows = doc.plot2d
     ? doc.spectra2d.map((m) => ({
         name: m.fileName,
@@ -65,43 +66,50 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
   // 印刷のときはアプリ本体を隠すので、印刷用の中身は body の直下に出す
   return createPortal(
     <div className="print-view">
-      <h1>
-        <RichHtml text={title || projectName || 'NMR'} />
-      </h1>
       <div className="print-figure" dangerouslySetInnerHTML={{ __html: svg }} />
-      <table className="print-table">
-        <thead>
-          <tr>
-            <th>{tr('スペクトル')}</th>
-            <th>{tr('核種')}</th>
-            <th>{tr('周波数')}</th>
-            <th>{tr('溶媒')}</th>
-            <th>{tr('積算')}</th>
-            <th>{tr('測定日')}</th>
-            <th>{tr('備考')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td>{r.name}</td>
-              <td>
-                <RichHtml text={r.nucleus.replace(/^(\d+)/, '^{$1}').replace(/\{(\d+)([A-Z])\}/, '{^{$1}$2}')} />
-              </td>
-              <td>{r.freq}</td>
-              <td>{r.solvent ? <RichHtml text={r.solvent} /> : '—'}</td>
-              <td>{r.scans ?? '—'}</td>
-              <td>{r.date || '—'}</td>
-              <td className="note">
-                <RichHtml text={r.note} />
-              </td>
+      <section className="print-desc">
+        <h1>{name}</h1>
+        {/* 図の下にタイトルを出していない図だけ、説明に書く (同じ文を 2 回出さない) */}
+        {title && !doc.figure.showTitle && (
+          <p className="print-title">
+            <RichHtml text={title} />
+          </p>
+        )}
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>{tr('スペクトル')}</th>
+              <th>{tr('核種')}</th>
+              <th>{tr('周波数')}</th>
+              <th>{tr('溶媒')}</th>
+              <th>{tr('積算')}</th>
+              <th>{tr('測定日')}</th>
+              <th>{tr('備考')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="print-foot">
-        {projectName ?? tr('未保存の図')} · {new Date().toLocaleString(locale())}
-      </p>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{r.name}</td>
+                <td>
+                  {/* 質量数を上付きに (2D の「1H / 13C」は両方、デカップリングの {1H} も) */}
+                  <RichHtml text={r.nucleus.replace(/(^|\/\s*)(\d+)/g, '$1^{$2}').replace(/\{(\d+)([A-Z])\}/, '{^{$1}$2}')} />
+                </td>
+                <td>{r.freq}</td>
+                <td>{r.solvent ? <RichHtml text={r.solvent} /> : '—'}</td>
+                <td>{r.scans ?? '—'}</td>
+                <td>{r.date || '—'}</td>
+                <td className="print-note">
+                  <RichHtml text={r.note} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="print-foot">
+          {tr('印刷: {time}', { time: new Date().toLocaleString(locale()) })} · NMR Figure Editor
+        </p>
+      </section>
     </div>,
     document.body,
   );

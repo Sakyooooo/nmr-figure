@@ -1099,32 +1099,54 @@ details.sub[open] {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
 }
+/*
+ * 印刷: 縦の用紙 1 枚に、上に図だけ、下に説明 (PrintView.tsx)。印刷用の中身 (body の直下) 以外はすべて隠す
+ * (アプリの枠の名前は画面の作り直しで変わることがあるので、名前で隠さない)
+ */
 @media print {
-  .app,
-  .home-root,
-  .toast,
-  .modal {
+  body > :not(.print-view) {
     display: none !important;
   }
-  .print-view {
-    display: block;
-    padding: 0;
-    color: #000;
-    font-family: 'Times New Roman', Times, serif;
+  :root,
+  body {
+    height: auto;
+    overflow: visible;
+    background: #fff;
   }
-  .print-view h1 {
-    font-size: 15pt;
-    margin: 0 0 8pt;
-    font-weight: 600;
+  .print-view {
+    display: flex;
+    flex-direction: column;
+    gap: 12pt;
+    color: #000;
+    font-family: 'Times New Roman', Times, 'Yu Mincho', serif;
+  }
+  /* 図はページの幅いっぱい。縦に長い図 (2D など) も、下の説明と 1 枚に収まる高さまで */
+  .print-figure {
+    break-inside: avoid;
   }
   .print-figure svg {
+    display: block;
     width: 100%;
     height: auto;
+    max-height: 150mm;
+  }
+  .print-desc {
+    break-inside: avoid;
+    padding-top: 8pt;
+    border-top: 0.75pt solid #000;
+  }
+  .print-desc h1 {
+    margin: 0 0 2pt;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+  .print-title {
+    margin: 0 0 6pt;
+    font-size: 10pt;
   }
   .print-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10pt;
     font-size: 9pt;
   }
   .print-table th,
@@ -1132,17 +1154,24 @@ details.sub[open] {
     border: 0.5pt solid #999;
     padding: 2pt 4pt;
     text-align: left;
+    vertical-align: top;
   }
-  .print-table .note {
+  .print-table th {
+    background: #f2f2f2;
+    font-weight: 700;
+  }
+  .print-table .print-note {
     font-size: 8pt;
   }
   .print-foot {
-    margin-top: 8pt;
+    margin: 6pt 0 0;
     font-size: 8pt;
     color: #444;
   }
+  /* 縦の用紙 (大きさは印刷の画面で選ぶ A4 など) */
   @page {
-    margin: 12mm;
+    size: portrait;
+    margin: 15mm;
   }
 }
 
