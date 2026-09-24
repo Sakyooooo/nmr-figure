@@ -1,5 +1,6 @@
 import { tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { cdxmlAtomSites, drawCdxml } from '../lib/cdxml';
 import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
 import { annotationBox, buildScene, pxToImageAnchor, type PlacedAnnotation, type Scene } from '../lib/scene';
@@ -23,6 +24,7 @@ import {
   toggleMarker,
   openStructureEditor,
   togglePeakLabel,
+  toggleAtomMarker,
   updateFigureImage,
   updateAnnotation,
   updateIntegral,
@@ -105,6 +107,20 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
   const snapWindow = (g: LayerGeom) => {
     const pxWin = (8 * (doc.view.xMax - doc.view.xMin)) / layout.plot.w;
     return Math.max(pxWin, Math.min(nucleusDefaults(g.meta.nucleus).snapPpm, pxWin * 3));
+  };
+
+  /** 構造式のクリックした所にいちばん近い原子 (結合の長さの半分より遠ければ null) */
+  const nearestAtom = (image: NmrDocument['figureImages'][number], x: number, y: number) => {
+    const box = image.cdxml ? drawCdxml(image.cdxml, 1)?.box : null;
+    if (!image.cdxml || !box) return null;
+    const r = imageRect(image, layout);
+    const k = r.w / (box.r - box.l);
+    let best: { id: string; d: number } | null = null;
+    for (const s of cdxmlAtomSites(image.cdxml)) {
+      const d = Math.hypot(r.x + (s.x - box.l) * k - x, r.y + (s.y - box.t) * k - y);
+      if (!best || d < best.d) best = { id: s.id, d };
+    }
+    return best && best.d <= Math.max(8, 7.5 * k) ? best.id : null;
   };
 
   /** その場所にある構造式・画像 (後から置いたものが上) */
@@ -266,6 +282,28 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       setDraft(gesture.current);
       capture();
       return;
+    }
+
+    // マーカー: ChemDraw の構造式の上なら、いちばん近い原子に付ける (帰属)
+    if (tool === 'marker') {
+      // 端の原子 (末端の CH3 など) は構造式の枠のすぐ端にあるので、枠の少し外まで原子を探す
+      const image = [...doc.figureImages].reverse().find((im) => {
+        if (!im.cdxml) return false;
+        const r = imageRect(im, layout);
+        const pad = 12;
+        return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad && (imageAt(x, y) === im.id || !!nearestAtom(im, x, y));
+      });
+      if (image?.cdxml) {
+        const styleId = useEditor.getState().activeMarkerStyleId;
+        if (!styleId) {
+          notify(tr('右の「マーカー・凡例」で付けたい種類を選んでください'), 'error');
+          return;
+        }
+        const atom = nearestAtom(image, x, y);
+        if (atom) toggleAtomMarker(image.id, atom, styleId);
+        else notify(tr('原子の近くをクリックしてください'), 'info');
+        return;
+      }
     }
 
     if (!g) return;

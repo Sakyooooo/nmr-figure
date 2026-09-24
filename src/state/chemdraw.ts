@@ -11,7 +11,7 @@
  */
 import { create } from 'zustand';
 import { tr } from '../i18n';
-import { cdxmlToSvg, drawCdxml, looksLikeCdxml } from '../lib/cdxml';
+import { cdxmlAtomSites, cdxmlToSvg, drawCdxml, looksLikeCdxml } from '../lib/cdxml';
 import { downloadBlob } from '../lib/exportFigure';
 import { buildLinkInstaller, LINK_INSTALLER_NAME } from '../lib/linkInstaller';
 import { imageRect, PX_PER_PT } from '../lib/scene';
@@ -72,9 +72,15 @@ function replaceCdxml(imageId: string, text: string, record = true): boolean {
   const ny = old ? r.y + (now.box.t - old.box.t) * k : r.y;
   const nw = (now.box.r - now.box.l) * k;
   const nh = nw * ratio;
+  // 原子の id は ChemDraw で直しても変わらない。なくなった原子の帰属のマーカーは外す
+  const alive = new Set(cdxmlAtomSites(text).map((s) => s.id));
+  let removed = 0;
   edit((d) => {
     const im = d.figureImages.find((x) => x.id === imageId);
     if (!im) return;
+    const before = d.markers.length;
+    d.markers = d.markers.filter((m) => m.imageId !== im.id || !m.atomId || alive.has(m.atomId));
+    removed = before - d.markers.length;
     // 構造式に固定した印は、図の上の位置を変えずに新しい枠に対する割合に直す
     const toNew = (fx: number, fy: number) => ({ x: (r.x + fx * r.w - nx) / nw, y: (r.y + fy * r.h - ny) / nh });
     for (const a of d.annotations) {
@@ -85,6 +91,7 @@ function replaceCdxml(imageId: string, text: string, record = true): boolean {
     }
     Object.assign(im, { cdxml: text, svg: drawn.svg, source: null, href: null, ratio, x: nx / fig.width, y: ny / fig.height, w: nw / fig.width });
   }, record);
+  if (removed) notify(tr('構造式から原子がなくなったので、帰属のマーカーを {n} 個外しました', { n: removed }), 'info');
   return true;
 }
 

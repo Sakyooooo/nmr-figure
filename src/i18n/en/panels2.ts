@@ -167,8 +167,7 @@ export const EN_PANELS2: Record<string, string> = {
   'ほかの候補も表示 ({v0})': 'Show other candidates ({v0})',
   ' → なし': ' → none',
   'マーカー・凡例': 'Markers & legend',
-  '色を選んでからピークをクリックすると付け外しできます。名前を入れるとその色が凡例に出ます (空のままなら出ません)。名前は H_{two}O のように書くと下付きになります。':
-    'Choose a color, then click a peak to add or remove a marker. Colors with a name appear in the legend (blank names are hidden). Write names like H_{two}O for subscripts.',
+  "色を選んでからピークをクリックすると付け外しできます。ChemDraw の構造式の原子をクリックすると、原子の横にも同じ印が付きます (帰属。1 つの原子に 1 つ)。名前を入れるとその色が凡例に出ます (空のままなら出ません)。名前は H_{two}O のように書くと下付きになります。": "Choose a color, then click a peak to add or remove a marker. Clicking an atom of a ChemDraw structure puts the same mark next to the atom (assignment; one per atom). Colors with a name appear in the legend (blank names are hidden). Write names like H_{two}O for subscripts.",
   この種類でマーカーを付ける: 'Place markers of this type',
   '名前 (凡例に出す)': 'Name (shown in the legend)',
   付いているマーカーの数: 'Number of markers placed',

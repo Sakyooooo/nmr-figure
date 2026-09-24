@@ -123,7 +123,13 @@ export const FigureContent = memo(function FigureContent({
 
       {/* マーカーと凡例 */}
       {scene.markers.map((m) => (
-        <path key={m.id} d={markerPath(m.style.shape, m.x, m.y, figure.markerSize)} fill={m.style.color} />
+        <path
+          key={m.id}
+          d={markerPath(m.style.shape, m.x, m.y, figure.markerSize)}
+          fill={m.style.color}
+          // 構造式の原子に付けたもの (「ChemDraw で開く」では ChemDraw の図形にする)
+          data-atom-marker={m.imageId}
+        />
       ))}
       {scene.legend && (
         <g>

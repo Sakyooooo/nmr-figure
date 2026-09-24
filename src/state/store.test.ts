@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { beginGesture, edit, endGesture, loadDocument, notify, redo, select, undo, useEditor } from './store';
+import { beginGesture, edit, endGesture, loadDocument, notify, redo, select, toggleAtomMarker, undo, useEditor } from './store';
 import { emptyDocument } from './types';
 
 const width = () => useEditor.getState().doc.figure.width;
@@ -71,5 +71,20 @@ describe('右のパネルのタブと、元に戻せる知らせ', () => {
     expect(useEditor.getState().message?.undoDepth).toBe(1);
     notify('ただの知らせ');
     expect(useEditor.getState().message?.undoDepth).toBeUndefined();
+  });
+});
+
+describe('構造式の原子のマーカー (帰属)', () => {
+  beforeEach(() => loadDocument(emptyDocument(), {}, null, null));
+
+  it('1 つの原子に 1 つ: 同じ種類なら外し、違う種類なら付け替える', () => {
+    const [a, b] = useEditor.getState().doc.markerStyles;
+    const atoms = () => useEditor.getState().doc.markers.map((m) => [m.atomId, m.styleId]);
+    toggleAtomMarker('img', '5', a.id);
+    expect(atoms()).toEqual([['5', a.id]]);
+    toggleAtomMarker('img', '5', b.id);
+    expect(atoms()).toEqual([['5', b.id]]);
+    toggleAtomMarker('img', '5', b.id);
+    expect(atoms()).toEqual([]);
   });
 });

@@ -27,6 +27,10 @@ describe('ChemDraw で開く (CDXML を組み立てる)', () => {
       { cdxml: structure('Helvetica', '1'), x: 10, y: 10, w: 40 },
     ],
     marks: [{ structure: 0, lines: [[{ text: 'c' }, { text: '2', sub: true }], [{ text: 'b', italic: true }]], x: 120, y: 60, size: 9, lineHeight: 11.25, font: 'Times New Roman', color: '#1f5fd1' }],
+    shapes: [
+      { structure: 0, shape: 'circle', x: 110, y: 55, size: 6, color: '#d12b2b' },
+      { structure: 0, shape: 'triangle', x: 130, y: 55, size: 6, color: '#1a8a3a' },
+    ],
   });
   const root = readCdxml(xml)!;
   const nodes = all(root);
@@ -85,5 +89,17 @@ describe('ChemDraw で開く (CDXML を組み立てる)', () => {
       ['2\n', '32'],
       ['b', '2'],
     ]);
+  });
+
+  it('原子のマーカーは塗りつぶした図形にして、構造式とまとめる (丸は楕円、ほかは閉じた曲線)', () => {
+    const group = nodes.filter((x) => x.name === 'group')[0];
+    const oval = all(group).find((x) => x.name === 'graphic' && x.attrs.GraphicType === 'Oval')!;
+    expect(oval.attrs.OvalType).toBe('Filled');
+    expect(oval.attrs.Center3D).toBe('146 91 0');
+    const curve = all(group).find((x) => x.name === 'curve')!;
+    expect(curve.attrs.Closed).toBe('yes');
+    expect(curve.attrs.FillType).toBe('Solid');
+    // 三角: 向き + 始点 + 3 辺 × 3 点 + 向き
+    expect(curve.attrs.CurvePoints.split(' ').length / 2).toBe(1 + 1 + 9 + 1);
   });
 });

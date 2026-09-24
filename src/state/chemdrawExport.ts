@@ -9,7 +9,8 @@ import { tr } from '../i18n';
 import { buildChemDrawDocument, type ExportMark, type ExportMarkSeg } from '../lib/chemdrawExport';
 import { baseName, downloadBlob } from '../lib/exportFigure';
 import { parseRich } from '../lib/richText';
-import { imageAnchorToPx, imageRect, PX_PER_PT } from '../lib/scene';
+import { atomMarkerPos, imageAnchorToPx, imageRect, PX_PER_PT } from '../lib/scene';
+import type { ExportShape } from '../lib/chemdrawExport';
 import { svgToEmf } from '../lib/svgToEmf';
 import { notify, useEditor } from './store';
 
@@ -32,6 +33,10 @@ export async function openInChemDraw(svg: SVGSVGElement) {
   const [, , w, h] = (svg.getAttribute('viewBox') ?? `0 0 ${fig.width} ${fig.height}`).split(/\s+/).map(Number);
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.querySelectorAll('[data-ui], [data-cdxml]').forEach((el) => el.remove());
+  // 原子に付けたマーカー (帰属) は ChemDraw の図形にする
+  clone.querySelectorAll('[data-atom-marker]').forEach((el) => {
+    if (ids.has(el.getAttribute('data-atom-marker') ?? '')) el.remove();
+  });
   clone.querySelectorAll('[data-annotation]').forEach((el) => {
     if (markIds.has(el.getAttribute('data-annotation') ?? '')) el.remove();
   });
@@ -75,7 +80,15 @@ export async function openInChemDraw(svg: SVGSVGElement) {
       color: a.stroke,
     };
   });
-  const xml = buildChemDrawDocument({ width: w * PT, height: h * PT, picture: { emf }, structures, marks: exportMarks });
+  const shapes: ExportShape[] = [];
+  for (const m of doc.markers) {
+    const image = m.imageId ? images.find((x) => x.id === m.imageId) : undefined;
+    const style = doc.markerStyles.find((s) => s.id === m.styleId);
+    const pos = image && style && m.atomId ? atomMarkerPos(image, m.atomId, layout, fig.markerSize) : null;
+    if (!image || !style || !pos) continue;
+    shapes.push({ structure: images.indexOf(image), shape: style.shape, x: pos.x * PT, y: pos.y * PT, size: fig.markerSize * PT, color: style.color });
+  }
+  const xml = buildChemDrawDocument({ width: w * PT, height: h * PT, picture: { emf }, structures, marks: exportMarks, shapes });
   const name = `${projectName ? baseName(projectName) : 'figure'}.cdxml`;
   downloadBlob(new Blob([xml], { type: 'chemical/x-cdxml' }), name);
   notify(

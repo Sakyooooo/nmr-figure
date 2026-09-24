@@ -206,4 +206,6 @@ export const EN_MESSAGES: Record<string, string> = {
   "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。": "To draw in ChemDraw, set up the ChemDraw link once on this PC.",
   "ChemDraw との連携がうまく動いていないようです (Edge の「開きますか」を許可しなかった、連携を外した、など)。もう一度「ChemDraw と連携する」を行ってください。": "The ChemDraw link does not seem to be working (for example, Edge's \"Open?\" was not allowed, or the link was removed). Run \"Link ChemDraw\" again.",
   "フォルダが開かれていません": "No folder is open",
+  "原子の近くをクリックしてください": "Click near an atom",
+  "構造式から原子がなくなったので、帰属のマーカーを {n} 個外しました": "Removed {n} assignment {n|marker|markers} because the atoms are gone from the structure",
 };

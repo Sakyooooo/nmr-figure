@@ -39,6 +39,17 @@ export interface ExportMark {
   color: string;
 }
 
+/** 構造式の原子に付けたマーカー (帰属)。ChemDraw の塗りつぶした図形にする */
+export interface ExportShape {
+  structure: number;
+  shape: 'circle' | 'square' | 'triangle' | 'invtriangle' | 'diamond' | 'star';
+  /** 中心 (pt、図の左上が 0,0) と大きさ (pt) */
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+}
+
 export interface ChemDrawExport {
   /** 図の大きさ (pt) */
   width: number;
@@ -47,6 +58,7 @@ export interface ChemDrawExport {
   picture: { emf?: Uint8Array; png?: Uint8Array } | null;
   structures: ExportStructure[];
   marks: ExportMark[];
+  shapes?: ExportShape[];
 }
 
 /** ChemDraw の余白 (ページの端から図までの距離、pt) */
@@ -292,6 +304,9 @@ export function buildChemDrawDocument(input: ChemDrawExport): string {
     input.marks
       .filter((m) => m.structure === k)
       .forEach((m, i) => group.children.push(markCaption(m, id(), placed.zBase + 90_000 + i, tables)));
+    (input.shapes ?? [])
+      .filter((s) => s.structure === k)
+      .forEach((s, i) => group.children.push(markShape(s, id(), placed.zBase + 80_000 + i, tables)));
     page.children.push(group);
     schemes.push(...placed.schemes);
   });
@@ -313,6 +328,94 @@ export function buildChemDrawDocument(input: ChemDrawExport): string {
   };
   root.children.push(...tables.xml(), page);
   return `<?xml version="1.0" encoding="UTF-8" ?>\n<!DOCTYPE CDXML SYSTEM "https://static.chemistry.revvitycloud.com/cdxml/CDXML.dtd" >\n${serializeXml(root)}\n`;
+}
+
+/** マーカーの形の頂点 (中心からの割合。アプリの markerPath と同じ形) */
+function shapePoints(shape: ExportShape['shape'], r: number): [number, number][] {
+  switch (shape) {
+    case 'square':
+      return [
+        [-r * 0.85, -r * 0.85],
+        [r * 0.85, -r * 0.85],
+        [r * 0.85, r * 0.85],
+        [-r * 0.85, r * 0.85],
+      ];
+    case 'triangle':
+      return [
+        [0, -r * 1.1],
+        [r, r * 0.75],
+        [-r, r * 0.75],
+      ];
+    case 'invtriangle':
+      return [
+        [0, r * 1.1],
+        [r, -r * 0.75],
+        [-r, -r * 0.75],
+      ];
+    case 'diamond':
+      return [
+        [0, -r * 1.15],
+        [r * 0.9, 0],
+        [0, r * 1.15],
+        [-r * 0.9, 0],
+      ];
+    default: {
+      // 星: 外 5 点と内 5 点
+      const pts: [number, number][] = [];
+      for (let i = 0; i < 10; i++) {
+        const rr = i % 2 ? r * 0.45 : r * 1.15;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+      }
+      return pts;
+    }
+  }
+}
+
+/** マーカー → ChemDraw の塗りつぶした図形 (丸は楕円、ほかは直線でつないだ閉じた曲線) */
+function markShape(s: ExportShape, idValue: string, z: number, tables: Tables): XNode {
+  const cx = MARGIN + s.x;
+  const cy = MARGIN + s.y;
+  const r = s.size / 2;
+  const color = tables.color(s.color);
+  if (s.shape === 'circle') {
+    return {
+      name: 'graphic',
+      attrs: {
+        id: idValue,
+        BoundingBox: `${f2(cx - r)} ${f2(cy - r)} ${f2(cx + r)} ${f2(cy + r)}`,
+        Z: String(z),
+        color,
+        GraphicType: 'Oval',
+        OvalType: 'Filled',
+        Center3D: `${f2(cx)} ${f2(cy)} 0`,
+        MajorAxisEnd3D: `${f2(cx + r)} ${f2(cy)} 0`,
+        MinorAxisEnd3D: `${f2(cx)} ${f2(cy + r)} 0`,
+      },
+      children: [],
+    };
+  }
+  // ChemDraw の曲線: [向き, 始点, (制御 1, 制御 2, 終点)…, 向き]。直線は制御点を両端に重ねる
+  const pts = shapePoints(s.shape, r).map(([x, y]) => [cx + x, cy + y] as [number, number]);
+  const seq: [number, number][] = [pts[0], pts[0]];
+  for (let i = 1; i <= pts.length; i++) {
+    const prev = pts[i - 1];
+    const next = pts[i % pts.length];
+    seq.push(prev, next, next);
+  }
+  seq.push(pts[0]);
+  return {
+    name: 'curve',
+    attrs: {
+      id: idValue,
+      Z: String(z),
+      color,
+      Closed: 'yes',
+      FillType: 'Solid',
+      CurvePoints: seq.map(([x, y]) => `${f2(x)} ${f2(y)}`).join(' '),
+    },
+    children: [],
+  };
 }
 
 /** 印 → ChemDraw の文字 (化学的な意味は読まない) */

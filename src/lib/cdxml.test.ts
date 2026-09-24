@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cdxmlToSvg, drawCdxml, looksLikeCdxml } from './cdxml';
+import { cdxmlAtomSites, cdxmlToSvg, drawCdxml, looksLikeCdxml } from './cdxml';
 import { elements, parseXml, walk, type XNode } from './xml';
 
 /** ChemDraw (ACS Document 1996) と同じ書式の、小さな CDXML */
@@ -106,5 +106,20 @@ describe('CDXML の描画', () => {
     // 全体を 2 倍する代わりに、線の太さを半分で書く
     expect(d.inner).toContain('scale(2)');
     expect(d.inner).toContain('stroke-width="0.3"');
+  });
+});
+
+describe('原子の位置 (帰属のマーカー用)', () => {
+  it('結合のない側を向く。末端は結合の先、鎖の途中は角の外側', () => {
+    const sites = cdxmlAtomSites(doc(n(1, 0, 0) + n(2, 12.47, 7.2) + n(3, 24.94, 0) + label(4, 24.94, -14.4, 'O') + b(5, 1, 2) + b(6, 2, 3) + b(7, 3, 4, 'Order="2"')));
+    const at = (id: string) => sites.find((s) => s.id === id)!;
+    // 末端の 1: 2 と反対 (左上)
+    expect(at('1').dir.x).toBeLessThan(0);
+    expect(at('1').dir.y).toBeLessThan(0);
+    // 鎖の途中の 2: 下
+    expect(at('2').dir.y).toBeGreaterThan(0.9);
+    // O は文字あり
+    expect(at('4').labeled).toBe(true);
+    expect(at('1').labeled).toBe(false);
   });
 });

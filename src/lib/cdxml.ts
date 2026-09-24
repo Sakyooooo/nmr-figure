@@ -1124,3 +1124,75 @@ function hashText(s: string) {
   }
   return (h >>> 0).toString(36);
 }
+
+// ---- 原子の位置 (帰属のマーカーを原子の横に置くため) ----
+
+export interface AtomSite {
+  /** CDXML の原子の id */
+  id: string;
+  x: number;
+  y: number;
+  /** 原子に文字 (O, NH など) があるか */
+  labeled: boolean;
+  /** 結合のない側 (単位ベクトル)。マーカーはこちらに置く */
+  dir: { x: number; y: number };
+}
+
+const siteCache = new Map<string, AtomSite[]>();
+
+/** 構造式の原子 (見えるもの) の位置と、結合のない向き。座標は CDXML のまま (pt) */
+export function cdxmlAtomSites(text: string): AtomSite[] {
+  const key = `${text.length}:${hashText(text)}`;
+  const hit = siteCache.get(key);
+  if (hit) return hit;
+  const out: AtomSite[] = [];
+  const root = readCdxml(text);
+  const visit = (node: XNode) => {
+    for (const el of elements(node)) {
+      if (el.attrs.Visible === 'no' || el.attrs.SupersededBy) continue;
+      if (el.name === 'fragment') fragmentSites(el, out);
+      else if (el.name === 'page' || el.name === 'group' || el.name === 'altgroup' || el.name === 'bracketedgroup') visit(el);
+    }
+  };
+  if (root) visit(root);
+  if (siteCache.size > 60) siteCache.delete(siteCache.keys().next().value!);
+  siteCache.set(key, out);
+  return out;
+}
+
+function fragmentSites(frag: XNode, out: AtomSite[]) {
+  const atoms = new Map<string, { x: number; y: number; labeled: boolean; nb: string[] }>();
+  for (const n of elements(frag, 'n')) {
+    const p = nums(n.attrs.p);
+    if (p.length < 2 || n.attrs.NodeType === 'ExternalConnectionPoint' || n.attrs.Visible === 'no') continue;
+    const t = firstElement(n, 't');
+    atoms.set(n.attrs.id, { x: p[0], y: p[1], labeled: !!t && t.attrs.Visible !== 'no', nb: [] });
+  }
+  for (const b of elements(frag, 'b')) {
+    const a = atoms.get(b.attrs.B);
+    const e = atoms.get(b.attrs.E);
+    if (!a || !e) continue;
+    a.nb.push(b.attrs.E);
+    e.nb.push(b.attrs.B);
+  }
+  const list = [...atoms.values()];
+  const cx = list.reduce((s, a) => s + a.x, 0) / (list.length || 1);
+  const cy = list.reduce((s, a) => s + a.y, 0) / (list.length || 1);
+  for (const [id, a] of atoms) {
+    // 結合の向きを足して逆を向く。釣り合っているとき (3 本が 120° など) は構造式の外側
+    let dx = 0;
+    let dy = 0;
+    for (const other of a.nb) {
+      const o = atoms.get(other)!;
+      const L = Math.hypot(o.x - a.x, o.y - a.y) || 1;
+      dx -= (o.x - a.x) / L;
+      dy -= (o.y - a.y) / L;
+    }
+    if (Math.hypot(dx, dy) < 0.3) {
+      dx = a.x - cx;
+      dy = a.y - cy;
+    }
+    const L = Math.hypot(dx, dy);
+    out.push({ id, x: a.x, y: a.y, labeled: a.labeled, dir: L < 1e-6 ? { x: 0, y: -1 } : { x: dx / L, y: dy / L } });
+  }
+}

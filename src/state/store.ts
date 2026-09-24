@@ -570,6 +570,19 @@ export function toggleMarker(layerId: string, styleId: string, ppm: number, tol:
   });
 }
 
+/**
+ * 構造式の原子にマーカーを付ける (帰属)。1 つの原子に 1 つだけ: 同じ種類なら外し、違う種類なら付け替える
+ */
+export function toggleAtomMarker(imageId: string, atomId: string, styleId: string) {
+  edit((d) => {
+    const i = d.markers.findIndex((m) => m.imageId === imageId && m.atomId === atomId);
+    const same = i >= 0 && d.markers[i].styleId === styleId;
+    if (i >= 0) d.markers.splice(i, 1);
+    if (!same) d.markers.push({ id: crypto.randomUUID(), layerId: '', ppm: 0, styleId, imageId, atomId });
+    pruneStyles(d);
+  });
+}
+
 export function togglePeakLabel(layerId: string, ppm: number, tol: number) {
   edit((d) => {
     const i = d.peakLabels.findIndex((p) => p.layerId === layerId && Math.abs(p.ppm - ppm) <= tol);
@@ -755,8 +768,9 @@ export function deleteSelection() {
     if (selection.kind === 'integral') d.integrals = d.integrals.filter((x) => x.id !== selection.id);
     if (selection.kind === 'image') {
       d.figureImages = d.figureImages.filter((x) => x.id !== selection.id);
-      // 構造式に固定した印も一緒に消す
+      // 構造式に固定した印・原子のマーカーも一緒に消す
       d.annotations = d.annotations.filter((a) => a.imageId !== selection.id);
+      d.markers = d.markers.filter((m) => m.imageId !== selection.id);
     }
     if (selection.kind === 'legend') d.figure.showLegend = false;
     pruneStyles(d);

@@ -133,11 +133,17 @@ export interface MarkerStyle {
 }
 
 /** ppm はすべて基準合わせ前の値。表示位置は ppm + refOffset */
+/**
+ * マーカー。ピークに付けるもの (layerId と ppm) と、構造式の原子に付けるもの (帰属。imageId と atomId、layerId は空) がある
+ */
 export interface Marker {
   id: string;
   layerId: string;
   styleId: string;
   ppm: number;
+  /** 構造式の原子に付けたとき: その構造式 (FigureImage) の id と、CDXML の原子の id */
+  imageId?: string;
+  atomId?: string;
 }
 
 export interface PeakLabel {

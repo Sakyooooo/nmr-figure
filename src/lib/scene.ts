@@ -1,4 +1,5 @@
 import type { Annotation, Dash, FigureImage, MarkerStyle, NmrDocument } from '../state/types';
+import { cdxmlAtomSites, drawCdxml } from './cdxml';
 import { decimalsFor, niceStep, spreadLabels, ticks } from './labels';
 import { cumulative, integralValues } from './integrals';
 import {
@@ -51,6 +52,8 @@ export interface PlacedMarker {
   x: number;
   y: number;
   style: MarkerStyle;
+  /** 構造式の原子に付けたマーカーなら、その構造式 */
+  imageId?: string;
 }
 
 export interface PlacedLegend {
@@ -194,6 +197,14 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
   const stackCount = new Map<string, number>();
   const size = f.markerSize;
   for (const m of doc.markers) {
+    if (m.imageId) {
+      // 帰属: 構造式の原子の横
+      const image = doc.figureImages.find((x) => x.id === m.imageId);
+      const style = styleById.get(m.styleId);
+      const pos = image && style && m.atomId ? atomMarkerPos(image, m.atomId, layout, size) : null;
+      if (pos && style) markers.push({ id: m.id, x: pos.x, y: pos.y, style, imageId: m.imageId });
+      continue;
+    }
     const g = geomById.get(m.layerId);
     const style = styleById.get(m.styleId);
     if (!g || !style || !inView(g, m.ppm)) continue;
@@ -208,7 +219,9 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
   // 凡例: 表示中のスペクトルで使っている種類だけ
   let legend: PlacedLegend | null = null;
   // 名前を入れていない種類 (色だけのマーカー) は凡例に出さない
-  const usedStyles = doc.markerStyles.filter((s) => s.name && doc.markers.some((m) => m.styleId === s.id && geomById.has(m.layerId)));
+  const usedStyles = doc.markerStyles.filter(
+    (s) => s.name && doc.markers.some((m) => m.styleId === s.id && (geomById.has(m.layerId) || (!!m.imageId && doc.figureImages.some((x) => x.id === m.imageId)))),
+  );
   if (f.showLegend && usedStyles.length) {
     const lfs = f.legendFontSize;
     const rowH = Math.round(lfs * 1.45);
@@ -259,6 +272,24 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
 /** 注釈の枠 (px)。テキストは文字幅から概算 */
 /** 図の座標 (Word の 96 dpi の px) と pt の比。ChemDraw の構造式は pt で描いてから合わせる */
 export const PX_PER_PT = 4 / 3;
+
+/**
+ * 構造式の原子に付けたマーカーの位置 (図の座標)。原子の中心 (ax, ay) から、結合のない側へ少し離す。
+ * 原子がなければ (ChemDraw で消したなど) null
+ */
+export function atomMarkerPos(image: FigureImage, atomId: string, figure: { width: number; height: number }, size: number) {
+  if (!image.cdxml) return null;
+  const site = cdxmlAtomSites(image.cdxml).find((s) => s.id === atomId);
+  const box = drawCdxml(image.cdxml, 1)?.box;
+  if (!site || !box) return null;
+  const r = imageRect(image, figure);
+  const k = r.w / (box.r - box.l);
+  const ax = r.x + (site.x - box.l) * k;
+  const ay = r.y + (site.y - box.t) * k;
+  // 文字のある原子 (O, NH など) は字の外まで離す
+  const off = size * 0.6 + (site.labeled ? 5.5 : 2.5) * k;
+  return { x: ax + site.dir.x * off, y: ay + site.dir.y * off, ax, ay };
+}
 
 /** 図に置いた構造式・画像の枠 (図の座標) */
 export function imageRect(image: FigureImage, figure: { width: number; height: number }) {
