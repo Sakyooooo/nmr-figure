@@ -450,6 +450,13 @@ const variablesApi = {
         if (!m) fail('renameMode');
         m.name = n;
       },
+      // 本人の Figma は Starter (モードは 1 つまで)。MODE_LIMIT=4 などで有料のプランを真似る
+      addMode(n) {
+        if (this.modes.length >= Number(process.env.MODE_LIMIT || 1)) throw new Error('Limited to 1 modes only');
+        const id = `M:${varSeq++}`;
+        this.modes.push({ modeId: id, name: n });
+        return id;
+      },
       remove() {
         collections.splice(collections.indexOf(this), 1);
       },

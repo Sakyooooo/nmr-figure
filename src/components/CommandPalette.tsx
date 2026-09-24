@@ -17,6 +17,7 @@ import {
   setCanvasTab,
   setLanguage,
   setInspectorTab,
+  setTheme,
   setTool,
   setViewZoom,
   togglePanel,
@@ -27,6 +28,7 @@ import { TOOLS } from './Dock';
 import { Icon, type IconName } from './Icon';
 import { Kbd } from './ui';
 import { openOnboarding } from './Onboarding';
+import { currentTheme } from '../lib/theme';
 
 type Command = { group: string; label: string; icon: IconName; shortcut?: string; keywords?: string; run: () => void; enabled: boolean };
 
@@ -262,5 +264,13 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
     { group: tr('設定'), label: tr('タッチでの操作 (使い方)'), icon: 'info', keywords: 'たぶれっと ゆび ヘルプ', run: onTouchHelp, enabled: true },
     { group: tr('設定'), label: tr('使い方の説明 (初めて開いたときの 5 枚)'), icon: 'book-open', keywords: 'つかいかた ヘルプ help onboarding tutorial', run: openOnboarding, enabled: true },
     { group: tr('設定'), label: tr('言語: 日本語 / English'), icon: 'settings', keywords: 'げんご language english 英語', run: () => setLanguage(currentLang() === 'en' ? 'ja' : 'en'), enabled: true },
+    {
+      group: tr('設定'),
+      label: currentTheme() === 'dark' ? tr('画面の色: ライトにする') : tr('画面の色: ダークにする'),
+      icon: 'moon',
+      keywords: 'だーくもーど らいと dark mode light theme 画面の色 くろ 黒',
+      run: () => setTheme(currentTheme() === 'dark' ? 'light' : 'dark'),
+      enabled: true,
+    },
   ];
 }

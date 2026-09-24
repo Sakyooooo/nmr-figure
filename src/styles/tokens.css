@@ -41,6 +41,7 @@
   --color-icon-subtle: #646C78; /* gray/500 · 目立たせないアイコン (開閉の矢印など) */
 
   /* Data: 図の中身の色 (UI に使わない) */
+  --data-paper: #FFFFFF; /* 図の紙 (ダークモードでも白のまま。Word / PowerPoint に貼る図と同じ見た目) */
   --data-spectrum-1: #1F9E1F; /* スペクトル 1 本目 (Delta と同じ緑) */
   --data-spectrum-2: #1F4FD1;
   --data-spectrum-3: #D12B2B;
@@ -100,6 +101,52 @@
   --elevation-1: 0px 1px 2px 0px rgba(16, 24, 40, 0.06), 0px 4px 12px 0px rgba(16, 24, 40, 0.1); /* メニュー・ツールチップ・通知・浮かぶパネル */
   --elevation-2: 0px 2px 6px 0px rgba(16, 24, 40, 0.08), 0px 12px 32px 0px rgba(16, 24, 40, 0.18); /* ダイアログ */
   --focus-ring: 0px 0px 0px 2px #FFFFFF, 0px 0px 0px 4px #1A6FD6; /* フォーカスの輪: 2px の隙間 + 2px の主色 (コードでは outline 2px + offset 2px) */
+}
+
+/* ダークモード (設定の「画面の色」。印刷はいつも明るい色) */
+@media screen {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-bg-canvas: #111317; /* gray/950 */
+    --color-bg-surface: #1A1E23; /* gray/900 */
+    --color-bg-raised: #22262C; /* gray/850 */
+    --color-bg-subtle: #16191D; /* gray/925 */
+    --color-bg-hover: #282D34; /* gray/800 */
+    --color-bg-selected: #1A2F4D; /* blue/950 */
+    --color-bg-inverse: #E2E5E9; /* gray/150 */
+    --color-text-primary: #ECEEF1; /* gray/100 */
+    --color-text-secondary: #B4BBC4; /* gray/300 */
+    --color-text-tertiary: #9098A3; /* gray/350 */
+    --color-text-disabled: #4F5661; /* gray/600 */
+    --color-text-on-accent: #FFFFFF; /* gray/0 */
+    --color-text-accent: #7EB2F7; /* blue/300 */
+    --color-text-inverse: #1A1E23; /* gray/900 */
+    --color-border-subtle: #282D34; /* gray/800 */
+    --color-border-default: #3B414B; /* gray/700 */
+    --color-border-control: #858D99; /* gray/400 */
+    --color-border-focus: #4D95F0; /* blue/400 */
+    --color-accent-default: #1A6FD6; /* blue/600 */
+    --color-accent-hover: #1559B0; /* blue/700 */
+    --color-accent-pressed: #114890; /* blue/800 */
+    --color-accent-subtle: #22406A; /* blue/900 */
+    --color-danger-default: #C4271C; /* red/600 */
+    --color-danger-text: #F1877D; /* red/300 */
+    --color-status-success-fg: #5FC98A; /* green/300 */
+    --color-status-success-bg: #16291E; /* green/950 */
+    --color-status-warning-fg: #F2B45A; /* amber/300 */
+    --color-status-warning-bg: #2E2512; /* amber/950 */
+    --color-status-error-fg: #F1877D; /* red/300 */
+    --color-status-error-bg: #3A1C1A; /* red/950 */
+    --color-status-info-fg: #7EB2F7; /* blue/300 */
+    --color-status-info-bg: #1A2F4D; /* blue/950 */
+    --color-status-literature-fg: #B69CF2; /* purple/300 */
+    --color-status-literature-bg: #251E3B; /* purple/950 */
+    --color-icon-default: #B4BBC4; /* gray/300 */
+    --color-icon-subtle: #9098A3; /* gray/350 */
+    --elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 4px 12px 0px rgba(0, 0, 0, 0.45);
+    --elevation-2: 0px 2px 6px 0px rgba(0, 0, 0, 0.35), 0px 12px 32px 0px rgba(0, 0, 0, 0.6);
+    --focus-ring: 0px 0px 0px 2px #1A1E23, 0px 0px 0px 4px #4D95F0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

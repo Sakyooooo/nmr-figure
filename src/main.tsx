@@ -1,5 +1,6 @@
 import { startChemDrawHousekeeping } from './state/chemdraw';
 import { resolveLang, setLang, tr, useLang } from './i18n';
+import { applyTheme } from './lib/theme';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -19,6 +20,9 @@ import './styles/editor.css';
 // 画面の言語 (設定の「言語」。自動ならブラウザの言語)。開発のときは ?lang=en|ja でも決められる (画面の見本を撮るため)
 const langParam = import.meta.env.DEV ? new URLSearchParams(location.search).get('lang') : null;
 setLang(langParam === 'en' || langParam === 'ja' ? langParam : resolveLang(useEditor.getState().settings.ui.lang));
+// 画面の色 (設定の「画面の色」)。画面を出す前に付ける (一瞬明るくならないように)。開発のときは ?theme=dark|light でも決められる
+const themeParam = import.meta.env.DEV ? new URLSearchParams(location.search).get('theme') : null;
+applyTheme(themeParam === 'dark' || themeParam === 'light' ? themeParam : useEditor.getState().settings.ui.theme);
 
 // 古い版のタブがブラウザの保存領域を使ったままだと、閉じられるまで先に進めない。閉じてもらうまで上に出しておく
 window.addEventListener('nmr-db-blocked', () => {

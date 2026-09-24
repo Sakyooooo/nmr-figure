@@ -26,10 +26,13 @@ export interface Settings {
     onboardingDone: boolean;
     /** 構造式を描くソフト。null はまだ決めていない (初めて構造式ボタンを押したときに聞く) */
     structureTool: StructureTool | null;
+    /** 画面の色。system は OS の「アプリの色」に合わせる (lib/theme.ts)。図と印刷はいつも白い紙 */
+    theme: ThemeSetting;
   };
 }
 
 export type LangSetting = 'auto' | 'ja' | 'en';
+export type ThemeSetting = 'system' | 'light' | 'dark';
 /** chemdraw = ChemDraw で描いて保存すると図に入る / ketcher = このアプリの中で描く */
 export type StructureTool = 'chemdraw' | 'ketcher';
 
@@ -71,6 +74,7 @@ export function templatesFromJson(text: string): StyleTemplate[] {
   return (file.templates as StyleTemplate[]).filter((t) => t && typeof t.name === 'string' && t.figure);
 }
 
+/** public/theme.js も画面の色をここから読む (名前を変えたらそちらも) */
 const KEY = 'nmr-figure-editor.settings.v1';
 
 export function defaultSettings(): Settings {
@@ -81,7 +85,7 @@ export function defaultSettings(): Settings {
     pngScale: 4,
     templates: [],
     defaultTemplateId: null,
-    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false, structureTool: null },
+    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false, structureTool: null, theme: 'system' },
   };
 }
 

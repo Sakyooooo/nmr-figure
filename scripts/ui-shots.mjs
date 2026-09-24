@@ -11,6 +11,8 @@ const BASE = process.env.UI_BASE ?? 'http://localhost:5180';
 const OUT = resolve(process.argv[2] ?? '.dev-output/shots');
 /** 画面の言語 (UI_LANG=en で英語の画面を撮る。名前の末尾に -en が付く) */
 const LANG = process.env.UI_LANG;
+/** 画面の色 (UI_THEME=dark でダークモードの画面を撮る。名前の末尾に -dark が付く) */
+const THEME = process.env.UI_THEME;
 /** 撮るものを絞る (UI_ONLY=chemdraw なら名前に chemdraw を含むものだけ) */
 const ONLY = process.env.UI_ONLY ? new RegExp(process.env.UI_ONLY) : null;
 const PORT = 9333;
@@ -72,7 +74,7 @@ async function main() {
       const s = (method, params) => cdp.send(method, params, sessionId);
       await s('Page.enable');
       await s('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
-      await s('Page.navigate', { url: `${BASE}/?demo=${demo}${LANG ? `&lang=${LANG}` : ''}` });
+      await s('Page.navigate', { url: `${BASE}/?demo=${demo}${LANG ? `&lang=${LANG}` : ''}${THEME ? `&theme=${THEME}` : ''}` });
       let ready = false;
       for (let i = 0; i < 100 && !ready; i++) {
         await sleep(200);
@@ -86,7 +88,7 @@ async function main() {
         await sleep(400);
       }
       const { data } = await s('Page.captureScreenshot', { format: 'png' });
-      writeFileSync(join(OUT, `${name}${LANG ? `-${LANG}` : ''}.png`), Buffer.from(data, 'base64'));
+      writeFileSync(join(OUT, `${name}${LANG ? `-${LANG}` : ''}${THEME ? `-${THEME}` : ''}.png`), Buffer.from(data, 'base64'));
       console.log(`${name} (${w}×${h})`);
       await cdp.send('Target.closeTarget', { targetId });
       await cdp.send('Target.disposeBrowserContext', { browserContextId });

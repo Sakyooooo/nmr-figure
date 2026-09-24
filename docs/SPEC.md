@@ -297,6 +297,26 @@ B = このアプリで処理した 1H + ピーク値・積分 + 図、C = この
   初めて開いたとき (settings.ui.onboardingDone が false) に出し、閉じると覚える。ホーム画面の「使い方」・設定・Ctrl+K から見直せる。
   画面の見本は ?demo=onboarding (それ以外の ?demo では出さない)
 
+## ダークモード (lib/theme.ts, design/figma-plugin/code.js の SEMANTIC_DARK)
+2026-09-25 本人の希望「ダークモードを実装してください」。
+- 設定の「画面の色」(settings.ui.theme: system / light / dark、既定は system = OS の「アプリの色」)。Ctrl+K の「画面の色」で ライト⇔ダーク。
+  html に data-theme="light" | "dark" を付ける。system のときは OS の色が変わると付け直す (matchMedia の change)
+- 色は tokens.css の :root[data-theme='dark'] (@media screen の中なので**印刷はいつも明るい色**)。元の定義は code.js の SEMANTIC_DARK
+  (意味の名前 → 元の色) と EFFECTS_DARK (影・フォーカスの輪)。npm run tokens で作る。Figma では Color の 2 つ目のモード Dark にするが、
+  本人の Starter はモードが 1 つまでなので、足せなければ Light だけにして記録に残す (check.cjs は MODE_LIMIT で両方を試せる)
+- コントラスト: 本文はどの背景でも 11:1 以上、補足 7:1、単位など 4.6:1、入力欄の境界 4:1 以上。主色 (ボタン) はライトと同じ #1A6FD6 (白い文字で 4.9:1)。
+  選択の文字・リンクは明るい青 (blue/300)、削除の文字は明るい赤 (red/300)
+- **図は変えない**: 紙 (.stage .paper と図の SVG の白い四角) は --data-paper (白)、図の中身の色 (Data) もそのまま。図の上の選択の印は主色なので
+  ダークでも同じ。スキームの絵 (ホーム) も白い紙の上に出す。ホームのスペクトルのプレビューは画面の一部なので暗くする
+- 画面を描く前に public/theme.js (CSP の script-src 'self' で読める普通のスクリプト) が設定を読んで data-theme を付ける (一瞬白くならないように)。
+  設定の場所 (localStorage の nmr-figure-editor.settings.v1) を変えたらこちらも。Vite には vite-ignore で束ねないよう伝える
+- アプリとして入れたときの題の帯 (meta theme-color) もパネルの色に合わせる
+- styles.css の直書きの色 (バッジ・同期の印・候補のホバーなど) は tokens の status の色に置き換えた (ライトでの見た目はほぼ同じ)。
+  幕 (ダイアログの後ろ) は --scrim / --scrim-light (ダークは濃く)
+- Ketcher (このアプリの中で構造式を描く画面) はライトだけなので、中身は白いまま (上の帯だけ暗くなる)
+- 確かめ: `UI_THEME=dark node scripts/ui-shots.mjs` (?theme=dark。開発のときだけ効く) で撮る。設定で切り替え → 再読み込みでも残る、
+  自動のとき OS の色の変更についていく、本番の形 (4180、CSP) でも CSP の違反なしで暗くなる、を確かめた
+
 ## アプリとして入れる (public/manifest.webmanifest, state/launch.ts)
 2026-09-24 本人の希望: .jdf にできない図 (2D・文献だけ) の .nmrfig も、ダブルクリックでこのソフトが開くように。
 - Web App Manifest (name・192/512 の PNG アイコン・start_url・display standalone) で Edge / Chrome に入れられる。

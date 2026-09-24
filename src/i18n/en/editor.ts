@@ -131,6 +131,8 @@ export const EN_EDITOR: Record<string, string> = {
   'タッチでの操作 (使い方)': 'Touch gestures (help)',
   '使い方の説明 (初めて開いたときの 5 枚)': 'Getting-started guide (5 pages)',
   '言語: 日本語 / English': 'Language: 日本語 / English',
+  '画面の色: ライトにする': 'Appearance: switch to light',
+  '画面の色: ダークにする': 'Appearance: switch to dark',
 
   // SelectionBar.tsx (選んだものの上の帯)
   消す: 'Delete',
@@ -161,6 +163,11 @@ export const EN_EDITOR: Record<string, string> = {
   '合わせる ({shift} ppm)': 'Apply ({shift} ppm)',
   '自動 (ブラウザの言語に合わせる)': 'Automatic (follow the browser language)',
   使い方の説明をもう一度見る: 'Show the getting-started guide again',
+  画面の色: 'Appearance',
+  '自動 (Windows の色に合わせる)': 'Automatic (follow Windows)',
+  ライト: 'Light',
+  ダーク: 'Dark',
+  '図は、Word や PowerPoint に貼ったときと同じ白い紙のまま表示します。': 'Figures stay on white paper, just as they look when pasted into Word or PowerPoint.',
   '研究室の基準値 (溶媒ピーク)': 'Lab reference values (solvent peaks)',
   '空欄なら Fulmer et al. (2010) の値を使います。不純物の照合も、この値との差だけずらして行います。':
     'Blank uses the values from Fulmer et al. (2010). Impurity matching is shifted by the difference from these values.',

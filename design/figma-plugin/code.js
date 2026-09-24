@@ -54,6 +54,23 @@ const PRIMITIVES = {
   'red/700': '#B42318',
   'purple/50': '#F2EDFB',
   'purple/700': '#5B3AA6',
+  // ダークモードだけで使う色 (SEMANTIC_DARK)
+  'gray/350': '#9098A3',
+  'gray/850': '#22262C',
+  'gray/925': '#16191D',
+  'gray/950': '#111317',
+  'blue/300': '#7EB2F7',
+  'blue/400': '#4D95F0',
+  'blue/900': '#22406A',
+  'blue/950': '#1A2F4D',
+  'green/300': '#5FC98A',
+  'green/950': '#16291E',
+  'amber/300': '#F2B45A',
+  'amber/950': '#2E2512',
+  'red/300': '#F1877D',
+  'red/950': '#3A1C1A',
+  'purple/300': '#B69CF2',
+  'purple/950': '#251E3B',
 };
 
 const BG = ['FRAME_FILL', 'SHAPE_FILL'];
@@ -102,8 +119,51 @@ const SEMANTIC = [
   ['color/icon/subtle', 'gray/500', ANY_COLOR, '目立たせないアイコン (開閉の矢印など)'],
 ];
 
+// ダークモードの元の色 (Figma では Color の 2 つ目のモード Dark。アプリは設定の「画面の色」)。
+// 本文はどの背景でも 11:1 以上、補足 5:1 以上、単位など 4.5:1 以上、入力欄の境界 3:1 以上。
+// 主色 (ボタン) はライトと同じ (白い文字で 4.9:1)。図の中身 (Data) と紙は変えない
+const SEMANTIC_DARK = {
+  'color/bg/canvas': 'gray/950',
+  'color/bg/surface': 'gray/900',
+  'color/bg/raised': 'gray/850',
+  'color/bg/subtle': 'gray/925',
+  'color/bg/hover': 'gray/800',
+  'color/bg/selected': 'blue/950',
+  'color/bg/inverse': 'gray/150',
+  'color/text/primary': 'gray/100',
+  'color/text/secondary': 'gray/300',
+  'color/text/tertiary': 'gray/350',
+  'color/text/disabled': 'gray/600',
+  'color/text/on-accent': 'gray/0',
+  'color/text/accent': 'blue/300',
+  'color/text/inverse': 'gray/900',
+  'color/border/subtle': 'gray/800',
+  'color/border/default': 'gray/700',
+  'color/border/control': 'gray/400',
+  'color/border/focus': 'blue/400',
+  'color/accent/default': 'blue/600',
+  'color/accent/hover': 'blue/700',
+  'color/accent/pressed': 'blue/800',
+  'color/accent/subtle': 'blue/900',
+  'color/danger/default': 'red/600',
+  'color/danger/text': 'red/300',
+  'color/status/success/fg': 'green/300',
+  'color/status/success/bg': 'green/950',
+  'color/status/warning/fg': 'amber/300',
+  'color/status/warning/bg': 'amber/950',
+  'color/status/error/fg': 'red/300',
+  'color/status/error/bg': 'red/950',
+  'color/status/info/fg': 'blue/300',
+  'color/status/info/bg': 'blue/950',
+  'color/status/literature/fg': 'purple/300',
+  'color/status/literature/bg': 'purple/950',
+  'color/icon/default': 'gray/300',
+  'color/icon/subtle': 'gray/350',
+};
+
 // 図 (中身) の色。UI には使わない。値はアプリの今の既定のまま (Word / PowerPoint との互換を確かめてあるため)
 const DATA = [
+  ['data/paper', '#FFFFFF', '図の紙 (ダークモードでも白のまま。Word / PowerPoint に貼る図と同じ見た目)'],
   ['data/spectrum/1', '#1F9E1F', 'スペクトル 1 本目 (Delta と同じ緑)'],
   ['data/spectrum/2', '#1F4FD1', ''],
   ['data/spectrum/3', '#D12B2B', ''],
@@ -138,6 +198,12 @@ const EFFECTS = [
   ['Elevation/1', [[0, 1, 2, 0, '#101828', 0.06], [0, 4, 12, 0, '#101828', 0.1]], 'メニュー・ツールチップ・通知・浮かぶパネル (--elevation-1)'],
   ['Elevation/2', [[0, 2, 6, 0, '#101828', 0.08], [0, 12, 32, 0, '#101828', 0.18]], 'ダイアログ (--elevation-2)'],
   ['Focus/Ring', [[0, 0, 0, 2, '#FFFFFF', 1], [0, 0, 0, 4, '#1A6FD6', 1]], 'フォーカスの輪: 2px の隙間 + 2px の主色 (コードでは outline 2px + offset 2px)'],
+];
+// ダークモードの影 (暗い背景では濃くしないと見えない)。Figma のスタイルにはモードがないのでコードだけ
+const EFFECTS_DARK = [
+  ['Elevation/1', [[0, 1, 2, 0, '#000000', 0.3], [0, 4, 12, 0, '#000000', 0.45]]],
+  ['Elevation/2', [[0, 2, 6, 0, '#000000', 0.35], [0, 12, 32, 0, '#000000', 0.6]]],
+  ['Focus/Ring', [[0, 0, 0, 2, '#1A1E23', 1], [0, 0, 0, 4, '#4D95F0', 1]]],
 ];
 const RADIUS = [
   ['radius/sm', 4, '入力欄・チップ・バッジ'],
@@ -409,6 +475,7 @@ const ICONS = {
     '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
   settings:
     '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   'panel-left': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
   'panel-right': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
@@ -554,6 +621,14 @@ async function foundationsTokens() {
 
   const color = col('Color', 'Light');
   for (const [n, p, scopes, desc] of SEMANTIC) make(color, n, 'COLOR', figma.variables.createVariableAlias(V[p]), scopes, true, desc);
+  // ダークモード。Figma の Starter はコレクションにモードを 1 つしか持てないので、足せなければ Light だけにする (値は SEMANTIC_DARK)
+  let dark = null;
+  try {
+    dark = color.c.addMode('Dark');
+  } catch (e) {
+    RUN.done.push('Color の Dark モードは Figma のプランの上限で足せませんでした (値は code.js の SEMANTIC_DARK)');
+  }
+  if (dark) for (const [n] of SEMANTIC) V[n].setValueForMode(dark, figma.variables.createVariableAlias(V[SEMANTIC_DARK[n]]));
 
   const data = col('Data', 'Value');
   for (const [n, h, desc] of DATA) make(data, n, 'COLOR', rgba(h, 1), ['SHAPE_FILL', 'STROKE_COLOR', 'TEXT_FILL'], true, desc || '図の色 (UI には使わない)');

@@ -10,10 +10,18 @@
   --accent-soft: var(--color-bg-selected);
   --danger: var(--color-danger-text);
   --radius: var(--radius-md);
+  /* ダイアログなどの後ろを暗くする幕 */
+  --scrim: rgba(26, 30, 35, 0.32);
+  --scrim-light: rgba(26, 30, 35, 0.24);
   color-scheme: light;
   font: var(--type-body);
   color: var(--color-text-primary);
   background: var(--color-bg-canvas);
+}
+/* ダークモード (色は tokens.css。ここは tokens にない幕の濃さだけ) */
+:root[data-theme='dark'] {
+  --scrim: rgba(0, 0, 0, 0.55);
+  --scrim-light: rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -252,7 +260,7 @@ input[type='radio'] {
   inset: 12px;
   border: 3px dashed var(--accent);
   border-radius: 14px;
-  background: rgba(230, 240, 252, 0.85);
+  background: color-mix(in srgb, var(--color-bg-selected) 85%, transparent);
   display: grid;
   place-items: center;
   font: var(--type-title);
@@ -426,7 +434,7 @@ details.sub[open] {
   border-radius: 4px;
 }
 .candidates li:hover {
-  background: #f5f7fa;
+  background: var(--color-bg-hover);
 }
 .candidates li.partial .name {
   color: var(--muted);
@@ -450,7 +458,7 @@ details.sub[open] {
   font-variant-numeric: tabular-nums;
 }
 .candidates .signals .miss {
-  color: #a0a7b1;
+  color: var(--color-text-disabled);
 }
 
 .marker-styles {
@@ -495,7 +503,7 @@ details.sub[open] {
   width: min(760px, 94vw);
 }
 .modal::backdrop {
-  background: rgba(26, 30, 35, 0.32);
+  background: var(--scrim);
 }
 .modal > header {
   position: sticky;
@@ -758,7 +766,8 @@ details.sub[open] {
   height: 64px;
   overflow: hidden;
   border-radius: var(--radius-sm);
-  background: var(--color-bg-surface);
+  /* スキームの絵は白い紙の上に描いたもの (ダークモードでも白) */
+  background: var(--data-paper);
   box-shadow: inset 0 0 0 1px var(--color-border-subtle);
 }
 .scheme-thumb img {
@@ -896,6 +905,9 @@ details.sub[open] {
   border-radius: var(--radius-md);
   background: var(--color-bg-surface);
 }
+.scheme-box:not(.empty) {
+  background: var(--data-paper);
+}
 .scheme-box.empty {
   border-style: dashed;
   background: var(--color-bg-subtle);
@@ -927,6 +939,15 @@ details.sub[open] {
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   background: var(--color-bg-surface);
+}
+.preview .preview-line {
+  stroke: var(--data-spectrum-1);
+}
+.preview .preview-axis {
+  stroke: var(--color-border-control);
+}
+.preview .preview-tick {
+  fill: var(--color-text-tertiary);
 }
 .preview.loading {
   display: grid;
@@ -996,7 +1017,7 @@ details.sub[open] {
 .si-output {
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--color-bg-surface);
   padding: 8px 10px;
   font: var(--type-body);
   font-family: 'Times New Roman', Times, serif;
@@ -1009,8 +1030,8 @@ details.sub[open] {
   margin: 0 0 6px;
 }
 .si-table input.edited {
-  border-color: #d17a00;
-  background: #fff7e6;
+  border-color: var(--color-status-warning-fg);
+  background: var(--color-status-warning-bg);
 }
 
 .slider-row input[type='range'] {
@@ -1018,8 +1039,8 @@ details.sub[open] {
   min-width: 60px;
 }
 .badge.fid {
-  background: #fff1d6;
-  color: #9a5b00;
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-fg);
 }
 
 /* スキームを描く画面 (Ketcher) */
@@ -1177,8 +1198,8 @@ details.sub[open] {
 
 /* Delta との同期・記録 */
 .badge.sync-synced {
-  background: #e3f4e8;
-  color: #1d7a3a;
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-fg);
 }
 .badge.sync-pending,
 .badge.sync-waiting {
@@ -1187,8 +1208,8 @@ details.sub[open] {
 }
 .badge.sync-need-permission,
 .badge.sync-error {
-  background: #fff1d6;
-  color: #9a5b00;
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-fg);
 }
 .sync-alert {
   display: flex;
@@ -1232,7 +1253,7 @@ details.sub[open] {
   font: var(--type-label);
   color: var(--muted);
   padding: 4px 8px;
-  background: #f6f7f9;
+  background: var(--color-bg-subtle);
   border-bottom: 1px solid var(--line);
 }
 .history ul {
@@ -1274,12 +1295,12 @@ details.sub[open] {
   white-space: nowrap;
 }
 .badge.from-delta {
-  background: #efe8fb;
-  color: #5b3aa6;
+  background: var(--color-status-literature-bg);
+  color: var(--color-status-literature-fg);
 }
 .badge.from-app {
-  background: #e3f4e8;
-  color: #1d7a3a;
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-fg);
 }
 .history-detail {
   padding: 4px 8px 8px;
@@ -1288,11 +1309,11 @@ details.sub[open] {
   gap: 6px;
 }
 .sync-indicator {
-  color: #1d7a3a;
+  color: var(--color-status-success-fg);
   white-space: nowrap;
 }
 .sync-indicator.warn {
-  color: #9a5b00;
+  color: var(--color-status-warning-fg);
 }
 .db-blocked {
   position: fixed;
@@ -1301,9 +1322,9 @@ details.sub[open] {
   right: 0;
   z-index: 1000;
   padding: 10px 16px;
-  background: #fff1d6;
-  color: #7a4700;
-  border-bottom: 1px solid #e0b060;
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning-fg);
+  border-bottom: 1px solid var(--color-status-warning-fg);
   font: var(--type-body);
   text-align: center;
 }

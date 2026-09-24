@@ -14,7 +14,7 @@ export function readDefinitions() {
   const from = src.indexOf('function hex(');
   const to = src.indexOf('// ------------------------------------------------------------------ 作ったもの');
   if (from < 0 || to < 0) throw new Error('code.js の定義の場所が見つかりません');
-  return new Function(`${src.slice(from, to)}\nreturn { PRIMITIVES, SEMANTIC, DATA, SPACING, RADIUS, SIZE, MOTION, TYPE, EFFECTS, FONT_UI };`)();
+  return new Function(`${src.slice(from, to)}\nreturn { PRIMITIVES, SEMANTIC, SEMANTIC_DARK, DATA, SPACING, RADIUS, SIZE, MOTION, TYPE, EFFECTS, EFFECTS_DARK, FONT_UI };`)();
 }
 
 export function readIcons() {
@@ -102,6 +102,21 @@ export function buildTokensCss() {
   out.push('');
   out.push('  /* Elevation (重なるものだけ) */');
   for (const [name, layers, desc] of d.EFFECTS) line(cssName(name), shadowCss(layers), desc.replace(/\s*\(--[^)]*\)/, ''));
+  out.push('}');
+  out.push('');
+  // ダークモード: 設定の「画面の色」で html に data-theme="dark" が付く (lib/theme.ts)。
+  // 印刷はいつも明るい色なので画面だけ。図の中身 (Data) は変えない
+  out.push('/* ダークモード (設定の「画面の色」。印刷はいつも明るい色) */');
+  out.push('@media screen {');
+  out.push("  :root[data-theme='dark'] {");
+  out.push('    color-scheme: dark;');
+  for (const [name] of d.SEMANTIC) {
+    const prim = d.SEMANTIC_DARK[name];
+    if (!prim || !d.PRIMITIVES[prim]) throw new Error(`SEMANTIC_DARK に ${name} がありません`);
+    out.push(`    ${cssName(name)}: ${d.PRIMITIVES[prim]}; /* ${prim} */`);
+  }
+  for (const [name, layers] of d.EFFECTS_DARK) out.push(`    ${cssName(name)}: ${shadowCss(layers)};`);
+  out.push('  }');
   out.push('}');
   out.push('');
   out.push('@media (prefers-reduced-motion: reduce) {');

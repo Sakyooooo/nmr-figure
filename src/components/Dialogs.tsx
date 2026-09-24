@@ -2,10 +2,10 @@ import { tr } from '../i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusDefaults, nucleusRich } from '../lib/nuclei';
-import { labReference, type LangSetting, type StructureTool } from '../lib/settings';
+import { labReference, type LangSetting, type StructureTool, type ThemeSetting } from '../lib/settings';
 import { CHEMDRAW_DIR, refreshLinkStatus, setupChemDrawLink, useChemDrawLink } from '../state/chemdraw';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
-import { setLanguage, setReferenceOffset, setStructureTool, updateSettings, useEditor } from '../state/store';
+import { setLanguage, setReferenceOffset, setStructureTool, setTheme, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { RichHtml } from './RichText';
 import { ICON_LICENSE } from './iconPaths';
@@ -106,6 +106,17 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             {tr('使い方の説明をもう一度見る')}
           </button>
         </div>
+      </section>
+      <section>
+        <h3>{tr('画面の色')}</h3>
+        <div className="row wrap">
+          <select value={settings.ui.theme} aria-label={tr('画面の色')} onChange={(e) => setTheme(e.target.value as ThemeSetting)}>
+            <option value="system">{tr('自動 (Windows の色に合わせる)')}</option>
+            <option value="light">{tr('ライト')}</option>
+            <option value="dark">{tr('ダーク')}</option>
+          </select>
+        </div>
+        <p className="hint">{tr('図は、Word や PowerPoint に貼ったときと同じ白い紙のまま表示します。')}</p>
       </section>
       <section>
         <h3>{tr('構造式を描くソフト')}</h3>

@@ -680,10 +680,10 @@ function SpectrumPreview({ e }: { e: ExperimentMeta }) {
   if ('error' in state) return <p className="hint warn">{state.error}</p>;
   return (
     <svg className="preview" viewBox={`0 0 ${PW} ${PH}`} role="img" aria-label={tr('スペクトルのプレビュー')}>
-      <path d={state.path} fill="none" stroke="#1f9e1f" strokeWidth={0.8} />
-      <line x1={0} y1={PH - 14} x2={PW} y2={PH - 14} stroke="#999" strokeWidth={0.5} />
+      <path className="preview-line" d={state.path} fill="none" strokeWidth={0.8} />
+      <line className="preview-axis" x1={0} y1={PH - 14} x2={PW} y2={PH - 14} strokeWidth={0.5} />
       {state.ticks.map((t) => (
-        <text key={t.label} x={t.x} y={PH - 3} fontSize={9} textAnchor="middle" fill="#667085">
+        <text className="preview-tick" key={t.label} x={t.x} y={PH - 3} fontSize={9} textAnchor="middle">
           {t.label}
         </text>
       ))}

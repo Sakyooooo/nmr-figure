@@ -389,7 +389,8 @@
 .stage .paper {
   flex: none;
   margin: auto;
-  background: var(--color-bg-surface);
+  /* 図の紙はダークモードでも白 (Word / PowerPoint に貼る図と同じ見た目) */
+  background: var(--data-paper);
   outline: 1px solid var(--color-border-default);
 }
 
@@ -558,7 +559,7 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 12vh;
-  background: rgba(26, 30, 35, 0.24);
+  background: var(--scrim-light);
 }
 .palette {
   display: flex;
@@ -1006,7 +1007,7 @@ details.sub[open] > summary::before {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(26, 30, 35, 0.32);
+  background: var(--scrim);
 }
 .sheet {
   display: flex;

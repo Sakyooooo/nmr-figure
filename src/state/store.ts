@@ -7,7 +7,8 @@ import { deltaReference } from '../lib/jdfAnnotations';
 import { isAutoSimulatedLabel, simulatedLabel } from '../lib/simulate';
 import { autoYZoom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
-import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StructureTool, type StyleTemplate } from '../lib/settings';
+import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StructureTool, type StyleTemplate, type ThemeSetting } from '../lib/settings';
+import { applyTheme } from '../lib/theme';
 import { detectSignals, exclusions } from '../lib/siText';
 import { findPeaks, maxInRange, noiseLevel } from '../lib/spectrum';
 import { autoPhase, finish, referenceShift, tallestPpm, transform, type FidData, type Processing, type Spectrum } from '../lib/fid';
@@ -907,6 +908,14 @@ export function setLanguage(lang: LangSetting) {
     s.ui.lang = lang;
   });
   setLang(resolveLang(lang));
+}
+
+/** 画面の色 (ライト / ダーク / OS に合わせる) */
+export function setTheme(theme: ThemeSetting) {
+  updateSettings((s) => {
+    s.ui.theme = theme;
+  });
+  applyTheme(theme);
 }
 
 /** 使い方の説明を見終わった (閉じた) ことを覚える。false にすると次に開いたときにまた出す */
