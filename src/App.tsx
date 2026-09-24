@@ -1,3 +1,4 @@
+import { tr } from './i18n';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { CommandPalette } from './components/CommandPalette';
 import { ReferenceDialog, SettingsDialog } from './components/Dialogs';
@@ -16,6 +17,7 @@ import { Spectrum2dPanel } from './components/Plot2dPanel';
 import { LayerPanel, ViewPanel } from './components/LayerPanel';
 import { TopBar } from './components/TopBar';
 import { TouchHelp, useFirstTouchHelp } from './components/TouchHelp';
+import { Onboarding } from './components/Onboarding';
 import { TrendChart } from './components/TrendChart';
 import { IconButton, Kbd } from './components/ui';
 import { computeLayout } from './lib/layout';
@@ -75,7 +77,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = `${dirty && hasData ? '● ' : ''}${projectName ?? '無題'} - NMR Figure Editor`;
+    document.title = `${dirty && hasData ? '● ' : ''}${projectName ?? tr('無題')} - NMR Figure Editor`;
   }, [dirty, hasData, projectName]);
 
   const dropProps = (mode: 'add' | 'new') => ({
@@ -109,8 +111,9 @@ export default function App() {
       <div className="home-root" {...dropProps('new')}>
         <Home />
         <StructureEditorHost />
-      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は新しい図で開く、図入りの .jdf と {PROJECT_EXT} は図を開く)</div>}
+      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は新しい図で開く、図入りの .jdf と {ext} は図を開く)', { ext: PROJECT_EXT })}</div>}
         <DialogHost />
+        <Onboarding />
         <Toast />
       </div>
     );
@@ -142,7 +145,7 @@ export default function App() {
           </div>
         )}
         {hasData && <ZoomControl zoom={paperWidth / w} />}
-        <aside className="float-panel left" aria-label={is2d ? '2D スペクトル' : 'スペクトル'} hidden={!leftShown}>
+        <aside className="float-panel left" aria-label={is2d ? tr('2D スペクトル') : tr('スペクトル')} hidden={!leftShown}>
           {is2d ? (
             <Spectrum2dPanel />
           ) : (
@@ -152,14 +155,14 @@ export default function App() {
             </>
           )}
         </aside>
-        <aside className="float-panel right" aria-label="右のパネル" hidden={!rightShown}>
+        <aside className="float-panel right" aria-label={tr('右のパネル')} hidden={!rightShown}>
           <Inspector />
         </aside>
         {hasData && !is2d && <SelectionBar stageRef={stageRef} />}
         <Toast />
       </main>
       <StructureEditorHost />
-      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は追加、図入りの .jdf と {PROJECT_EXT} は図を開く)</div>}
+      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く)', { ext: PROJECT_EXT })}</div>}
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}
@@ -169,6 +172,7 @@ export default function App() {
       {touchHelp && <TouchHelp onClose={() => setTouchHelp(false)} />}
       <PrintView svgRef={svgRef} />
       <DialogHost />
+      <Onboarding />
     </div>
   );
 }
@@ -207,27 +211,27 @@ function EmptyState() {
       <span className="empty-icon" aria-hidden="true">
         <Icon name="nmr-spectrum" size={32} />
       </span>
-      <h1>スペクトルがありません</h1>
-      <p className="secondary">測定の .jdf をこの画面にドロップするか、下から選んでください</p>
-      <div className="empty-actions" role="group" aria-label="始め方">
+      <h1>{tr('スペクトルがありません')}</h1>
+      <p className="secondary">{tr('測定の .jdf をこの画面にドロップするか、下から選んでください')}</p>
+      <div className="empty-actions" role="group" aria-label={tr('始め方')}>
         <button type="button" className="empty-row" onClick={() => void openDialog('new')}>
           <Icon name="folder-open" />
-          <span className="grow">ファイルを開く</span>
+          <span className="grow">{tr('ファイルを開く')}</span>
           <Kbd>Ctrl+O</Kbd>
         </button>
         <button type="button" className="empty-row" onClick={() => useEditor.setState({ screen: 'home' })}>
           <Icon name="house" />
-          <span className="grow">ホームの一覧から選ぶ</span>
+          <span className="grow">{tr('ホームの一覧から選ぶ')}</span>
         </button>
         <button type="button" className="empty-row" onClick={() => openSiImport()}>
           <Icon name="book-open" />
-          <span className="grow">文献値から作図 (SI の文を貼る)</span>
+          <span className="grow">{tr('文献値から作図 (SI の文を貼る)')}</span>
         </button>
       </div>
       <p className="tertiary">
-        データはこのパソコンの中だけで処理され、外部には送信されません。
+        {tr('データはこのパソコンの中だけで処理され、外部には送信されません。')}
         <br />
-        図はこのブラウザに自動で保存されます。ほかのパソコンでは見えないので、残したい図はファイルに保存してください
+        {tr('図はこのブラウザに自動で保存されます。ほかのパソコンでは見えないので、残したい図はファイルに保存してください')}
       </p>
     </div>
   );
@@ -250,16 +254,16 @@ function ZoomControl({ zoom }: { zoom: number }) {
   return (
     <div className="zoom-control bar">
       <span className="readout num">{readout || (is2d ? 'F2 —, F1 —' : 'δ — ppm')}</span>
-      <IconButton icon="minus" size="sm" label="縮小" shortcut="-" onClick={() => setViewZoom(stepZoom(zoom, -1))} />
-      <button type="button" className={`zoom-value num${viewZoom === 'fit' ? ' on' : ''}`} onClick={() => setViewZoom('fit')} title="画面に合わせる">
+      <IconButton icon="minus" size="sm" label={tr('縮小')} shortcut="-" onClick={() => setViewZoom(stepZoom(zoom, -1))} />
+      <button type="button" className={`zoom-value num${viewZoom === 'fit' ? ' on' : ''}`} onClick={() => setViewZoom('fit')} title={tr('画面に合わせる')}>
         {Math.round(zoom * 100)}%
       </button>
-      <IconButton icon="plus" size="sm" label="拡大" shortcut="+" onClick={() => setViewZoom(stepZoom(zoom, 1))} />
+      <IconButton icon="plus" size="sm" label={tr('拡大')} shortcut="+" onClick={() => setViewZoom(stepZoom(zoom, 1))} />
       {tab === 'spectrum' && (
         <>
           <span className="bar-sep" aria-hidden="true" />
-          <IconButton icon="expand" size="sm" label="全体を表示" shortcut="0" onClick={fullRange} />
-          {!is2d && <IconButton icon="fit-y" size="sm" label="縦を自動 (表示範囲の最大ピークに合わせる)" shortcut="F" onClick={fitY} />}
+          <IconButton icon="expand" size="sm" label={tr('全体を表示')} shortcut="0" onClick={fullRange} />
+          {!is2d && <IconButton icon="fit-y" size="sm" label={tr('縦を自動 (表示範囲の最大ピークに合わせる)')} shortcut="F" onClick={fitY} />}
         </>
       )}
     </div>
@@ -299,10 +303,10 @@ function Toast() {
             useEditor.setState({ message: null });
           }}
         >
-          元に戻す
+          {tr('元に戻す')}
         </button>
       )}
-      <IconButton icon="x" size="sm" label="閉じる" onClick={() => useEditor.setState({ message: null })} />
+      <IconButton icon="x" size="sm" label={tr('閉じる')} onClick={() => useEditor.setState({ message: null })} />
     </div>
   );
 }

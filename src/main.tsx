@@ -1,3 +1,4 @@
+import { resolveLang, setLang, tr, useLang } from './i18n';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -5,6 +6,7 @@ import { figureSvgString, svgToPng } from './lib/exportFigure';
 import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
+import { openOnboarding } from './components/Onboarding';
 import { startFileLaunch } from './state/launch';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
 import { addAnnotation, autoDetectSignals, select, useEditor } from './state/store';
@@ -13,13 +15,17 @@ import './styles/tokens.css';
 import './styles.css';
 import './styles/editor.css';
 
+// 画面の言語 (設定の「言語」。自動ならブラウザの言語)。開発のときは ?lang=en|ja でも決められる (画面の見本を撮るため)
+const langParam = import.meta.env.DEV ? new URLSearchParams(location.search).get('lang') : null;
+setLang(langParam === 'en' || langParam === 'ja' ? langParam : resolveLang(useEditor.getState().settings.ui.lang));
+
 // 古い版のタブがブラウザの保存領域を使ったままだと、閉じられるまで先に進めない。閉じてもらうまで上に出しておく
 window.addEventListener('nmr-db-blocked', () => {
   if (document.getElementById('db-blocked')) return;
   const el = document.createElement('div');
   el.id = 'db-blocked';
   el.className = 'db-blocked';
-  el.textContent = 'ブラウザの保存領域を開けずに待っています。ほかのタブでこのソフト (前の版) が開いていたら、そのタブを閉じる (または再読み込みする) と、ここで続きが読み込まれます。';
+  el.textContent = tr('ブラウザの保存領域を開けずに待っています。ほかのタブでこのソフト (前の版) が開いていたら、そのタブを閉じる (または再読み込みする) と、ここで続きが読み込まれます。');
   document.body.appendChild(el);
 });
 window.addEventListener('nmr-db-open', () => document.getElementById('db-blocked')?.remove());
@@ -31,6 +37,9 @@ void restoreWork().finally(() => {
   startDeltaSync();
   // アプリとして入れたとき、ダブルクリックした .nmrfig を開く (前回の図を読み込んだあとに)
   startFileLaunch();
+  // 初めて開いたときは使い方の説明を出す (開発の画面の見本 ?demo=… では、demo=onboarding のときだけ)
+  const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get('demo') : null;
+  if ((demo === null && !useEditor.getState().settings.ui.onboardingDone) || demo === 'onboarding') openOnboarding();
   if (import.meta.env.DEV) void openDemo();
 });
 
@@ -46,7 +55,7 @@ async function openDemo() {
     await openFiles([{ file: new File([await res.arrayBuffer()], decodeURIComponent(path.split('/').pop()!)) }]);
   };
   if (demo === '2d') await load('/samples/cosy-2d.jdf');
-  else if (demo !== 'empty') {
+  else if (demo !== 'empty' && demo !== 'onboarding') {
     await load('/samples/sample-c6d6-1h.jdf');
     await load('/samples/sample-c6d6-1h-b.jdf');
   }
@@ -56,16 +65,16 @@ async function openDemo() {
     const files = await Promise.all(
       names.map(async (n) => new File([await (await fetch(`/samples/${n}`)).arrayBuffer()], n, { lastModified: Date.now() })),
     );
-    await loadLibraryFiles(files, 'samples (開発用)');
+    await loadLibraryFiles(files, tr('samples (開発用)'));
     const first = useLibrary.getState().experiments[0];
     if (first) useLibrary.setState({ focus: first.key });
   }
-  useEditor.setState({ screen: demo === 'home' ? 'home' : 'editor' });
+  useEditor.setState({ screen: demo === 'home' || demo === 'onboarding' ? 'home' : 'editor' });
   if (demo === 'palette') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
   if (demo === 'integral') useEditor.setState({ tool: 'integral' });
   if (demo === 'text') {
     const { activeLayerId } = useEditor.getState();
-    if (activeLayerId) addAnnotation({ ...annotationDefaults('text'), layerId: activeLayerId, x1: 6, y1: 0.5, x2: 6, y2: 0.5, text: '生成物' });
+    if (activeLayerId) addAnnotation({ ...annotationDefaults('text'), layerId: activeLayerId, x1: 6, y1: 0.5, x2: 6, y2: 0.5, text: tr('生成物') });
   }
   if (demo === 'selected') {
     const { activeLayerId } = useEditor.getState();
@@ -77,9 +86,15 @@ async function openDemo() {
   Object.assign(window, { __demoReady: true });
 }
 
+/** 言語を切り替えたら、画面ごと描き直す */
+function Root() {
+  const lang = useLang((s) => s.lang);
+  return <App key={lang} />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 );
 
@@ -97,7 +112,7 @@ if (import.meta.env.DEV) {
             return new File([await res.arrayBuffer()], decodeURIComponent(p.split('/').pop()!), { lastModified: Date.now() });
           }),
         );
-        await loadLibraryFiles(files, 'samples (開発用)');
+        await loadLibraryFiles(files, tr('samples (開発用)'));
       },
       async load(path: string) {
         const res = await fetch(path);
@@ -109,7 +124,7 @@ if (import.meta.env.DEV) {
       /** 今の図を .dev-output/ に PNG と SVG で保存する */
       async snapshot(name = 'figure', scale = 1.5) {
         const svg = document.querySelector<SVGSVGElement>('svg.figure');
-        if (!svg) throw new Error('図がありません');
+        if (!svg) throw new Error(tr('図がありません'));
         const text = figureSvgString(svg);
         await fetch(`/__dev/save?name=${name}.svg`, { method: 'POST', body: text });
         await fetch(`/__dev/save?name=${name}.png`, { method: 'POST', body: await svgToPng(text, scale) });

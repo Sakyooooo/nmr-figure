@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { migrateDocument, type NmrDocument } from '../state/types';
 import type { FidData } from './fid';
 import { transform2d, type Fid2dData, type Spectrum2dData } from './fid2d';
@@ -62,8 +63,8 @@ export function parseProject(text: string): {
   jdfBase: string | null;
 } {
   const file = JSON.parse(text) as ProjectFileV1;
-  if (file?.format !== 'nmr-figure-editor') throw new Error('NMR Figure Editor のプロジェクトファイルではありません');
-  if (file.version !== 1) throw new Error(`対応していないバージョンです (${file.version})`);
+  if (file?.format !== 'nmr-figure-editor') throw new Error(tr('NMR Figure Editor のプロジェクトファイルではありません'));
+  if (file.version !== 1) throw new Error(tr('対応していないバージョンです ({version})', { version: file.version }));
   const data: Record<string, Float32Array> = {};
   for (const [id, b64] of Object.entries(file.data)) data[id] = fromBase64(b64);
   const fids: Record<string, FidData> = {};

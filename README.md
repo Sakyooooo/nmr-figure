@@ -20,6 +20,12 @@ Word / PowerPoint 用の図を作るブラウザアプリです。反応の経�
 - Chrome / Edge で開いてください (フォルダの読み込み・上書き保存・図のコピーに必要です)
 - 初回は「データフォルダを選ぶ」で `.jdf` の入ったフォルダを選びます
 
+### 使い方の説明・言語 (English)
+
+- 初めて開いたときに、使い方の説明 (5 枚) が出ます。あとからはホーム画面の「使い方」、設定、操作を探す (Ctrl+K) から見直せます。
+- 画面は日本語と英語に対応しています。ふだんはブラウザの言語に合わせ (日本語以外は英語)、説明の 1 枚目か設定の「Language / 言語」で切り替えられます。
+- The app is available in English. It follows your browser language; switch it on the first page of the guide or in Settings → "Language / 言語".
+
 ### アプリとして入れる (`.nmrfig` をダブルクリックで開く)
 
 Edge (または Chrome) にアプリとして入れると、スタートメニューから起動でき、保存した `.nmrfig` (2D の図など) をダブルクリックで開けます。

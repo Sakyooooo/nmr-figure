@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { Layer, NmrDocument, SpectrumMeta, TrackedRegion, TrendSettings } from '../state/types';
 import { indexRange } from './spectrum';
 
@@ -66,7 +67,7 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
   const notes: string[] = [];
   const ref = t.normalize === 'reference' || t.normalize === 'sum' ? t.regions.find((r) => r.id === t.referenceId) : undefined;
   const series = t.regions.filter((r) => r !== ref);
-  if (t.normalize === 'reference' && !ref) notes.push('基準にする範囲を選んでください');
+  if (t.normalize === 'reference' && !ref) notes.push(tr('基準にする範囲を選んでください'));
 
   const rows: TrendRow[] = [];
   const unitMs = TIME_UNITS[t.timeUnit.trim().toLowerCase()] ?? TIME_UNITS.h;
@@ -87,8 +88,8 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
     rows.push({ layer, time, timeSource, raw, values: [] });
   });
   rows.sort((a, b) => a.time - b.time);
-  if (rows.some((r) => r.timeSource === 'order')) notes.push('時間が分からないスペクトルは、並び順 (0, 1, 2…) で置いています');
-  if (rows.some((r) => r.timeSource === 'acquired')) notes.push('時間は測定時刻から求めています (最初の測定 = 0)。反応開始からの時間にするときは、名前か「時間」に入れてください');
+  if (rows.some((r) => r.timeSource === 'order')) notes.push(tr('時間が分からないスペクトルは、並び順 (0, 1, 2…) で置いています'));
+  if (rows.some((r) => r.timeSource === 'acquired')) notes.push(tr('時間は測定時刻から求めています (最初の測定 = 0)。反応開始からの時間にするときは、名前か「時間」に入れてください'));
 
   const col = (r: TrackedRegion) => t.regions.indexOf(r);
   for (const row of rows) {
@@ -111,9 +112,9 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
       }
     });
   }
-  if (t.normalize === 'first') notes.push('積算回数や受信感度がそろっていないと比べられません。内部標準があれば「基準との比」を使ってください');
+  if (t.normalize === 'first') notes.push(tr('積算回数や受信感度がそろっていないと比べられません。内部標準があれば「基準との比」を使ってください'));
 
-  const refName = ref?.name ?? '基準';
+  const refName = ref?.name ?? tr('基準');
   const autoY = {
     none: t.measure === 'area' ? 'Integral (a.u.)' : 'Intensity (a.u.)',
     first: 'Relative intensity (%)',

@@ -2,6 +2,7 @@
  * ピーク値の一覧 (ピークピックアップ)。
  * 図に付けたピーク値ラベルを、ppm と高さの表にして、Excel や文章に持ち出せるようにする。
  */
+import { tr } from '../i18n';
 import type { NmrDocument } from '../state/types';
 import { snapToPeak } from './spectrum';
 
@@ -36,7 +37,7 @@ export function peakRows(doc: NmrDocument, dataMap: Record<string, Float32Array>
 
 /** 表計算に貼れる形 (タブ区切り) */
 export function peakTableText(rows: PeakRow[], decimals: number): string {
-  const lines = ['δ (ppm)\t高さ (%)'];
+  const lines = [tr('δ (ppm)	高さ (%)')];
   for (const r of rows) lines.push(`${r.ppm.toFixed(decimals)}\t${r.relative.toFixed(1)}`);
   return lines.join('\n');
 }

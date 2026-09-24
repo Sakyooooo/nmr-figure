@@ -5,6 +5,7 @@
  *   データ点の間の ppm の違いや、基準の積分の選び方の違いでは食い違わない
  * - .jdf の中身を図に入れるとき、同じ点・同じ範囲のものは id と SI テキストの上書きをそのまま残す
  */
+import { tr } from '../i18n';
 import type { Draft } from 'immer';
 import type { NmrDocument, SpectrumMeta } from '../state/types';
 import { deltaBaseline, integralArea, integralRange, pointStep, referenceOf } from './integrals';
@@ -119,7 +120,7 @@ function point(meta: Axis, ppm: number) {
 
 /** 記録の一覧に出す短い説明 (例: ピーク 7 / 積分 5) */
 export function summary(ann: WritableAnnotations) {
-  return `ピーク ${ann.peaks.length} / 積分 ${ann.integrals.length}`;
+  return tr('ピーク {length} / 積分 {length2}', { length: ann.peaks.length, length2: ann.integrals.length });
 }
 
 /**

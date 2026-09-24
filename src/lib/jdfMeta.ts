@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { SolventKey } from './impurityTypes';
 import { parseSummary, type FigureSummary } from './jdfEmbed';
 import { normalizeNucleus } from './nuclei';
@@ -65,7 +66,7 @@ export async function readJdfMeta(file: File): Promise<ExperimentMeta> {
     }
     return s.trim();
   };
-  if (text(0, 8) !== 'JEOL.NMR') throw new Error(`${file.name}: JEOL Delta のファイルではありません`);
+  if (text(0, 8) !== 'JEOL.NMR') throw new Error(tr('{name}: JEOL Delta のファイルではありません', { name: file.name }));
   const little = head.getInt8(8) === 1;
   const dimension = head.getUint8(12);
   const unitBase = head.getInt8(0x21);

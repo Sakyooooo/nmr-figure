@@ -1,3 +1,4 @@
+import { currentLang, tr, trk } from '../i18n';
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ExperimentMeta } from '../lib/jdfMeta';
 import { nucleusRich } from '../lib/nuclei';
@@ -32,11 +33,12 @@ import {
 import { setHomeSort, notify, useEditor } from '../state/store';
 import type { HomeSort } from '../lib/settings';
 import { Icon } from './Icon';
+import { openOnboarding } from './Onboarding';
 import { RichHtml } from './RichText';
 import { IconButton } from './ui';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-const FILTER_LABEL: Record<NucleusFilter, string> = { '1H': '^{1}H', '13C': '^{13}C', '19F': '^{19}F', '31P': '^{31}P', '2D': '2D', other: 'その他' };
+const FILTER_LABEL: Record<NucleusFilter, string> = { '1H': '^{1}H', '13C': '^{13}C', '19F': '^{19}F', '31P': '^{31}P', '2D': '2D', other: trk('その他') };
 
 export function Home() {
   const lib = useLibrary();
@@ -54,13 +56,17 @@ export function Home() {
         <h1>NMR Figure Editor</h1>
         <FolderStatus />
         <div className="spacer" />
+        <button className="btn ghost" onClick={openOnboarding} title={tr('初めて開いたときの使い方の説明を、もう一度見る')}>
+          <Icon name="book-open" size={16} />
+          {tr('使い方')}
+        </button>
         <button className="btn" onClick={() => void openDialog('new')}>
           <Icon name="folder-open" size={16} />
-          ファイルを開く
+          {tr('ファイルを開く')}
         </button>
         {hasDoc && (
           <button className="btn" onClick={() => useEditor.setState({ screen: 'editor' })}>
-            編集中の図に戻る
+            {tr('編集中の図に戻る')}
             <Icon name="arrow-right" size={16} />
           </button>
         )}
@@ -70,13 +76,13 @@ export function Home() {
 
       <div className="home-body">
         <main className="home-list">
-          {lib.status === 'ready' && !lib.experiments.length && <p className="hint pad">このフォルダには .jdf がありません。</p>}
-          {lib.experiments.length > 0 && !list.length && <p className="hint pad">条件に合う実験はありません。</p>}
+          {lib.status === 'ready' && !lib.experiments.length && <p className="hint pad">{tr('このフォルダには .jdf がありません。')}</p>}
+          {lib.experiments.length > 0 && !list.length && <p className="hint pad">{tr('条件に合う実験はありません。')}</p>}
           {groups.map((g) => (
             <section key={g.day ?? 'all'} className="day">
               {g.day && (
                 <h2>
-                  {formatDay(g.day)} <span className="muted">{g.samples.reduce((n, s) => n + s.items.length, 0)} 測定</span>
+                  {formatDay(g.day)} <span className="muted">{tr('{n} 測定', { n: g.samples.reduce((n, s) => n + s.items.length, 0) })}</span>
                 </h2>
               )}
               <div className="day-samples">
@@ -88,7 +94,7 @@ export function Home() {
           ))}
           {lib.failed.length > 0 && (
             <details className="failed">
-              <summary>読めなかったファイル ({lib.failed.length})</summary>
+              <summary>{tr('読めなかったファイル ({n})', { n: lib.failed.length })}</summary>
               <ul>
                 {lib.failed.map((f) => (
                   <li key={f.fileName}>
@@ -113,19 +119,19 @@ function FolderStatus() {
   const denied = folderPermission === 'denied';
   return (
     <div className="folder">
-      {status === 'loading' && <span className="muted">読み込み中…</span>}
+      {status === 'loading' && <span className="muted">{tr('読み込み中…')}</span>}
       {status === 'no-folder' && (
         <button className="btn primary" onClick={() => void pickFolder()}>
           <Icon name="folder-open" size={16} />
-          データフォルダを選ぶ
+          {tr('データフォルダを選ぶ')}
         </button>
       )}
       {folderName && status !== 'no-folder' && (
         <>
           <Icon name="folder-open" size={16} />
-          <span className="folder-name" title="データフォルダ">
+          <span className="folder-name" title={tr('データフォルダ')}>
             {folderName}
-            {temporary && <span className="muted"> (今回だけ)</span>}
+            {temporary && <span className="muted"> {' '}{tr('(今回だけ)')}</span>}
           </span>
           {status === 'need-permission' && (
             <button
@@ -133,21 +139,21 @@ function FolderStatus() {
               onClick={() => void grantPermission()}
               title={
                 denied
-                  ? 'ブラウザがこのフォルダへのアクセスを拒否した状態で覚えています。押すとフォルダを選び直せます'
-                  : 'ブラウザにフォルダの読み取りを許可してもらいます'
+                  ? tr('ブラウザがこのフォルダへのアクセスを拒否した状態で覚えています。押すとフォルダを選び直せます')
+                  : tr('ブラウザにフォルダの読み取りを許可してもらいます')
               }
             >
-              {denied ? 'フォルダを選び直す' : 'フォルダを読み込む'}
+              {denied ? tr('フォルダを選び直す') : tr('フォルダを読み込む')}
             </button>
           )}
           {status === 'scanning' && progress && (
             <span className="muted">
-              読み込み中 {progress.done}/{progress.total}
+              {tr('読み込み中 {done}/{total}', { done: progress.done, total: progress.total })}
             </span>
           )}
-          {status === 'ready' && !temporary && <IconButton icon="refresh" size="sm" label="読み込み直す (新しく測定したファイル)" onClick={() => void scanFolder()} />}
+          {status === 'ready' && !temporary && <IconButton icon="refresh" size="sm" label={tr('読み込み直す (新しく測定したファイル)')} onClick={() => void scanFolder()} />}
           <button className="btn ghost sm" onClick={() => void pickFolder()}>
-            フォルダを変更
+            {tr('フォルダを変更')}
           </button>
         </>
       )}
@@ -171,8 +177,8 @@ function Filters() {
         <Icon name="search" size={16} />
         <input
           type="search"
-          placeholder="サンプル名・ファイル名・メモ・タグで検索"
-          aria-label="検索"
+          placeholder={tr('サンプル名・ファイル名・メモ・タグで検索')}
+          aria-label={tr('検索')}
           value={query}
           onChange={(e) => set({ query: e.target.value })}
         />
@@ -185,14 +191,14 @@ function Filters() {
             onClick={() => set({ nuclei: nuclei.includes(n) ? nuclei.filter((x) => x !== n) : [...nuclei, n] })}
           >
             <span>
-              <RichHtml text={FILTER_LABEL[n]} />
+              <RichHtml text={n === 'other' ? tr(FILTER_LABEL[n]) : FILTER_LABEL[n]} />
             </span>
           </button>
         ))}
       </div>
       <SortControl />
-      <select value={solvent} aria-label="溶媒" onChange={(e) => set({ solvent: e.target.value })}>
-        <option value="">すべての溶媒</option>
+      <select value={solvent} aria-label={tr('溶媒')} onChange={(e) => set({ solvent: e.target.value })}>
+        <option value="">{tr('すべての溶媒')}</option>
         {solvents.map((s) => (
           <option key={s} value={s}>
             {s}
@@ -214,22 +220,22 @@ function Filters() {
 
 const SORT_LABEL: Record<HomeSort['key'], [string, string, string]> = {
   // [選択肢の名前, 降順の説明, 昇順の説明]
-  date: ['測定日', '新しい順', '古い順'],
-  name: ['名前', 'Z → A', 'A → Z'],
-  modified: ['編集順 (保存した日時)', '新しい順', '古い順'],
+  date: [trk('測定日'), trk('新しい順'), trk('古い順')],
+  name: [trk('名前'), trk('Z → A'), trk('A → Z')],
+  modified: [trk('編集順 (保存した日時)'), trk('新しい順'), trk('古い順')],
 };
 
 function SortControl() {
   const sort = useEditor((s) => s.settings.ui.homeSort);
-  const [, descLabel, ascLabel] = SORT_LABEL[sort.key];
+  const [, descLabel, ascLabel] = SORT_LABEL[sort.key].map((s) => tr(s));
   return (
     <div className="sort">
       <label className="field">
-        並び
+        {tr('並び')}
         <select value={sort.key} onChange={(e) => setHomeSort({ key: e.target.value as HomeSort['key'] })}>
           {(Object.keys(SORT_LABEL) as HomeSort['key'][]).map((k) => (
             <option key={k} value={k}>
-              {SORT_LABEL[k][0]}
+              {tr(SORT_LABEL[k][0])}
             </option>
           ))}
         </select>
@@ -237,7 +243,7 @@ function SortControl() {
       <button
         className="chip"
         onClick={() => setHomeSort({ desc: !sort.desc })}
-        title={`今は${sort.desc ? descLabel : ascLabel}。押すと${sort.desc ? ascLabel : descLabel}になります`}
+        title={tr('今は{v0}。押すと{v1}になります', { v0: sort.desc ? descLabel : ascLabel, v1: sort.desc ? ascLabel : descLabel })}
       >
         <Icon name={sort.desc ? 'arrow-down' : 'arrow-up'} size={16} />
         {sort.desc ? descLabel : ascLabel}
@@ -330,7 +336,7 @@ function openMeasurement(m: Measurement, choice: Record<string, string>) {
     void openExperiments([file.key], 'new');
     return;
   }
-  notify(`${file.fileName} は開けません`, 'error');
+  notify(tr('{fileName} は開けません', { fileName: file.fileName }), 'error');
 }
 
 function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: ExperimentMeta; checked: boolean; focused: boolean }) {
@@ -345,7 +351,7 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
         type="checkbox"
         checked={checked}
         disabled={!openable}
-        aria-label={`${label} を選ぶ (まとめて開く)`}
+        aria-label={tr('{label} を選ぶ (まとめて開く)', { label })}
         onChange={(ev) => {
           for (const f of m.files) if (f.key !== file.key) toggleSelected(f.key, false);
           toggleSelected(file.key, ev.target.checked);
@@ -355,8 +361,8 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
         type="button"
         className="exp-open"
         aria-pressed={focused}
-        aria-label={`${label}。Enter で開く`}
-        title={`${file.fileName}\nクリックで右に内容、ダブルクリック (ダブルタップ) か Enter で開く`}
+        aria-label={tr('{label}。Enter で開く', { label })}
+        title={tr('{fileName}\nクリックで右に内容、ダブルクリック (ダブルタップ) か Enter で開く', { fileName: file.fileName })}
         onClick={() => useLibrary.setState({ focus: file.key })}
         onKeyDown={(ev) => {
           if (ev.key === 'Enter') {
@@ -375,21 +381,21 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
         </span>
         <span className="exp-time">{formatTime(file.measuredAt)}</span>
         {file.figure && (
-          <span className="badge" title="このソフトで編集して保存した版です。開くと、ピーク値・積分・重ね書きなども含めた図ごと開きます (ほかの版は右の「ファイル」で選べます)">
-            編集
+          <span className="badge" title={tr('このソフトで編集して保存した版です。開くと、ピーク値・積分・重ね書きなども含めた図ごと開きます (ほかの版は右の「ファイル」で選べます)')}>
+            {tr('編集')}
           </span>
         )}
         {!file.figure && file.dimension >= 2 && (
-          <span className="badge fid" title="2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します">
+          <span className="badge fid" title={tr('2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します')}>
             2D
           </span>
         )}
         {!file.figure && file.dimension === 1 && !file.processed && (
-          <span className="badge fid" title="Delta で処理していない生データです。開くとこのアプリで FT・位相補正します">
+          <span className="badge fid" title={tr('Delta で処理していない生データです。開くとこのアプリで FT・位相補正します')}>
             FID
           </span>
         )}
-        {processed > 1 && <span className="badge">{processed} 版</span>}
+        {processed > 1 && <span className="badge">{tr('{n} 版', { n: processed })}</span>}
       </button>
     </div>
   );
@@ -402,18 +408,18 @@ function FigureChip({ figure }: { figure: SavedFigure }) {
       <button
         type="button"
         className="exp-open"
-        title={`${figure.name}\n${figure.layers} 本を重ねた図 (${formatStamp(figure.savedAt)})`}
-        aria-label={`保存した図 ${figure.name} を開く`}
+        title={tr('{name}\n{layers} 本を重ねた図 ({formatStamp})', { name: figure.name, layers: figure.layers, formatStamp: formatStamp(figure.savedAt) })}
+        aria-label={tr('保存した図 {name} を開く', { name: figure.name })}
         onClick={() => void openSavedFigure(figure.id)}
       >
         <Icon name="file-text" size={16} />
         <span className="exp-nuc">
-          図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
+          {tr('図')}{' '}<RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
         </span>
         <span className="exp-time">{formatTime(figure.savedAt)}</span>
-        {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
+        {figure.layers > 1 && <span className="badge">{tr('{n} 本', { n: figure.layers })}</span>}
       </button>
-      <IconButton icon="x" size="sm" label={`${figure.name} をホーム画面から消す (測定データは消えません)`} onClick={() => void deleteFigure(figure.id)} />
+      <IconButton icon="x" size="sm" label={tr('{name} をホーム画面から消す (測定データは消えません)', { name: figure.name })} onClick={() => void deleteFigure(figure.id)} />
     </div>
   );
 }
@@ -448,11 +454,11 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
       </h3>
       {m.files.length > 1 && (
         <label className="field block">
-          ファイル ({m.files.length})
+          {tr('ファイル ({n})', { n: m.files.length })}
           <select value={e.key} onChange={(ev) => choose(ev.target.value)}>
             {m.files.map((f) => (
               <option key={f.key} value={f.key}>
-                {versionLabel(f)} — {f.fileName} (保存 {formatStamp(f.lastModified)})
+                {versionLabel(f)} — {f.fileName} {tr('(保存 {time})', { time: formatStamp(f.lastModified) })}
               </option>
             ))}
           </select>
@@ -462,35 +468,36 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
       {e.dimension === 1 && <SpectrumPreview e={e.baseKey ? { ...e, key: e.baseKey } : e} />}
       {e.figure ? (
         <p className="hint">
-          このソフトで編集して保存した版です{e.figure.layers > 1 ? ` (${e.figure.layers} 本を重ねた図)` : ''}。開くと、ピーク値・積分・図形なども含めた図ごと開きます。
-          {e.savedFigureId ? '' : ' Delta でもこのファイルを開けます (見えるのは一番下のスペクトル)。'}
+          
+          {e.figure.layers > 1 ? tr('このソフトで編集して保存した版です ({layers} 本を重ねた図)。開くと、ピーク値・積分・図形なども含めた図ごと開きます。', { layers: e.figure.layers }) : tr('このソフトで編集して保存した版です。開くと、ピーク値・積分・図形なども含めた図ごと開きます。')}
+          {e.savedFigureId ? '' : tr(' Delta でもこのファイルを開けます (見えるのは一番下のスペクトル)。')}
         </p>
       ) : (
         <>
-          {e.dimension >= 2 && <p className="hint">2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。</p>}
-          {e.dimension === 1 && !e.processed && <p className="hint">生データ (FID) です。開くと自動で FT・位相補正・ベースライン補正・溶媒での基準合わせをします。</p>}
+          {e.dimension >= 2 && <p className="hint">{tr('2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。')}</p>}
+          {e.dimension === 1 && !e.processed && <p className="hint">{tr('生データ (FID) です。開くと自動で FT・位相補正・ベースライン補正・溶媒での基準合わせをします。')}</p>}
         </>
       )}
       <dl className="facts">
-        <Fact label="測定">{`${formatDay(localDay(e.measuredAt))} ${formatTime(e.measuredAt)}`}</Fact>
-        <Fact label="周波数">{`${e.freqMHz.toFixed(1)} MHz`}</Fact>
-        <Fact label="溶媒">{solventInfo(e.solvent) ? <RichHtml text={solventInfo(e.solvent)!.label} /> : e.solventRaw || '—'}</Fact>
-        <Fact label="積算">{e.scans ?? '—'}</Fact>
-        <Fact label="温度">{e.temperatureC !== null ? `${e.temperatureC.toFixed(1)} °C` : '—'}</Fact>
-        <Fact label="ファイル">{e.fileName}</Fact>
+        <Fact label={tr('測定')}>{`${formatDay(localDay(e.measuredAt))} ${formatTime(e.measuredAt)}`}</Fact>
+        <Fact label={tr('周波数')}>{`${e.freqMHz.toFixed(1)} MHz`}</Fact>
+        <Fact label={tr('溶媒')}>{solventInfo(e.solvent) ? <RichHtml text={solventInfo(e.solvent)!.label} /> : e.solventRaw || '—'}</Fact>
+        <Fact label={tr('積算')}>{e.scans ?? '—'}</Fact>
+        <Fact label={tr('温度')}>{e.temperatureC !== null ? `${e.temperatureC.toFixed(1)} °C` : '—'}</Fact>
+        <Fact label={tr('ファイル')}>{e.fileName}</Fact>
       </dl>
       <div className="row wrap">
         <button className={`btn${selecting ? '' : ' primary'}`} disabled={!openable} onClick={() => void openExperiments([e.key], 'new')}>
-          {e.figure ? 'この図を開く' : 'この実験を開く'}
+          {e.figure ? tr('この図を開く') : tr('この実験を開く')}
         </button>
         {hasDoc && !e.savedFigureId && (
           <button className="btn" disabled={!openable} onClick={() => void openExperiments([e.key], 'add')}>
-            編集中の図に追加
+            {tr('編集中の図に追加')}
           </button>
         )}
         {e.savedFigureId && (
-          <button className="btn" onClick={() => void deleteFigure(e.savedFigureId!)} title="ブラウザの中に残した図の控えを消します (保存したファイルと測定データは消えません)">
-            この版をホーム画面から消す
+          <button className="btn" onClick={() => void deleteFigure(e.savedFigureId!)} title={tr('ブラウザの中に残した図の控えを消します (保存したファイルと測定データは消えません)')}>
+            {tr('この版をホーム画面から消す')}
           </button>
         )}
       </div>
@@ -500,9 +507,9 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
 
 /** 版の選択肢の名前 */
 function versionLabel(f: ExperimentMeta) {
-  if (f.figure) return `このソフトで編集した版${f.figure.layers > 1 ? ` (${f.figure.layers} 本を重ねた図)` : ''}`;
-  if (f.dimension >= 2) return '2D (このアプリで処理)';
-  return f.processed ? `Delta で処理した版 ${fileVersion(f.fileName) || ''}` : '生データ (FID・このアプリで処理)';
+  if (f.figure) return f.figure.layers > 1 ? tr('このソフトで編集した版 ({layers} 本を重ねた図)', { layers: f.figure.layers }) : tr('このソフトで編集した版');
+  if (f.dimension >= 2) return tr('2D (このアプリで処理)');
+  return f.processed ? tr('Delta で処理した版 {v0}', { v0: fileVersion(f.fileName) || '' }) : tr('生データ (FID・このアプリで処理)');
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -518,18 +525,20 @@ function Welcome() {
   const { status, experiments } = useLibrary();
   return (
     <div className="detail welcome">
-      <h2>実験を選んでください</h2>
+      <h2>{tr('実験を選んでください')}</h2>
       <ul className="hint">
-        <li>クリックで右に内容を表示、ダブルクリックで開きます。</li>
-        <li>チェックを付けて複数まとめて開くと、重ね書き・推移グラフに使えます。</li>
-        <li>サンプルを選ぶと、スキーム画像 (ChemDraw などからコピーして貼り付け)・メモ・タグを付けられます。</li>
+        <li>{tr('クリックで右に内容を表示、ダブルクリックで開きます。')}</li>
+        <li>{tr('チェックを付けて複数まとめて開くと、重ね書き・推移グラフに使えます。')}</li>
+        <li>{tr('サンプルを選ぶと、スキーム画像 (ChemDraw などからコピーして貼り付け)・メモ・タグを付けられます。')}</li>
       </ul>
       {status === 'no-folder' && (
         <p className="hint">
-          最初に .jdf が入っているフォルダを選んでください。{supportsFolderAccess() ? '次からは自動で読み込みます。' : 'このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。'}
+          {supportsFolderAccess()
+            ? tr('最初に .jdf が入っているフォルダを選んでください。次からは自動で読み込みます。')
+            : tr('最初に .jdf が入っているフォルダを選んでください。このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。')}
         </p>
       )}
-      {experiments.length > 0 && <p className="muted">{experiments.length} 件の実験</p>}
+      {experiments.length > 0 && <p className="muted">{tr('{n} 件の実験', { n: experiments.length })}</p>}
     </div>
   );
 }
@@ -580,22 +589,22 @@ function SchemeBox({ sampleKey, scheme, schemeSource }: { sampleKey: string; sch
         save(file);
       }}
     >
-      {scheme ? <BlobImage blob={scheme} alt="スキーム" /> : <span className="muted">「描く」か、画像を貼り付け (Ctrl+V)・ドロップ</span>}
+      {scheme ? <BlobImage blob={scheme} alt={tr('スキーム')} /> : <span className="muted">{tr('「描く」か、画像を貼り付け (Ctrl+V)・ドロップ')}</span>}
       <div className="scheme-actions">
-        <button className="mini" onClick={() => setDrawing(true)} title="構造式や反応式をこのアプリで描きます">
-          {schemeSource ? '描き直す' : '描く'}
+        <button className="mini" onClick={() => setDrawing(true)} title={tr('構造式や反応式をこのアプリで描きます')}>
+          {schemeSource ? tr('描き直す') : tr('描く')}
         </button>
         <button className="mini" onClick={choose}>
-          画像を選ぶ
+          {tr('画像を選ぶ')}
         </button>
         {scheme && (
           <button className="mini danger" onClick={() => save(null)}>
-            外す
+            {tr('外す')}
           </button>
         )}
       </div>
       {drawing && (
-        <Suspense fallback={<div className="scheme-editor loading">スキームを描く画面を読み込んでいます…</div>}>
+        <Suspense fallback={<div className="scheme-editor loading">{tr('スキームを描く画面を読み込んでいます…')}</div>}>
           <SchemeEditor
             sampleKey={sampleKey}
             source={schemeSource}
@@ -619,15 +628,15 @@ function NoteEditor({ sampleKey, memo, tags }: { sampleKey: string; memo: string
   return (
     <div className="note">
       <label className="field block">
-        メモ
-        <textarea rows={2} value={text} placeholder="反応名、ノート番号など" onChange={(e) => setText(e.target.value)} onBlur={() => text !== memo && void saveNote(sampleKey, { memo: text })} />
+        {tr('メモ')}
+        <textarea rows={2} value={text} placeholder={tr('反応名、ノート番号など')} onChange={(e) => setText(e.target.value)} onBlur={() => text !== memo && void saveNote(sampleKey, { memo: text })} />
       </label>
       <label className="field block">
-        タグ (カンマ区切り)
+        {tr('タグ (カンマ区切り)')}
         <input
           type="text"
           value={tagText}
-          placeholder="例: W錯体, 反応追跡"
+          placeholder={tr('例: W錯体, 反応追跡')}
           onChange={(e) => setTagText(e.target.value)}
           onBlur={() => {
             const next = [...new Set(tagText.split(/[,、]/).map((t) => t.trim().replace(/^#/, '')).filter(Boolean))];
@@ -635,7 +644,7 @@ function NoteEditor({ sampleKey, memo, tags }: { sampleKey: string; memo: string
           }}
         />
       </label>
-      <p className="hint">メモ・タグ・スキームは、同じサンプル名の測定すべてに共通です。</p>
+      <p className="hint">{tr('メモ・タグ・スキームは、同じサンプル名の測定すべてに共通です。')}</p>
     </div>
   );
 }
@@ -667,10 +676,10 @@ function SpectrumPreview({ e }: { e: ExperimentMeta }) {
       cancelled = true;
     };
   }, [e.key]);
-  if (!state || state.key !== e.key) return <div className="preview loading">読み込み中…</div>;
+  if (!state || state.key !== e.key) return <div className="preview loading">{tr('読み込み中…')}</div>;
   if ('error' in state) return <p className="hint warn">{state.error}</p>;
   return (
-    <svg className="preview" viewBox={`0 0 ${PW} ${PH}`} role="img" aria-label="スペクトルのプレビュー">
+    <svg className="preview" viewBox={`0 0 ${PW} ${PH}`} role="img" aria-label={tr('スペクトルのプレビュー')}>
       <path d={state.path} fill="none" stroke="#1f9e1f" strokeWidth={0.8} />
       <line x1={0} y1={PH - 14} x2={PW} y2={PH - 14} stroke="#999" strokeWidth={0.5} />
       {state.ticks.map((t) => (
@@ -718,17 +727,17 @@ function SelectionBar() {
   const selected = useLibrary((s) => s.selected);
   const hasDoc = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
   return (
-    <div className="home-select-bar bar" role="region" aria-label="選んだ測定">
-      <span className="count">{selected.length} 件を選択中</span>
+    <div className="home-select-bar bar" role="region" aria-label={tr('選んだ測定')}>
+      <span className="count">{tr('{n} 件を選択中', { n: selected.length })}</span>
       <button className="btn primary" onClick={() => void openExperiments(selected, 'new')}>
-        新しい図で開く
+        {tr('新しい図で開く')}
       </button>
       {hasDoc && (
         <button className="btn" onClick={() => void openExperiments(selected, 'add')}>
-          編集中の図に追加
+          {tr('編集中の図に追加')}
         </button>
       )}
-      <IconButton icon="x" size="sm" label="選択を解除" onClick={() => useLibrary.setState({ selected: [] })} />
+      <IconButton icon="x" size="sm" label={tr('選択を解除')} onClick={() => useLibrary.setState({ selected: [] })} />
     </div>
   );
 }
@@ -747,13 +756,14 @@ function BlobImage({ blob, alt }: { blob: Blob; alt: string }) {
 function dayRange(items: Measurement[]) {
   const first = localDay(items[0].main.measuredAt);
   const last = localDay(items[items.length - 1].main.measuredAt);
-  return first === last ? formatDay(last) : `${formatDay(first)} 〜 ${formatDay(last)}`;
+  return first === last ? formatDay(last) : tr('{formatDay} 〜 {formatDay2}', { formatDay: formatDay(first), formatDay2: formatDay(last) });
 }
 
 function formatDay(day: string) {
   const [y, m, d] = day.split('-').map(Number);
-  const w = WEEKDAYS[new Date(y, m - 1, d).getDay()];
-  return `${y}年${m}月${d}日 (${w})`;
+  const date = new Date(y, m - 1, d);
+  if (currentLang() === 'en') return date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  return `${y}年${m}月${d}日 (${WEEKDAYS[date.getDay()]})`;
 }
 
 function formatStamp(ms: number) {

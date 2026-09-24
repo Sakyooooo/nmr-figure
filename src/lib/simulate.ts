@@ -2,6 +2,8 @@
  * 論文の SI に書かれた値から、比較用のスペクトルを作る。
  * 実測ではないので、必ず引用元を図に出す (types.ts の Simulated)。
  */
+import { tr, trk } from '../i18n';
+import { EN } from '../i18n/en/index';
 import type { SpectrumMeta } from '../state/types';
 import { detectSolvent } from './solvents';
 import { multipletLines, parseSi, type ParsedSignal } from './siParse';
@@ -51,22 +53,29 @@ export function signalLines(signal: ParsedSignal, freqMHz: number): { ppm: numbe
  * 文献の値から作ったスペクトルに付ける言葉。「文献 (著者 年)」だと論文に載っている実測スペクトルに見えるので、
  * 書かれた値から作図したものだと分かる言い方にする (図の下の引用の行は消せない)
  */
-export const SIMULATED_WORD = '文献値から作図';
+export const SIMULATED_WORD = trk('文献値から作図');
+
+/** 今の言語での言い方 (図の下の引用の行・印刷の表) */
+export function simulatedWord() {
+  return tr(SIMULATED_WORD);
+}
 
 /** 文献のスペクトルの名前 (初期値)。例: 文献値から作図 (Smith 2024) */
 export function simulatedLabel(short: string | undefined) {
-  return short ? `${SIMULATED_WORD} (${short})` : SIMULATED_WORD;
+  const word = simulatedWord();
+  return short ? `${word} (${short})` : word;
 }
 
-/** 名前が自動で付けたもの (前の言い方も含む) か。自分で付け替えた名前は作り直しても変えない */
+/** 名前が自動で付けたものか (どちらの言語で付けた名前も、前の言い方「文献 (…)」も)。自分で付け替えた名前は作り直しても変えない */
 export function isAutoSimulatedLabel(label: string) {
-  return !label || label === SIMULATED_WORD || label.startsWith(`${SIMULATED_WORD} (`) || label.startsWith('文献 (');
+  if (!label) return true;
+  return [SIMULATED_WORD, EN[SIMULATED_WORD], '文献'].some((w) => w && (label === w || label.startsWith(`${w} (`)));
 }
 
 /** SI の文から、比較用のスペクトルを作る */
 export function simulateFromSi(text: string, citation: { full: string; short: string }, override?: Partial<SimulateOptions>) {
   const parsed = parseSi(text);
-  if (!parsed.signals.length) throw new Error('NMR のデータを読み取れませんでした。δ から始まる部分を貼り付けてください');
+  if (!parsed.signals.length) throw new Error(tr('NMR のデータを読み取れませんでした。δ から始まる部分を貼り付けてください'));
   const nucleus = parsed.nucleus;
   const freqMHz = override?.freqMHz ?? parsed.freqMHz ?? 400;
   const range = defaultRange(nucleus);
@@ -100,7 +109,7 @@ export function simulateFromSi(text: string, citation: { full: string; short: st
 
   const meta: SpectrumMeta = {
     id: crypto.randomUUID(),
-    fileName: `${citation.short || '文献'}.si`,
+    fileName: `${citation.short || tr('文献')}.si`,
     title: citation.short,
     nucleus,
     axisName: nucleus,
@@ -109,7 +118,7 @@ export function simulateFromSi(text: string, citation: { full: string; short: st
     freqMHz,
     temperatureC: null,
     scans: null,
-    experiment: '文献データ',
+    experiment: tr('文献データ'),
     date: null,
     decoupled: null,
     acquiredAt: null,

@@ -1,3 +1,5 @@
+import { tr } from '../i18n';
+import { trx } from '../i18n/react';
 import { useMemo, useState } from 'react';
 import { findImpurityCandidates, type ImpurityCandidate } from '../lib/impurities';
 import { labReference, toleranceFor } from '../lib/settings';
@@ -41,12 +43,12 @@ export function ImpurityPanel() {
 
   if (!layer || !meta) return null;
   const solvent = solventInfo(meta.solvent);
-  const title = `不純物の候補${layer.label ? ` — ${layer.label}` : ''}`;
+  const title = tr('不純物の候補{v0}', { v0: layer.label ? ` — ${layer.label}` : '' });
 
   if (!solvent || !result) {
     return (
       <Section title={title}>
-        <p className="hint">左の一覧で溶媒を選ぶと、不純物の候補を表示します。</p>
+        <p className="hint">{tr('左の一覧で溶媒を選ぶと、不純物の候補を表示します。')}</p>
       </Section>
     );
   }
@@ -56,15 +58,15 @@ export function ImpurityPanel() {
   return (
     <Section title={title}>
       <p className="hint">
-        <RichHtml text={solvent.label} /> · 基準 {ref ?? '—'} ppm · 許容幅 ±{toleranceFor(settings, meta.nucleus)} ppm · 表示範囲のピーク {result.peakCount} 本
+        {trx('{solvent} · 基準 {ref} ppm · 許容幅 ±{tol} ppm · 表示範囲のピーク {n} 本', { solvent: <RichHtml text={solvent.label} />, ref: ref ?? '—', tol: toleranceFor(settings, meta.nucleus), n: result.peakCount })}
       </p>
       <div className="row">
-        <label className="field" title="ノイズの何倍以上をピークとみなすか">
-          検出感度 S/N
+        <label className="field" title={tr('ノイズの何倍以上をピークとみなすか')}>
+          {tr('検出感度 S/N')}
           <NumberInput value={snr} min={2} max={200} step={1} width={52} onCommit={(v) => setSnr(v ?? 8)} />
         </label>
       </div>
-      {!candidates.length && <p className="hint">一致する不純物はありませんでした。</p>}
+      {!candidates.length && <p className="hint">{tr('一致する不純物はありませんでした。')}</p>}
       <ul className="candidates">
         {shown.map((c) => (
           <CandidateRow key={c.compoundId} cand={c} layerId={layer.id} checked={isImpurityMarked(doc, layer.id, c.compoundId)} />
@@ -72,7 +74,7 @@ export function ImpurityPanel() {
       </ul>
       {candidates.length > SHOW_LIMIT && (
         <button className="link" onClick={() => setShowAll(!showAll)}>
-          {showAll ? '一致の少ない候補を隠す' : `ほかの候補も表示 (${candidates.length - SHOW_LIMIT})`}
+          {showAll ? tr('一致の少ない候補を隠す') : tr('ほかの候補も表示 ({v0})', { v0: candidates.length - SHOW_LIMIT })}
         </button>
       )}
     </Section>
@@ -97,7 +99,7 @@ function CandidateRow({ cand, layerId, checked }: { cand: ImpurityCandidate; lay
         {cand.signals.map((s, i) => (
           <span key={i} className={s.observed ? 'hit' : 'miss'} title={s.group}>
             {fmt(s.expected)}
-            {s.observed ? ` → ${s.observed.ppm.toFixed(2)}` : ' → なし'}
+            {s.observed ? ` → ${s.observed.ppm.toFixed(2)}` : tr(' → なし')}
           </span>
         ))}
       </div>
@@ -128,11 +130,10 @@ export function MarkerPanel() {
 
   return (
     <Section
-      title="マーカー・凡例"
+      title={tr('マーカー・凡例')}
       help={
         <>
-          色を選んでからピークをクリックすると付け外しできます。名前を入れるとその色が凡例に出ます (空のままなら出ません)。
-          名前は H_{'{2}'}O のように書くと下付きになります。
+          {tr('色を選んでからピークをクリックすると付け外しできます。名前を入れるとその色が凡例に出ます (空のままなら出ません)。名前は H_{two}O のように書くと下付きになります。', { two: '{2}' })}
         </>
       }
     >
@@ -143,7 +144,7 @@ export function MarkerPanel() {
               type="radio"
               name="marker-style"
               checked={s.id === activeId}
-              title="この種類でマーカーを付ける"
+              title={tr('この種類でマーカーを付ける')}
               onChange={() => {
                 useEditor.setState({ activeMarkerStyleId: s.id });
                 setTool('marker');
@@ -157,11 +158,11 @@ export function MarkerPanel() {
               ))}
             </select>
             <ColorInput value={s.color} onChange={(color) => setStyle(s.id, { color })} />
-            <TextInput value={s.name} onCommit={(name) => setStyle(s.id, { name })} width="100%" placeholder="名前 (凡例に出す)" />
-            <span className="count" title="付いているマーカーの数">
+            <TextInput value={s.name} onCommit={(name) => setStyle(s.id, { name })} width="100%" placeholder={tr('名前 (凡例に出す)')} />
+            <span className="count" title={tr('付いているマーカーの数')}>
               {markers.filter((m) => m.styleId === s.id).length}
             </span>
-            <button className="mini danger" onClick={() => removeMarkerStyle(s.id)} title="この種類とマーカーを削除">
+            <button className="mini danger" onClick={() => removeMarkerStyle(s.id)} title={tr('この種類とマーカーを削除')}>
               ×
             </button>
           </li>
@@ -170,11 +171,11 @@ export function MarkerPanel() {
       <div className="row">
         <button
           onClick={() => {
-            addMarkerStyle('生成物');
+            addMarkerStyle(tr('生成物'));
             setTool('marker');
           }}
         >
-          ＋ 種類を追加
+          {tr('＋ 種類を追加')}
         </button>
         <Check
           checked={showLegend}
@@ -184,7 +185,7 @@ export function MarkerPanel() {
             })
           }
         >
-          凡例を表示
+          {tr('凡例を表示')}
         </Check>
       </div>
     </Section>

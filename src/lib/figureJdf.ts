@@ -8,6 +8,7 @@
  * - 重ねたほかのスペクトルは図の中身にだけ入る (Delta では土台の 1 本だけが見える)
  * 2D と、文献のスペクトルだけの図は .jdf にできない (.nmrfig で保存する)
  */
+import { tr } from '../i18n';
 import type { NmrDocument, SpectrumMeta } from '../state/types';
 import { layerAnnotations, shiftAnnotations } from './deltaSync';
 import type { FidData } from './fid';
@@ -51,10 +52,10 @@ export function figureSummaryOf(doc: NmrDocument): FigureSummary {
 export async function buildFigureJdf(template: ArrayBuffer, doc: NmrDocument, base: FigureBase, json: string, fid?: FidData): Promise<ArrayBuffer> {
   let bytes = template;
   if (base.meta.processing) {
-    if (!fid) throw new JdfFormatError('FID の元データがないので、処理済みのファイルを作れません');
+    if (!fid) throw new JdfFormatError(tr('FID の元データがないので、処理済みのファイルを作れません'));
     bytes = writeProcessedJdf(template, fid, base.meta.processing, base.meta.refOffset);
   } else if (new Uint8Array(template)[HEADER.unitBase] !== UNIT_PPM) {
-    throw new JdfFormatError('土台のファイルが処理済みのスペクトルではありません');
+    throw new JdfFormatError(tr('土台のファイルが処理済みのスペクトルではありません'));
   }
   // FID から処理して書いたファイルの軸には基準合わせのずれが入っている。図の ppm (ずれの前) をそのぶんずらして書く
   const shift = base.meta.processing ? base.meta.refOffset : 0;

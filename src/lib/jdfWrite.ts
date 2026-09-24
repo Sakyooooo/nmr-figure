@@ -13,6 +13,7 @@
  * 以前 (2026-09-19) の版は +64 を通し番号だと思い込み、レコードが自分自身を指す鎖を作っていた。
  * Delta が固まったのはこのため (鎖をたどり終わらない)。
  */
+import { tr } from '../i18n';
 import type { IntegralBaseline } from '../state/types';
 import { checkAnnotationLinks, isIntegralType, isPeakType } from './jdfAnnoteCheck';
 import { deltaBaseline, integralArea, integralRange, pointStep } from './integrals';
@@ -256,7 +257,7 @@ function finish(out: Uint8Array<ArrayBuffer>, view: DataView, body: number, tota
   view.setUint32(ANNOTE_LENGTH, body, false);
   view.setBigUint64(TOTAL_SIZE, BigInt(total), false);
   const problems = checkAnnotationLinks(out.buffer);
-  if (problems.length) throw new JdfWriteError(`Delta の形になっていないので書きませんでした (${problems[0]})`);
+  if (problems.length) throw new JdfWriteError(tr('Delta の形になっていないので書きませんでした ({v0})', { v0: problems[0] }));
   return out.buffer;
 }
 
@@ -265,17 +266,17 @@ function checkSource(source: ArrayBuffer) {
   const src = new Uint8Array(source);
   const head = new DataView(source);
   if (src.length < TOTAL_SIZE + 8 || new TextDecoder().decode(src.subarray(0, 8)) !== 'JEOL.NMR') {
-    throw new JdfWriteError('JEOL Delta のファイルではありません');
+    throw new JdfWriteError(tr('JEOL Delta のファイルではありません'));
   }
-  if (src[12] !== 1) throw new JdfWriteError('1D のスペクトルにだけ書き戻せます');
+  if (src[12] !== 1) throw new JdfWriteError(tr('1D のスペクトルにだけ書き戻せます'));
   // 軸の単位 (26 = ppm)。FID (秒) には ppm の注釈を書いても意味がない
-  if (src[33] !== 26) throw new JdfWriteError('Delta で処理済みのスペクトル (ppm の軸) にだけ書き戻せます');
+  if (src[33] !== 26) throw new JdfWriteError(tr('Delta で処理済みのスペクトル (ppm の軸) にだけ書き戻せます'));
   const start = Number(head.getBigUint64(ANNOTE_START, false));
   const oldLength = head.getUint32(ANNOTE_LENGTH, false);
-  if (!start || start > src.length) throw new JdfWriteError('注釈の場所が分かりません');
+  if (!start || start > src.length) throw new JdfWriteError(tr('注釈の場所が分かりません'));
   // 注釈のうしろに中身がないことを確かめる (0 埋めだけのはず)
   for (let i = start + oldLength; i < src.length; i++) {
-    if (src[i] !== 0) throw new JdfWriteError('注釈のうしろに読めない部分があるので、書き換えをやめました');
+    if (src[i] !== 0) throw new JdfWriteError(tr('注釈のうしろに読めない部分があるので、書き換えをやめました'));
   }
   return { src, start, oldLength };
 }
@@ -342,13 +343,13 @@ function readSpectrum(head: DataView, buffer: ArrayBuffer) {
   const offset = head.getUint32(OFFSET_START, false);
   const points = head.getUint32(OFFSET_STOP, false) - offset + 1;
   if (!Number.isFinite(first) || !Number.isFinite(last) || points < 2 || first === last) {
-    throw new JdfWriteError('ファイルの軸が読めません');
+    throw new JdfWriteError(tr('ファイルの軸が読めません'));
   }
   const float32 = head.getUint8(14) >> 6 === 1;
   const little = head.getUint8(8) === 1;
   const size = float32 ? 4 : 8;
   const dataStart = head.getUint32(DATA_START, false);
-  if (dataStart + (offset + points) * size > buffer.byteLength) throw new JdfWriteError('測定データが途中で切れています');
+  if (dataStart + (offset + points) * size > buffer.byteLength) throw new JdfWriteError(tr('測定データが途中で切れています'));
   const v = new DataView(buffer);
   const data = new Float32Array(points);
   for (let k = 0; k < points; k++) {

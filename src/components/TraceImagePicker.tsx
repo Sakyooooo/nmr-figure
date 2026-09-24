@@ -2,6 +2,8 @@
  * 文献の図 (スクショ) を貼って、スペクトルの枠と左右の ppm を教えてもらい、波形を読み取る。
  * 読み取った波形は「線幅を測る」ためだけに使う (位置や J は SI の文を優先)。
  */
+import { tr } from '../i18n';
+import { trx } from '../i18n/react';
 import { useEffect, useRef, useState } from 'react';
 import { traceImage, type Pixels, type Rect, type Trace } from '../lib/trace';
 import { NumberInput } from './inputs';
@@ -28,7 +30,7 @@ export function TraceImagePicker({ onTrace }: { onTrace: (trace: Trace | null) =
       canvas.width = bmp.width;
       canvas.height = bmp.height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('画像を読めません');
+      if (!ctx) throw new Error(tr('画像を読めません'));
       ctx.drawImage(bmp, 0, 0);
       const data = ctx.getImageData(0, 0, bmp.width, bmp.height);
       setBitmap(bmp);
@@ -36,7 +38,7 @@ export function TraceImagePicker({ onTrace }: { onTrace: (trace: Trace | null) =
       setRect({ x: 0, y: 0, w: bmp.width, h: bmp.height });
       setError('');
     } catch (e) {
-      setError(`画像を読めませんでした: ${(e as Error).message}`);
+      setError(tr('画像を読めませんでした: {message}', { message: (e as Error).message }));
     }
   };
 
@@ -96,8 +98,8 @@ export function TraceImagePicker({ onTrace }: { onTrace: (trace: Trace | null) =
   return (
     <div className="trace-picker">
       <p className="hint">
-        SI の図のスクショを貼ると、線の太さや山の形を figure に合わせられます。
-        <strong>位置と J は SI の文を優先</strong>するので、図が無くても使えます。
+        {tr('SI の図のスクショを貼ると、線の太さや山の形を figure に合わせられます。')}
+        {trx('{strong}ので、図が無くても使えます。', { strong: <strong>{tr('位置と J は SI の文を優先する')}</strong> })}
       </p>
       <div
         className="trace-drop"
@@ -115,7 +117,7 @@ export function TraceImagePicker({ onTrace }: { onTrace: (trace: Trace | null) =
           void load(e.dataTransfer.files[0] ?? null);
         }}
       >
-        ここをクリックして Ctrl+V で貼り付け、または画像をドロップ
+        {tr('ここをクリックして Ctrl+V で貼り付け、または画像をドロップ')}
         <input type="file" accept="image/*" onChange={(e) => void load(e.target.files?.[0] ?? null)} />
       </div>
       {error && <p className="hint warn">{error}</p>}
@@ -143,23 +145,23 @@ export function TraceImagePicker({ onTrace }: { onTrace: (trace: Trace | null) =
               dragFrom.current = null;
             }}
           />
-          <p className="hint">スペクトルの線が入る範囲をドラッグで囲みます (目盛りの数字や文字は入れない方が、きれいに読めます)。</p>
+          <p className="hint">{tr('スペクトルの線が入る範囲をドラッグで囲みます (目盛りの数字や文字は入れない方が、きれいに読めます)。')}</p>
           <div className="row wrap">
-            <label className="field" title="囲んだ枠の左端の ppm">
-              枠の左端
+            <label className="field" title={tr('囲んだ枠の左端の ppm')}>
+              {tr('枠の左端')}
               <NumberInput value={left} min={-500} max={500} step={0.1} width={64} allowEmpty onCommit={setLeft} />
               ppm
             </label>
-            <label className="field" title="囲んだ枠の右端の ppm">
-              右端
+            <label className="field" title={tr('囲んだ枠の右端の ppm')}>
+              {tr('右端')}
               <NumberInput value={right} min={-500} max={500} step={0.1} width={64} allowEmpty onCommit={setRight} />
               ppm
             </label>
           </div>
           {trace && (
             <p className="hint">
-              読み取り: {trace.y.length} 画素 / 1 画素 = {(Math.abs(trace.left - trace.right) / Math.max(1, trace.y.length - 1)).toFixed(4)} ppm
-              {trace.blank > trace.y.length * 0.2 ? '。線が見つからない列が多いので、枠を線に合わせて囲み直してください' : ''}
+              {tr('読み取り: {n} 画素 / 1 画素 = {ppm} ppm', { n: trace.y.length, ppm: (Math.abs(trace.left - trace.right) / Math.max(1, trace.y.length - 1)).toFixed(4) })}
+              {trace.blank > trace.y.length * 0.2 ? tr('。線が見つからない列が多いので、枠を線に合わせて囲み直してください') : ''}
             </p>
           )}
         </>

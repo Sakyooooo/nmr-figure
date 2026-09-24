@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useMemo, type RefObject } from 'react';
 import { decimalsFor, niceStep, ticks } from '../lib/labels';
 import { markerPath } from '../lib/scene';
@@ -122,7 +123,7 @@ export function TrendChart({ svgRef }: { svgRef: RefObject<SVGSVGElement | null>
       </g>
       {!result.series.length && (
         <text data-ui="empty" x={W / 2} y={H / 2} textAnchor="middle" fontSize={14} fill="#667085">
-          右の「推移グラフ」で追跡する範囲を追加してください
+          {tr('右の「推移グラフ」で追跡する範囲を追加してください')}
         </text>
       )}
     </svg>

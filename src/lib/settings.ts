@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { FigureStyle } from '../state/types';
 import type { CustomImpurity, SolventKey } from './impurityTypes';
 import { nucleusDefaults } from './nuclei';
@@ -15,8 +16,18 @@ export interface Settings {
   /** 新しい図を作ったときに自動で当てるテンプレート */
   defaultTemplateId: string | null;
   /** 画面まわりの好み */
-  ui: { leftOpen: boolean; rightOpen: boolean; homeSort: HomeSort };
+  ui: {
+    leftOpen: boolean;
+    rightOpen: boolean;
+    homeSort: HomeSort;
+    /** 画面の言語。auto はブラウザの言語に合わせる (日本語以外は英語) */
+    lang: LangSetting;
+    /** 初めて開いたときの使い方の説明を見終わった (閉じた) */
+    onboardingDone: boolean;
+  };
 }
+
+export type LangSetting = 'auto' | 'ja' | 'en';
 
 /** ホーム画面の並び順 */
 export interface HomeSort {
@@ -52,7 +63,7 @@ export function templatesToJson(list: StyleTemplate[]): string {
 
 export function templatesFromJson(text: string): StyleTemplate[] {
   const file = JSON.parse(text);
-  if (file?.format !== TEMPLATE_FILE || !Array.isArray(file.templates)) throw new Error('テンプレートのファイルではありません');
+  if (file?.format !== TEMPLATE_FILE || !Array.isArray(file.templates)) throw new Error(tr('テンプレートのファイルではありません'));
   return (file.templates as StyleTemplate[]).filter((t) => t && typeof t.name === 'string' && t.figure);
 }
 
@@ -66,7 +77,7 @@ export function defaultSettings(): Settings {
     pngScale: 4,
     templates: [],
     defaultTemplateId: null,
-    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true } },
+    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false },
   };
 }
 

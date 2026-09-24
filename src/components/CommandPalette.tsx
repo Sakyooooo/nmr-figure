@@ -1,3 +1,4 @@
+import { currentLang, tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import {
@@ -12,6 +13,7 @@ import {
   redo,
   scaleY,
   setCanvasTab,
+  setLanguage,
   setInspectorTab,
   setTool,
   setViewZoom,
@@ -22,10 +24,11 @@ import {
 import { TOOLS } from './Dock';
 import { Icon, type IconName } from './Icon';
 import { Kbd } from './ui';
+import { openOnboarding } from './Onboarding';
 
 type Command = { group: string; label: string; icon: IconName; shortcut?: string; keywords?: string; run: () => void; enabled: boolean };
 
-/** 漢字の名前を、変換する前の読み (ひらがな) でも探せるように */
+/** 漢字の名前を、変換する前の読み (ひらがな) でも探せるように (検索の手がかりなので訳さない) */
 const READINGS: Record<string, string> = {
   select: 'せんたく いどう',
   zoom: 'かくだい ずーむ',
@@ -98,15 +101,15 @@ export function CommandPalette({
   let lastGroup = '';
   return (
     <div className="palette-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="操作を探す" onKeyDown={onKeyDown}>
+      <div className="palette" role="dialog" aria-modal="true" aria-label={tr('操作を探す')} onKeyDown={onKeyDown}>
         <div className="palette-input">
           <Icon name="search" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="操作を探す (例: 積分、SVG、全体)"
-            aria-label="操作を探す"
+            placeholder={tr('操作を探す (例: 積分、SVG、全体)')}
+            aria-label={tr('操作を探す')}
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
@@ -114,7 +117,7 @@ export function CommandPalette({
           />
         </div>
         <div className="palette-list" id="palette-list" role="listbox" ref={listRef}>
-          {results.length === 0 && <p className="palette-empty">見つかりませんでした</p>}
+          {results.length === 0 && <p className="palette-empty">{tr('見つかりませんでした')}</p>}
           {results.map((c, i) => {
             const head = c.group !== lastGroup ? c.group : null;
             lastGroup = c.group;
@@ -139,13 +142,13 @@ export function CommandPalette({
         </div>
         <div className="palette-foot">
           <span>
-            <Kbd>↑</Kbd> <Kbd>↓</Kbd> 選ぶ
+            <Kbd>↑</Kbd> <Kbd>↓</Kbd> {' '}{tr('選ぶ')}
           </span>
           <span>
-            <Kbd>Enter</Kbd> 実行
+            <Kbd>Enter</Kbd> {' '}{tr('実行')}
           </span>
           <span>
-            <Kbd>Esc</Kbd> 閉じる
+            <Kbd>Esc</Kbd> {' '}{tr('閉じる')}
           </span>
         </div>
       </div>
@@ -175,64 +178,64 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
 
   return [
     ...TOOLS.map((t) => ({
-      group: '道具',
-      label: t.label,
+      group: tr('道具'),
+      label: tr(t.label),
       icon: t.icon,
       shortcut: t.key,
-      keywords: `${t.hint} ${READINGS[t.id] ?? ''}`,
+      keywords: `${tr(t.hint)} ${t.label} ${READINGS[t.id] ?? ''}`,
       run: () => setTool(t.id),
       enabled: hasData && tab === 'spectrum' && (!is2d || t.id === 'select' || t.id === 'zoom'),
     })),
-    { group: '道具', label: '構造式を描いて置く', icon: 'hexagon', keywords: 'ketcher chemdraw', run: () => openStructureEditor(null), enabled: spectrum },
+    { group: tr('道具'), label: tr('構造式を描いて置く'), icon: 'hexagon', keywords: 'ketcher chemdraw', run: () => openStructureEditor(null), enabled: spectrum },
 
     {
-      group: '解析',
-      label: '自動で積分 (選んでいるスペクトル)',
+      group: tr('解析'),
+      label: tr('自動で積分 (選んでいるスペクトル)'),
       icon: 'nmr-integral',
       keywords: 'せきぶん integral',
       run: () => {
         if (!activeLayerId) return;
         const n = autoDetectSignals(activeLayerId, 0.03, false);
-        notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えると基準が決まります` : '新しく積分する信号はありませんでした', 'info', { undo: n > 0 });
+        notify(n ? tr('{n} 個の信号を積分しました。値を1つ書き換えると基準が決まります', { n }) : tr('新しく積分する信号はありませんでした'), 'info', { undo: n > 0 });
       },
       enabled: !!layer,
     },
     {
-      group: '解析',
-      label: 'ピーク値を自動で付ける (選んでいるスペクトル)',
+      group: tr('解析'),
+      label: tr('ピーク値を自動で付ける (選んでいるスペクトル)'),
       icon: 'nmr-peak',
       keywords: 'ぴーく peak ラベル',
       run: () => {
         if (!activeLayerId) return;
         const n = autoPeakLabels(activeLayerId, 0.05, false);
-        notify(n ? `${n} 本のピークにラベルを付けました` : '新しく付けるピークはありませんでした', 'info', { undo: n > 0 });
+        notify(n ? tr('{n} 本のピークにラベルを付けました', { n }) : tr('新しく付けるピークはありませんでした'), 'info', { undo: n > 0 });
       },
       enabled: !!layer,
     },
 
-    { group: '書き出し', label: '図をコピー (Word / PowerPoint に貼る)', icon: 'copy', shortcut: 'Ctrl+Shift+C', run: withSvg(copyFigure), enabled: hasData },
-    { group: '書き出し', label: 'SVG で保存', icon: 'download', keywords: 'svg ベクター 図形に変換', run: withSvg(exportSvg), enabled: hasData },
-    { group: '書き出し', label: 'PNG で保存', icon: 'image', keywords: 'png 画像', run: withSvg(exportPng), enabled: hasData },
-    { group: '書き出し', label: '印刷 (図と測定条件)', icon: 'printer', keywords: 'pdf', run: printFigure, enabled: hasData },
+    { group: tr('書き出し'), label: tr('図をコピー (Word / PowerPoint に貼る)'), icon: 'copy', shortcut: 'Ctrl+Shift+C', run: withSvg(copyFigure), enabled: hasData },
+    { group: tr('書き出し'), label: tr('SVG で保存'), icon: 'download', keywords: 'svg ベクター 図形に変換', run: withSvg(exportSvg), enabled: hasData },
+    { group: tr('書き出し'), label: tr('PNG で保存'), icon: 'image', keywords: 'png 画像', run: withSvg(exportPng), enabled: hasData },
+    { group: tr('書き出し'), label: tr('印刷 (図と測定条件)'), icon: 'printer', keywords: 'pdf', run: printFigure, enabled: hasData },
 
-    { group: 'ファイル', label: '開く', icon: 'folder-open', shortcut: 'Ctrl+O', keywords: 'jdf', run: () => void openDialog(), enabled: true },
-    { group: 'ファイル', label: '保存', icon: 'save', shortcut: 'Ctrl+S', run: () => saveProject(), enabled: hasData },
-    { group: 'ファイル', label: '名前を付けて保存', icon: 'save', shortcut: 'Ctrl+Shift+S', run: () => saveProject(true), enabled: hasData },
-    { group: 'ファイル', label: '文献値からスペクトルを作る', icon: 'book-open', keywords: 'si 論文 文献', run: () => openSiImport(), enabled: true },
-    { group: 'ファイル', label: 'ホームに戻る (測定の一覧)', icon: 'house', run: () => useEditor.setState({ screen: 'home' }), enabled: true },
+    { group: tr('ファイル'), label: tr('開く'), icon: 'folder-open', shortcut: 'Ctrl+O', keywords: 'jdf', run: () => void openDialog(), enabled: true },
+    { group: tr('ファイル'), label: tr('保存'), icon: 'save', shortcut: 'Ctrl+S', run: () => saveProject(), enabled: hasData },
+    { group: tr('ファイル'), label: tr('名前を付けて保存'), icon: 'save', shortcut: 'Ctrl+Shift+S', run: () => saveProject(true), enabled: hasData },
+    { group: tr('ファイル'), label: tr('文献値からスペクトルを作る'), icon: 'book-open', keywords: 'si 論文 文献', run: () => openSiImport(), enabled: true },
+    { group: tr('ファイル'), label: tr('ホームに戻る (測定の一覧)'), icon: 'house', run: () => useEditor.setState({ screen: 'home' }), enabled: true },
 
-    { group: '表示', label: '全体を表示', icon: 'expand', shortcut: '0', run: fullRange, enabled: hasData && tab === 'spectrum' },
-    { group: '表示', label: '縦を自動 (表示範囲の最大ピークに合わせる)', icon: 'fit-y', shortcut: 'F', run: fitY, enabled: spectrum },
-    { group: '表示', label: 'スペクトルを高くする', icon: 'arrow-up', keywords: '縦 倍率', run: () => scaleY(1.5), enabled: spectrum },
-    { group: '表示', label: 'スペクトルを低くする', icon: 'arrow-down', keywords: '縦 倍率', run: () => scaleY(1 / 1.5), enabled: spectrum },
-    { group: '表示', label: '画面に合わせる', icon: 'expand', keywords: '表示倍率 ズーム', run: () => setViewZoom('fit'), enabled: hasData },
-    { group: '表示', label: tab === 'trend' ? 'スペクトルを見る' : '推移グラフを見る', icon: 'nmr-region', run: () => setCanvasTab(tab === 'trend' ? 'spectrum' : 'trend'), enabled: hasData && !is2d },
-    { group: '表示', label: ui.leftOpen ? 'スペクトルの一覧を閉じる' : 'スペクトルの一覧を開く', icon: 'panel-left', shortcut: '[', run: () => togglePanel('left'), enabled: hasData },
-    { group: '表示', label: ui.rightOpen ? '右のパネルを閉じる' : '右のパネルを開く', icon: 'panel-right', shortcut: ']', run: () => togglePanel('right'), enabled: hasData },
+    { group: tr('表示'), label: tr('全体を表示'), icon: 'expand', shortcut: '0', run: fullRange, enabled: hasData && tab === 'spectrum' },
+    { group: tr('表示'), label: tr('縦を自動 (表示範囲の最大ピークに合わせる)'), icon: 'fit-y', shortcut: 'F', run: fitY, enabled: spectrum },
+    { group: tr('表示'), label: tr('スペクトルを高くする'), icon: 'arrow-up', keywords: '縦 倍率', run: () => scaleY(1.5), enabled: spectrum },
+    { group: tr('表示'), label: tr('スペクトルを低くする'), icon: 'arrow-down', keywords: '縦 倍率', run: () => scaleY(1 / 1.5), enabled: spectrum },
+    { group: tr('表示'), label: tr('画面に合わせる'), icon: 'expand', keywords: '表示倍率 ズーム', run: () => setViewZoom('fit'), enabled: hasData },
+    { group: tr('表示'), label: tab === 'trend' ? tr('スペクトルを見る') : tr('推移グラフを見る'), icon: 'nmr-region', run: () => setCanvasTab(tab === 'trend' ? 'spectrum' : 'trend'), enabled: hasData && !is2d },
+    { group: tr('表示'), label: ui.leftOpen ? tr('スペクトルの一覧を閉じる') : tr('スペクトルの一覧を開く'), icon: 'panel-left', shortcut: '[', run: () => togglePanel('left'), enabled: hasData },
+    { group: tr('表示'), label: ui.rightOpen ? tr('右のパネルを閉じる') : tr('右のパネルを開く'), icon: 'panel-right', shortcut: ']', run: () => togglePanel('right'), enabled: hasData },
 
     ...(['analysis', 'figure', 'record'] as const).map((id) => ({
-      group: '右のパネル',
-      label: { analysis: '解析 (積分・ピーク値・不純物・SI 用の文)', figure: '図 (図に入れるもの・大きさ・字体・テンプレート)', record: '記録 (Delta との同期・編集記録)' }[id],
+      group: tr('右のパネル'),
+      label: { analysis: tr('解析 (積分・ピーク値・不純物・SI 用の文)'), figure: tr('図 (図に入れるもの・大きさ・字体・テンプレート)'), record: tr('記録 (Delta との同期・編集記録)') }[id],
       icon: ({ analysis: 'nmr-integral', figure: 'image', record: 'history' } as const)[id],
       run: () => {
         setInspectorTab(id);
@@ -241,9 +244,11 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
       enabled: spectrum,
     })),
 
-    { group: '編集', label: '元に戻す', icon: 'undo', shortcut: 'Ctrl+Z', run: undo, enabled: canUndo },
-    { group: '編集', label: 'やり直す', icon: 'redo', shortcut: 'Ctrl+Y', run: redo, enabled: canRedo },
-    { group: '設定', label: '設定 (研究室の基準値・自作の不純物・PNG の解像度)', icon: 'settings', run: onSettings, enabled: true },
-    { group: '設定', label: 'タッチでの操作 (使い方)', icon: 'info', keywords: 'たぶれっと ゆび ヘルプ', run: onTouchHelp, enabled: true },
+    { group: tr('編集'), label: tr('元に戻す'), icon: 'undo', shortcut: 'Ctrl+Z', run: undo, enabled: canUndo },
+    { group: tr('編集'), label: tr('やり直す'), icon: 'redo', shortcut: 'Ctrl+Y', run: redo, enabled: canRedo },
+    { group: tr('設定'), label: tr('設定 (研究室の基準値・自作の不純物・PNG の解像度)'), icon: 'settings', run: onSettings, enabled: true },
+    { group: tr('設定'), label: tr('タッチでの操作 (使い方)'), icon: 'info', keywords: 'たぶれっと ゆび ヘルプ', run: onTouchHelp, enabled: true },
+    { group: tr('設定'), label: tr('使い方の説明 (初めて開いたときの 5 枚)'), icon: 'book-open', keywords: 'つかいかた ヘルプ help onboarding tutorial', run: openOnboarding, enabled: true },
+    { group: tr('設定'), label: tr('言語: 日本語 / English'), icon: 'settings', keywords: 'げんご language english 英語', run: () => setLanguage(currentLang() === 'en' ? 'ja' : 'en'), enabled: true },
   ];
 }

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { create } from 'zustand';
 import { dbDelete, dbEntries, dbGet, dbSet } from '../lib/db';
 import { readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
@@ -162,7 +163,7 @@ export async function pickFolder() {
     await scanFolder();
   } catch (e) {
     // 選ぶのをやめたとき (AbortError) は何もしない
-    if ((e as Error).name !== 'AbortError') notify(`フォルダを開けませんでした: ${(e as Error).message}`, 'error');
+    if ((e as Error).name !== 'AbortError') notify(tr('フォルダを開けませんでした: {message}', { message: (e as Error).message }), 'error');
   }
 }
 
@@ -191,11 +192,11 @@ export async function grantPermission() {
   }
   if (before === 'denied') {
     // 拒否が覚えられていると、何度押してもダイアログは出ない。選び直してもらう
-    notify('ブラウザがこのフォルダへのアクセスを拒否した状態で覚えています。フォルダを選び直してください', 'error');
+    notify(tr('ブラウザがこのフォルダへのアクセスを拒否した状態で覚えています。フォルダを選び直してください'), 'error');
     await pickFolder();
     return;
   }
-  notify('フォルダの読み取りが許可されませんでした。もう一度「フォルダを読み込む」を押すか、「変更」で選び直してください', 'error');
+  notify(tr('フォルダの読み取りが許可されませんでした。もう一度「フォルダを読み込む」を押すか、「変更」で選び直してください'), 'error');
 }
 
 /** フォルダを選べないブラウザ向け。その場限りで一覧を作る */
@@ -237,7 +238,7 @@ export async function scanFolder() {
   } catch (e) {
     // 途中で読めなくなったら (許可が切れたなど)、読み込みボタンを出し直す
     set({ status: 'need-permission', progress: null });
-    notify(`フォルダを読めませんでした: ${(e as Error).message}`, 'error');
+    notify(tr('フォルダを読めませんでした: {message}', { message: (e as Error).message }), 'error');
     return;
   }
   await scanEntries(entries, true);
@@ -286,7 +287,7 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
 
 export async function loadExperiment(key: string, options?: ReadOptions): Promise<LoadedSpectrum> {
   const source = sources.get(key);
-  if (!source) throw new Error('ファイルが見つかりません。フォルダを読み直してください');
+  if (!source) throw new Error(tr('ファイルが見つかりません。フォルダを読み直してください'));
   const file = await source();
   return readJdf(await file.arrayBuffer(), file.name, options);
 }
@@ -299,7 +300,7 @@ export function folderFileHandle(fileName: string): FileHandle | null {
 /** 一覧の図入りの .jdf を開くためのファイル */
 export async function figureFileOf(key: string): Promise<{ file: File; handle?: FileHandle }> {
   const source = sources.get(key);
-  if (!source) throw new Error('ファイルが見つかりません。フォルダを読み直してください');
+  if (!source) throw new Error(tr('ファイルが見つかりません。フォルダを読み直してください'));
   const file = await source();
   return { file, handle: handles.get(file.name) };
 }
@@ -333,7 +334,7 @@ export async function folderWritePermission(ask: boolean): Promise<PermissionSta
 /** 2D の実験を読む */
 export async function load2dExperiment(key: string): Promise<Loaded2dSpectrum> {
   const source = sources.get(key);
-  if (!source) throw new Error('ファイルが見つかりません。フォルダを読み直してください');
+  if (!source) throw new Error(tr('ファイルが見つかりません。フォルダを読み直してください'));
   const file = await source();
   return readJdf2d(await file.arrayBuffer(), file.name);
 }

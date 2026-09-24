@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { IMPURITIES_13C, IMPURITIES_1H, RESIDUAL_13C, RESIDUAL_1H } from '../data/fulmer2010';
 import type { CustomImpurity, ImpurityCompound, Shift, SolventKey } from './impurityTypes';
 import { solventInfo, tableResidual } from './solvents';
@@ -88,7 +89,7 @@ export function findImpurityCandidates(peaks: Peak[], opts: MatchOptions): Impur
     if (matched) {
       out.push({
         compoundId: 'solvent-residual',
-        name: solventInfo(opts.solvent)?.residualName ?? '溶媒',
+        name: solventInfo(opts.solvent)?.residualName ?? tr('溶媒'),
         signals,
         matched,
         deviation: meanDeviation(signals),

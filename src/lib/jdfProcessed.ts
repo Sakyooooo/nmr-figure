@@ -12,6 +12,7 @@
  * 軸には基準合わせのずれ (refOffset) を入れるので、図のピーク値・積分 (ずれの前の軸) は +refOffset して書く (lib/deltaSync.ts の shiftAnnotations)。
  * 注釈は空。ピーク値・積分は lib/jdfWrite.ts で足す。
  */
+import { tr } from '../i18n';
 import { finish, phaseImag, transform, type FidData, type Processing } from './fid';
 import { CONTEXT, HEADER, JdfFormatError, UNIT_PPM, UNIT_SECOND, buildJdf, splitJdf } from './jdfSections';
 
@@ -24,9 +25,9 @@ const POINT_ALIGN = 16;
 export function writeProcessedJdf(template: ArrayBuffer, fid: FidData, processing: Processing, refOffset: number): ArrayBuffer {
   const parts = splitJdf(template);
   const head = new DataView(parts.header.buffer, parts.header.byteOffset, parts.header.byteLength);
-  if (parts.header[HEADER.dimensions] !== 1) throw new JdfFormatError('1D の FID だけを処理済みのファイルにできます');
+  if (parts.header[HEADER.dimensions] !== 1) throw new JdfFormatError(tr('1D の FID だけを処理済みのファイルにできます'));
   const unit = parts.header[HEADER.unitBase];
-  if (unit !== UNIT_SECOND && unit !== UNIT_PPM) throw new JdfFormatError('対応していない軸の単位のファイルです');
+  if (unit !== UNIT_SECOND && unit !== UNIT_PPM) throw new JdfFormatError(tr('対応していない軸の単位のファイルです'));
 
   const spec = transform(fid, processing.lb);
   const real = finish(spec, processing);

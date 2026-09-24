@@ -1,3 +1,4 @@
+import { tr, trk } from '../i18n';
 import { useEffect, useState } from 'react';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './ui';
@@ -30,11 +31,11 @@ export function useFirstTouchHelp(hasData: boolean): [boolean, (open: boolean) =
 }
 
 const ROWS: { icon: IconName; what: string; how: string }[] = [
-  { icon: 'pointer', what: '1 本指でなぞる', how: '選んだ道具で操作 (積分の範囲・図形・拡大する範囲など)' },
-  { icon: 'arrow-right', what: '背景を左右になぞる', how: '選択の道具のとき、表示する範囲を動かす (上下になぞると高さ)' },
-  { icon: 'zoom-in', what: '拡大する', how: '拡大の道具で四角く囲む (縦は四角の上端まで)。全体に戻すのは左下のボタン' },
-  { icon: 'more', what: '選んだものの操作', how: '選んだものの真上に出る帯 (値を変える・消す など)' },
-  { icon: 'undo', what: '元に戻す', how: '下の道具の左のボタン' },
+  { icon: 'pointer', what: trk('1 本指でなぞる'), how: trk('選んだ道具で操作 (積分の範囲・図形・拡大する範囲など)') },
+  { icon: 'arrow-right', what: trk('背景を左右になぞる'), how: trk('選択の道具のとき、表示する範囲を動かす (上下になぞると高さ)') },
+  { icon: 'zoom-in', what: trk('拡大する'), how: trk('拡大の道具で四角く囲む (縦は四角の上端まで)。全体に戻すのは左下のボタン') },
+  { icon: 'more', what: trk('選んだものの操作'), how: trk('選んだものの真上に出る帯 (値を変える・消す など)') },
+  { icon: 'undo', what: trk('元に戻す'), how: trk('下の道具の左のボタン') },
 ];
 
 /** タッチでの操作の説明 (下から出るパネル) */
@@ -49,8 +50,8 @@ export function TouchHelp({ onClose }: { onClose: () => void }) {
       <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="touch-help-title">
         <span className="sheet-handle" aria-hidden="true" />
         <div className="sheet-head">
-          <h2 id="touch-help-title">タッチでの操作</h2>
-          <IconButton icon="x" label="閉じる" onClick={onClose} />
+          <h2 id="touch-help-title">{tr('タッチでの操作')}</h2>
+          <IconButton icon="x" label={tr('閉じる')} onClick={onClose} />
         </div>
         <ul className="sheet-rows">
           {ROWS.map((r) => (
@@ -59,15 +60,15 @@ export function TouchHelp({ onClose }: { onClose: () => void }) {
                 <Icon name={r.icon} />
               </span>
               <span>
-                <b>{r.what}</b> · {r.how}
+                <b>{tr(r.what)}</b> · {tr(r.how)}
               </span>
             </li>
           ))}
         </ul>
         <div className="sheet-foot">
-          <span className="muted">「操作を探す」の「タッチでの操作」からいつでも見られます</span>
+          <span className="muted">{tr('「操作を探す」の「タッチでの操作」からいつでも見られます')}</span>
           <button type="button" className="btn primary" onClick={onClose} autoFocus>
-            わかった
+            {tr('わかった')}
           </button>
         </div>
       </section>

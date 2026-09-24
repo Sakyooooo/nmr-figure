@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * .jdf の区画 (パラメーター・測定データ・文脈 (context)・注釈) を読み、組み直す。
  * JEOL の公開仕様ではないので、研究室の .jdf 234 ファイルと Delta 付属の list_header.exe / convert.exe で確かめた (docs/SPEC.md)。
@@ -77,9 +78,9 @@ export function isJdf(bytes: Uint8Array) {
 
 export function splitJdf(source: ArrayBuffer): JdfParts {
   const bytes = new Uint8Array(source);
-  if (!isJdf(bytes)) throw new JdfFormatError('JEOL Delta のファイルではありません');
+  if (!isJdf(bytes)) throw new JdfFormatError(tr('JEOL Delta のファイルではありません'));
   const v = new DataView(source);
-  if (v.getUint8(HEADER.endian) !== 1) throw new JdfFormatError('対応していない並び (ビッグエンディアン) のファイルです');
+  if (v.getUint8(HEADER.endian) !== 1) throw new JdfFormatError(tr('対応していない並び (ビッグエンディアン) のファイルです'));
   const paramStart = v.getUint32(HEADER.paramStart);
   const paramLength = v.getUint32(HEADER.paramLength);
   const dataStart = v.getUint32(HEADER.dataStart);
@@ -94,9 +95,9 @@ export function splitJdf(source: ArrayBuffer): JdfParts {
     dataStart + dataLength === contextStart &&
     contextStart + contextLength === annoteStart &&
     annoteStart + annoteLength <= bytes.length;
-  if (!ordered) throw new JdfFormatError('区画の並びがいつもと違うので、書き換えをやめました');
+  if (!ordered) throw new JdfFormatError(tr('区画の並びがいつもと違うので、書き換えをやめました'));
   for (let i = annoteStart + annoteLength; i < bytes.length; i++) {
-    if (bytes[i]) throw new JdfFormatError('注釈のうしろに読めない部分があるので、書き換えをやめました');
+    if (bytes[i]) throw new JdfFormatError(tr('注釈のうしろに読めない部分があるので、書き換えをやめました'));
   }
   return {
     header: bytes.slice(0, paramStart),
@@ -111,7 +112,7 @@ export function splitJdf(source: ArrayBuffer): JdfParts {
 export function buildJdf(parts: JdfParts): ArrayBuffer {
   const paramStart = parts.header.length;
   const listStart = paramStart + parts.params.length;
-  if (listStart > parts.dataStart) throw new JdfFormatError('パラメーターが測定データの場所まではみ出します');
+  if (listStart > parts.dataStart) throw new JdfFormatError(tr('パラメーターが測定データの場所まではみ出します'));
   const context = buildContext(parts.context);
   const contextStart = parts.dataStart + parts.data.length;
   const annoteStart = contextStart + context.length;
@@ -148,7 +149,7 @@ export function parseContext(bytes: Uint8Array): ContextRecord[] {
     const type = v.getUint32(p, true);
     const length = v.getUint32(p + 4, true);
     if (!type && !length) break;
-    if (p + 8 + length > bytes.length) throw new JdfFormatError('文脈 (context) が途中で切れています');
+    if (p + 8 + length > bytes.length) throw new JdfFormatError(tr('文脈 (context) が途中で切れています'));
     out.push({ type, data: bytes.slice(p + 8, p + 8 + length) });
     p = align(p + 8 + length, CONTEXT_ALIGN);
   }
@@ -182,7 +183,7 @@ export function storageStrings(data: Uint8Array, prefix: string): Map<string, st
 export function replaceStoragePairs(data: Uint8Array, prefix: string, pairs: [string, string][]): Uint8Array {
   const base = data.length >= 8 ? data : listHead(0);
   const v = new DataView(base.buffer, base.byteOffset, base.byteLength);
-  if (v.getUint32(0) !== TAG_LIST) throw new JdfFormatError('PARAMETER_STORAGE がリストで始まっていません');
+  if (v.getUint32(0) !== TAG_LIST) throw new JdfFormatError(tr('PARAMETER_STORAGE がリストで始まっていません'));
   const found = findPairs(base, prefix);
   const kept: Uint8Array[] = [];
   let p = 8;
@@ -282,7 +283,7 @@ export function replaceStringParams(params: Uint8Array, prefix: string, add: { n
     if (rec[PARAM.group] === USER_GROUP) maxIndex = Math.max(maxIndex, rec[PARAM.index]);
   }
   const added = add.map((p, i) => {
-    if (p.name.length > PARAM.nameLength) throw new JdfFormatError(`パラメーターの名前が長すぎます (${p.name})`);
+    if (p.name.length > PARAM.nameLength) throw new JdfFormatError(tr('パラメーターの名前が長すぎます ({name})', { name: p.name }));
     const rec = new Uint8Array(size);
     rec[0] = 3;
     rec[PARAM.index] = Math.min(255, maxIndex + 1 + i);
@@ -303,13 +304,13 @@ export function replaceStringParams(params: Uint8Array, prefix: string, add: { n
 }
 
 function paramHead(params: Uint8Array) {
-  if (params.length < PARAM_HEAD) throw new JdfFormatError('パラメーターの見出しが読めません');
+  if (params.length < PARAM_HEAD) throw new JdfFormatError(tr('パラメーターの見出しが読めません'));
   const v = new DataView(params.buffer, params.byteOffset, params.byteLength);
   const size = v.getUint32(0, true);
   const low = v.getUint32(4, true);
   const high = v.getUint32(8, true);
   const count = high - low + 1;
-  if (size !== 64 || low !== 0 || PARAM_HEAD + count * size > params.length) throw new JdfFormatError('パラメーターの形がいつもと違います');
+  if (size !== 64 || low !== 0 || PARAM_HEAD + count * size > params.length) throw new JdfFormatError(tr('パラメーターの形がいつもと違います'));
   return { size, count };
 }
 
@@ -339,7 +340,7 @@ function fromLatin1(s: string) {
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) {
     const c = s.charCodeAt(i);
-    if (c > 0xff) throw new JdfFormatError('Delta のファイルに書けない文字があります');
+    if (c > 0xff) throw new JdfFormatError(tr('Delta のファイルに書けない文字があります'));
     out[i] = c;
   }
   return out;

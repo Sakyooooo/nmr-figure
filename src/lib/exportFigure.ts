@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /** 画面の SVG から操作用の要素 (data-ui) を取り除いた書き出し用の文字列 */
 export function figureSvgString(svg: SVGSVGElement): string {
   const clone = svg.cloneNode(true) as SVGSVGElement;
@@ -25,7 +26,7 @@ export async function svgToPng(svgText: string, scale: number): Promise<Blob> {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     return await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG を作れませんでした'))), 'image/png'),
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(tr('PNG を作れませんでした')))), 'image/png'),
     );
   } finally {
     URL.revokeObjectURL(url);

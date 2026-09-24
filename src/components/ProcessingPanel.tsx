@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useRef } from 'react';
 import type { Processing } from '../lib/fid';
 import { autoPhaseSpectrum, autoReference, beginGesture, endGesture, notify, setPivot, setProcessing, useEditor } from '../state/store';
@@ -18,41 +19,41 @@ export function ProcessingPanel() {
 
   return (
     <Section
-      title="FID の処理 (位相補正)"
-      help="Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。"
+      title={tr('FID の処理 (位相補正)')}
+      help={tr('Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。')}
     >
-      {!canRedo && <p className="hint warn">元の FID がないため、調整できません (古い形式で保存した図です)。</p>}
+      {!canRedo && <p className="hint warn">{tr('元の FID がないため、調整できません (古い形式で保存した図です)。')}</p>}
       <div className="row wrap">
         <button disabled={!canRedo} onClick={() => autoPhaseSpectrum(id)}>
-          位相を自動で合わせる
+          {tr('位相を自動で合わせる')}
         </button>
         <button
           onClick={() => {
             const ok = autoReference(id);
-            notify(ok ? '溶媒ピークで基準を合わせました' : '溶媒ピークが見つかりませんでした。「基準合わせ」ツールで合わせてください', ok ? 'info' : 'error');
+            notify(ok ? tr('溶媒ピークで基準を合わせました') : tr('溶媒ピークが見つかりませんでした。「基準合わせ」ツールで合わせてください'), ok ? 'info' : 'error');
           }}
           disabled={!meta.solvent}
-          title="研究室の基準値 (設定) に合わせます"
+          title={tr('研究室の基準値 (設定) に合わせます')}
         >
-          溶媒で基準合わせ
+          {tr('溶媒で基準合わせ')}
         </button>
       </div>
-      <PhaseSlider label="0次" value={p.ph0} min={-180} max={180} disabled={!canRedo} onChange={(ph0) => set({ ph0 })} />
-      <PhaseSlider label="1次" value={p.ph1} min={-180} max={180} disabled={!canRedo} onChange={(ph1) => set({ ph1 })} />
+      <PhaseSlider label={tr('0次')} value={p.ph0} min={-180} max={180} disabled={!canRedo} onChange={(ph0) => set({ ph0 })} />
+      <PhaseSlider label={tr('1次')} value={p.ph1} min={-180} max={180} disabled={!canRedo} onChange={(ph1) => set({ ph1 })} />
       <p className="hint">
-        1次位相の中心: {p.pivot.toFixed(2)} ppm (ここの位相は 0次だけで決まります)。
+        {tr('1次位相の中心: {ppm} ppm (ここの位相は 0次だけで決まります)。', { ppm: p.pivot.toFixed(2) })}
         <button className="link" disabled={!canRedo} onClick={() => setPivot(id, 'tallest')}>
-          一番大きいピークにする
+          {tr('一番大きいピークにする')}
         </button>
       </p>
       <div className="row wrap">
-        <label className="field" title="指数関数の窓。大きくするとノイズが減り、線は太くなります">
-          線幅 (LB)
+        <label className="field" title={tr('指数関数の窓。大きくするとノイズが減り、線は太くなります')}>
+          {tr('線幅 (LB)')}
           <NumberInput value={p.lb} min={0} max={100} step={0.1} width={56} onCommit={(lb) => set({ lb: lb ?? 0 })} />
           Hz
         </label>
         <Check checked={p.baseline} onChange={(baseline) => set({ baseline })}>
-          ベースライン補正
+          {tr('ベースライン補正')}
         </Check>
       </div>
     </Section>

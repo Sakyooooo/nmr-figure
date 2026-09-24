@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useState } from 'react';
 import { downloadBlob } from '../lib/exportFigure';
 import { templatesFromJson, templatesToJson } from '../lib/settings';
@@ -32,9 +33,9 @@ export function TemplatePanel() {
             else s.templates.push(item);
           }
         });
-        notify(`${list.length} 件のテンプレートを読み込みました`);
+        notify(tr('{length} 件のテンプレートを読み込みました', { length: list.length }));
       } catch (e) {
-        notify(`読み込めませんでした: ${(e as Error).message}`, 'error');
+        notify(tr('読み込めませんでした: {message}', { message: (e as Error).message }), 'error');
       }
     };
     input.click();
@@ -42,18 +43,18 @@ export function TemplatePanel() {
 
   return (
     <Section
-      title="スタイルのテンプレート"
+      title={tr('スタイルのテンプレート')}
       defaultOpen={false}
-      help="文字の大きさ・フォント・線の色・表示の設定などをまとめて保存します。★の付いた既定のテンプレートは、新しく .jdf を開いたときに自動で当たります。"
+      help={tr('文字の大きさ・フォント・線の色・表示の設定などをまとめて保存します。★の付いた既定のテンプレートは、新しく .jdf を開いたときに自動で当たります。')}
     >
       <div className="row">
         <select className="grow" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-          <option value="">テンプレートを選ぶ ({templates.length})</option>
+          <option value="">{tr('テンプレートを選ぶ ({n})', { n: templates.length })}</option>
           {templates.map((t) => (
             <option key={t.id} value={t.id}>
               {t.id === defaultId ? '★ ' : ''}
               {t.name}
-              {t.range ? ` (${t.range.nucleus} ${fmt(t.range.xMax)}〜${fmt(t.range.xMin)})` : ''}
+              {t.range ? tr(' ({nucleus} {fmt}〜{fmt2})', { nucleus: t.range.nucleus, fmt: fmt(t.range.xMax), fmt2: fmt(t.range.xMin) }) : ''}
             </option>
           ))}
         </select>
@@ -64,10 +65,10 @@ export function TemplatePanel() {
           onClick={() => {
             if (!selected) return;
             applyTemplate(selected);
-            notify(`「${selected.name}」を当てました`);
+            notify(tr('「{name}」を当てました', { name: selected.name }));
           }}
         >
-          当てる
+          {tr('当てる')}
         </button>
         <button
           disabled={!selected}
@@ -77,14 +78,14 @@ export function TemplatePanel() {
             })
           }
         >
-          {selected && selected.id === defaultId ? '既定を外す' : '既定にする'}
+          {selected && selected.id === defaultId ? tr('既定を外す') : tr('既定にする')}
         </button>
         <button
           className="danger"
           disabled={!selected}
           onClick={async () => {
             if (!selected) return;
-            const ok = await ask('テンプレートの削除', `「${selected.name}」を削除しますか？`, [{ label: '削除', value: 'delete', kind: 'danger' }]);
+            const ok = await ask(tr('テンプレートの削除'), tr('「{name}」を削除しますか？', { name: selected.name }), [{ label: tr('削除'), value: 'delete', kind: 'danger' }]);
             if (ok !== 'delete') return;
             updateSettings((s) => {
               s.templates = s.templates.filter((t) => t.id !== selectedId);
@@ -93,7 +94,7 @@ export function TemplatePanel() {
             setSelectedId('');
           }}
         >
-          削除
+          {tr('削除')}
         </button>
       </div>
 
@@ -104,26 +105,26 @@ export function TemplatePanel() {
           const n = name.trim() || selected?.name;
           if (!n) return;
           const result = saveTemplate(n, withRange);
-          notify(result === 'updated' ? `「${n}」を上書きしました` : `「${n}」を保存しました`);
+          notify(result === 'updated' ? tr('「{n}」を上書きしました', { n }) : tr('「{n}」を保存しました', { n }));
           setName('');
         }}
       >
         <div className="row">
-          <input type="text" className="grow" placeholder={selected ? `${selected.name} (上書き)` : '例: 1H 反応追跡'} value={name} onChange={(e) => setName(e.target.value)} />
-          <button type="submit">今の見た目を保存</button>
+          <input type="text" className="grow" placeholder={selected ? tr('{name} (上書き)', { name: selected.name }) : tr('例: 1H 反応追跡')} value={name} onChange={(e) => setName(e.target.value)} />
+          <button type="submit">{tr('今の見た目を保存')}</button>
         </div>
         <Check checked={withRange} onChange={setWithRange}>
-          表示範囲も保存する (同じ核種のときだけ当たります)
+          {tr('表示範囲も保存する (同じ核種のときだけ当たります)')}
         </Check>
       </form>
 
       <div className="row wrap">
         <button disabled={!templates.length} onClick={() => downloadBlob(new Blob([templatesToJson(templates)], { type: 'application/json' }), 'nmr-templates.json')}>
-          ファイルに書き出す
+          {tr('ファイルに書き出す')}
         </button>
-        <button onClick={importFile}>ファイルから読み込む</button>
+        <button onClick={importFile}>{tr('ファイルから読み込む')}</button>
       </div>
-      <p className="hint">研究室で共有するときは、書き出したファイルを渡して読み込んでもらってください。</p>
+      <p className="hint">{tr('研究室で共有するときは、書き出したファイルを渡して読み込んでもらってください。')}</p>
     </Section>
   );
 }

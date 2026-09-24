@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
@@ -251,7 +252,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     } else if (tool === 'marker') {
       const styleId = useEditor.getState().activeMarkerStyleId;
       if (!styleId) {
-        notify('右の「マーカー・凡例」で付けたい種類を選んでください', 'error');
+        notify(tr('右の「マーカー・凡例」で付けたい種類を選んでください'), 'error');
         return;
       }
       toggleMarker(g.layer.id, styleId, raw, pointSpacing(g.meta) * 1.5);

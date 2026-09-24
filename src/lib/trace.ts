@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 /**
  * 文献の図 (画像) から波形を読み取る。
  * 論文の SI の図は、線が 1 本の折れ線なので、列ごとに「いちばん上のインクの点」を拾えば波形になる。
@@ -58,7 +59,7 @@ export function traceImage(image: Pixels, rect: Rect, left: number, right: numbe
   const y0 = Math.max(0, Math.round(rect.y));
   const w = Math.min(image.width - x0, Math.round(rect.w));
   const h = Math.min(image.height - y0, Math.round(rect.h));
-  if (w < 8 || h < 8) throw new Error('枠が小さすぎます');
+  if (w < 8 || h < 8) throw new Error(tr('枠が小さすぎます'));
   const limit = inkThreshold(image, { x: x0, y: y0, w, h });
 
   const raw = new Float32Array(w);

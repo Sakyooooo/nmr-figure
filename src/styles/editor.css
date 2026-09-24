@@ -762,7 +762,7 @@
     box-shadow: var(--elevation-2);
   }
   .file-state,
-  .segmented,
+  .topbar .segmented,
   .sync-pill .sync-text {
     display: none;
   }
@@ -1078,5 +1078,153 @@ details.sub[open] > summary::before {
 @media (max-width: 1439px) {
   .zoom-control .readout {
     min-width: 88px;
+  }
+}
+
+/* ---------------------------------------------------------------- 初めて開いたときの使い方の説明 (Onboarding.tsx) */
+.modal.onboarding {
+  width: min(560px, 94vw);
+  overflow: hidden;
+}
+.onboarding-art {
+  padding: var(--spacing-16) var(--spacing-24) var(--spacing-8);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-subtle);
+}
+.onboarding-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.onboarding-body {
+  padding: var(--spacing-16) var(--spacing-24) var(--spacing-8);
+}
+.onboarding-body h2 {
+  margin: 0 0 var(--spacing-8);
+  font: var(--type-title);
+}
+.onboarding-body p {
+  margin: 0 0 var(--spacing-12);
+  font: var(--type-body);
+  color: var(--color-text-secondary);
+}
+.onboarding-body .onboarding-count {
+  margin: 0 0 var(--spacing-4);
+  font: var(--type-label);
+  color: var(--color-text-tertiary);
+}
+.onboarding-lang {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+.onboarding-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-24) var(--spacing-16);
+}
+.onboarding-foot .spacer {
+  flex: 1;
+}
+.onboarding-dots {
+  display: flex;
+  gap: 6px;
+}
+.onboarding-dots button {
+  flex: none;
+  width: 8px;
+  min-width: 0;
+  height: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-default);
+  cursor: pointer;
+}
+.onboarding-dots button.on {
+  width: 20px;
+  background: var(--color-accent-default);
+}
+.onboarding-dots button:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+/* 絵の部品 */
+.onboarding-svg .art-card {
+  fill: var(--color-bg-surface);
+  stroke: var(--color-border-default);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-page {
+  fill: var(--color-bg-surface);
+  stroke: var(--color-border-control);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-folder {
+  fill: var(--color-accent-subtle);
+  stroke: var(--color-accent-default);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-axis {
+  stroke: var(--color-text-tertiary);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-arrow {
+  fill: none;
+  stroke: var(--color-icon-default);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.onboarding-svg .art-textline {
+  stroke: var(--color-border-default);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.onboarding-svg .art-chip {
+  fill: var(--color-bg-subtle);
+  stroke: var(--color-border-default);
+}
+.onboarding-svg .art-check {
+  fill: var(--color-bg-surface);
+  stroke: var(--color-border-control);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-check.on {
+  fill: var(--color-accent-default);
+  stroke: var(--color-accent-default);
+}
+.onboarding-svg .art-integral {
+  fill: none;
+  stroke: var(--data-spectrum-2);
+  stroke-width: 1.5;
+}
+.onboarding-svg .art-dock {
+  fill: var(--color-bg-raised);
+  stroke: var(--color-border-default);
+}
+.onboarding-svg .art-tool {
+  fill: var(--color-bg-subtle);
+  stroke: var(--color-border-control);
+}
+.onboarding-svg .art-tool.on {
+  fill: var(--color-accent-default);
+  stroke: var(--color-accent-default);
+}
+.onboarding-svg .art-label {
+  fill: var(--color-text-secondary);
+  font: 600 12px var(--font-ui);
+}
+@media (max-width: 520px) {
+  .onboarding-art {
+    padding: var(--spacing-8) var(--spacing-12) 0;
+  }
+  .onboarding-body,
+  .onboarding-foot {
+    padding-left: var(--spacing-16);
+    padding-right: var(--spacing-16);
   }
 }

@@ -1,3 +1,4 @@
+import { resolveLang, setLang, tr } from '../i18n';
 import { produce, type Draft } from 'immer';
 import { create } from 'zustand';
 import type { ImpurityCandidate } from '../lib/impurities';
@@ -6,7 +7,7 @@ import { deltaReference } from '../lib/jdfAnnotations';
 import { isAutoSimulatedLabel, simulatedLabel } from '../lib/simulate';
 import { autoYZoom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
-import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type Settings, type StyleTemplate } from '../lib/settings';
+import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StyleTemplate } from '../lib/settings';
 import { detectSignals, exclusions } from '../lib/siText';
 import { findPeaks, maxInRange, noiseLevel } from '../lib/spectrum';
 import { autoPhase, finish, referenceShift, tallestPpm, transform, type FidData, type Processing, type Spectrum } from '../lib/fid';
@@ -325,7 +326,7 @@ export function addSpectra(items: LoadedSpectrum[]) {
     const template = settings.templates.find((t) => t.id === settings.defaultTemplateId);
     if (template) applyTemplate(template);
   }
-  if (nuclei.size > 1) notify(`核種の違うスペクトルが入っています (${[...nuclei].join(', ')})。重ね書きには向きませんが、SI 用テキストはまとめて作れます`);
+  if (nuclei.size > 1) notify(tr('核種の違うスペクトルが入っています ({join})。重ね書きには向きませんが、SI 用テキストはまとめて作れます', { join: [...nuclei].join(', ') }));
 }
 
 /** 2D のスペクトルを開く (1つの図に 1本)。前の図は置き換える */
@@ -667,7 +668,7 @@ export function clearPeakLabels(layerId: string) {
   edit((d) => {
     d.peakLabels = d.peakLabels.filter((p) => p.layerId !== layerId);
   });
-  if (n) notify(`ピーク値を ${n} 本消しました`, 'info', { undo: true });
+  if (n) notify(tr('ピーク値を {n} 本消しました', { n }), 'info', { undo: true });
 }
 
 export function addAnnotation(a: Omit<Annotation, 'id'>) {
@@ -847,7 +848,7 @@ export function addRegion(from: number, to: number) {
     const n = d.trend.regions.length;
     d.trend.regions.push({
       id: crypto.randomUUID(),
-      name: `範囲${n + 1}`,
+      name: tr('範囲{v0}', { v0: n + 1 }),
       color: REGION_COLORS[n % REGION_COLORS.length],
       from: Math.max(from, to),
       to: Math.min(from, to),
@@ -875,6 +876,21 @@ export function editAnnotationText() {
     el.focus();
     el.setSelectionRange?.(el.value.length, el.value.length);
   }, 0);
+}
+
+/** 画面の言語を変える (auto はブラウザの言語)。画面ごと描き直す */
+export function setLanguage(lang: LangSetting) {
+  updateSettings((s) => {
+    s.ui.lang = lang;
+  });
+  setLang(resolveLang(lang));
+}
+
+/** 使い方の説明を見終わった (閉じた) ことを覚える。false にすると次に開いたときにまた出す */
+export function setOnboardingDone(done: boolean) {
+  updateSettings((s) => {
+    s.ui.onboardingDone = done;
+  });
 }
 
 /** ホーム画面の並び順 */
@@ -922,7 +938,7 @@ export function clearIntegrals(layerId: string) {
     const layer = d.layers.find((l) => l.id === layerId);
     if (layer) layer.integralRef = null;
   });
-  if (n) notify(`積分を ${n} 個消しました`, 'info', { undo: true });
+  if (n) notify(tr('積分を {n} 個消しました', { n }), 'info', { undo: true });
 }
 
 /** 上下ドラッグでスペクトルの高さを変える。all のときは全体の縦倍率 */

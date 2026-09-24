@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { buildScene2d, fullView2d, type Scene2d } from '../lib/scene2d';
 import { setView2d, useEditor } from '../state/store';
@@ -176,7 +177,7 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       <Figure2dContent scene={scene} figure={doc.figure} images={doc.figureImages ?? []} />
       {scene.tooDense && (
         <text data-ui="warn" x={layout.plot.x + 8} y={layout.plot.y + 18} fontSize={12} fill="#b42318">
-          等高線が多すぎます。右の「等高線」で下限を上げてください
+          {tr('等高線が多すぎます。右の「等高線」で下限を上げてください')}
         </text>
       )}
       {draft?.type === 'zoom' && (

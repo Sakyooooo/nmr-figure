@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useEffect, useRef } from 'react';
 import { answer, useDialog } from '../state/dialog';
 
@@ -16,7 +17,7 @@ export function DialogHost() {
       <div className="dialog-body">
         <p>{current.message}</p>
         <div className="actions">
-          <button onClick={() => answer(null)}>キャンセル</button>
+          <button onClick={() => answer(null)}>{tr('キャンセル')}</button>
           {current.actions.map((a) => (
             <button key={a.value} className={a.kind ?? ''} onClick={() => answer(a.value)}>
               {a.label}

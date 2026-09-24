@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { parseJEOL } from 'jeolconverter';
 import { defaultProcessing2d, transform2d, type Fid2dData, type Spectrum2dData } from './fid2d';
 import { JdfError } from './jdf';
@@ -20,17 +21,17 @@ export function readJdf2d(buffer: ArrayBuffer, fileName: string): Loaded2dSpectr
   try {
     parsed = parseJEOL(buffer);
   } catch (e) {
-    throw new JdfError(`${fileName}: JEOL Delta のファイルとして読めませんでした (${(e as Error).message})`);
+    throw new JdfError(tr('{fileName}: JEOL Delta のファイルとして読めませんでした ({message})', { fileName, message: (e as Error).message }));
   }
   const { headers: h, info } = parsed;
-  if (h.fileIdentifier !== 'JEOL.NMR') throw new JdfError(`${fileName}: JEOL Delta のファイルではありません`);
-  if (h.dataDimensionNumber !== 2) throw new JdfError(`${fileName}: 2D のデータではありません`);
+  if (h.fileIdentifier !== 'JEOL.NMR') throw new JdfError(tr('{fileName}: JEOL Delta のファイルではありません', { fileName }));
+  if (h.dataDimensionNumber !== 2) throw new JdfError(tr('{fileName}: 2D のデータではありません', { fileName }));
   if (h.dataUnits[0]?.base !== 'Second' || h.dataUnits[1]?.base !== 'Second') {
-    throw new JdfError(`${fileName}: Delta で処理して保存した 2D はまだ開けません (生データなら開けます)`);
+    throw new JdfError(tr('{fileName}: Delta で処理して保存した 2D はまだ開けません (生データなら開けます)', { fileName }));
   }
   const rows = parsed.data?.re as ArrayLike<number>[] | undefined;
   const rowsIm = parsed.data?.im as ArrayLike<number>[] | undefined;
-  if (!rows?.length || !rowsIm?.length) throw new JdfError(`${fileName}: 2D のデータが読めませんでした`);
+  if (!rows?.length || !rowsIm?.length) throw new JdfError(tr('{fileName}: 2D のデータが読めませんでした', { fileName }));
 
   const param = (name: string) => parsed.parameters?.paramArray?.find((p: { name: string }) => p.name === name)?.value;
   const num = (name: string) => Number(param(name));
@@ -39,7 +40,7 @@ export function readJdf2d(buffer: ArrayBuffer, fileName: string): Loaded2dSpectr
   const freq2 = num('x_freq');
   const freq1 = num('y_freq');
   if (!(sw2 > 0) || !(sw1 > 0) || !(freq2 > 0) || !(freq1 > 0)) {
-    throw new JdfError(`${fileName}: 2D の測定条件 (sweep / freq) が読めませんでした`);
+    throw new JdfError(tr('{fileName}: 2D の測定条件 (sweep / freq) が読めませんでした', { fileName }));
   }
   const off2 = num('x_offset') || 0;
   const off1 = num('y_offset') || 0;

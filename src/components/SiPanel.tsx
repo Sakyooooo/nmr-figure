@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useMemo } from 'react';
 import { copyRichText } from '../lib/exportFigure';
 import { buildSiEntries, formatSi, type SiEntry, type SiSignal } from '../lib/siText';
@@ -25,17 +26,17 @@ export function SiPanel() {
     try {
       if (rich) await copyRichText(html, text);
       else await navigator.clipboard.writeText(text);
-      notify(rich ? 'コピーしました。Word に貼ると上付き・下付き・斜体の J が残ります' : 'テキストでコピーしました');
+      notify(rich ? tr('コピーしました。Word に貼ると上付き・下付き・斜体の J が残ります') : tr('テキストでコピーしました'));
     } catch (e) {
-      notify(`コピーできませんでした: ${(e as Error).message}`, 'error');
+      notify(tr('コピーできませんでした: {message}', { message: (e as Error).message }), 'error');
     }
   };
 
   return (
     <Section
-      title="SI 用テキスト"
+      title={tr('SI 用テキスト')}
       defaultOpen={false}
-      help="¹H は積分した範囲ごとに、多重度と J を自動で読みます (重なった信号は m)。¹³C などは積分がなければピーク値、それもなければ自動で拾ったピークを並べます。違うところは表で直せます。"
+      help={tr('¹H は積分した範囲ごとに、多重度と J を自動で読みます (重なった信号は m)。¹³C などは積分がなければピーク値、それもなければ自動で拾ったピークを並べます。違うところは表で直せます。')}
     >
 
       {layer && active && (
@@ -45,14 +46,14 @@ export function SiPanel() {
               <button
                 onClick={() => {
                   const n = autoDetectSignals(layer.id);
-                  notify(n ? `${n} 個の信号を積分しました。値を1つ書き換えて基準を決めてください` : '新しく見つかった信号はありません');
+                  notify(n ? tr('{n} 個の信号を積分しました。値を1つ書き換えて基準を決めてください', { n }) : tr('新しく見つかった信号はありません'));
                 }}
-                title="溶媒と、不純物マーカーを付けたピークは除きます"
+                title={tr('溶媒と、不純物マーカーを付けたピークは除きます')}
               >
-                信号を自動で積分
+                {tr('信号を自動で積分')}
               </button>
             )}
-            <button onClick={() => setTool('integral')}>積分を手で引く</button>
+            <button onClick={() => setTool('integral')}>{tr('積分を手で引く')}</button>
           </div>
           {active.source === 'integrals' ? (
             <SignalTable entry={active} decimals={active.nucleus === '1H' ? o.hDecimals : o.xDecimals} />
@@ -60,25 +61,25 @@ export function SiPanel() {
             <p className="hint">
               {active.source === 'none'
                 ? active.nucleus === '1H'
-                  ? '積分がありません。「信号を自動で積分」を押すか、積分ツールで範囲を引いてください。'
-                  : 'ピークが見つかりません。'
+                  ? tr('積分がありません。「信号を自動で積分」を押すか、積分ツールで範囲を引いてください。')
+                  : tr('ピークが見つかりません。')
                 : active.source === 'labels'
-                  ? `ピーク値ラベル ${active.signals.length} 個を並べています。`
-                  : `自動で拾ったピーク ${active.signals.length} 個を並べています (溶媒・不純物マーカーは除く)。P–P などで分裂している信号は、積分ツールで範囲を引くと d, t などとして1つにまとまります。`}
+                  ? tr('ピーク値ラベル {length} 個を並べています。', { length: active.signals.length })
+                  : tr('自動で拾ったピーク {length} 個を並べています (溶媒・不純物マーカーは除く)。P–P などで分裂している信号は、積分ツールで範囲を引くと d, t などとして1つにまとまります。', { length: active.signals.length })}
             </p>
           )}
         </>
       )}
 
       <details className="sub">
-        <summary>書き方</summary>
+        <summary>{tr('書き方')}</summary>
         <div className="grid2">
-          <label className="field" title="¹H の δ の小数桁">
+          <label className="field" title={tr('¹H の δ の小数桁')}>
             δ (¹H)
             <NumberInput value={o.hDecimals} min={0} max={4} width={44} onCommit={(v) => setSiOptions({ hDecimals: v ?? 2 })} />
           </label>
-          <label className="field" title="¹³C などの δ の小数桁">
-            δ (他)
+          <label className="field" title={tr('¹³C などの δ の小数桁')}>
+            {tr('δ (他)')}
             <NumberInput value={o.xDecimals} min={0} max={4} width={44} onCommit={(v) => setSiOptions({ xDecimals: v ?? 1 })} />
           </label>
           <label className="field">
@@ -88,26 +89,26 @@ export function SiPanel() {
         </div>
         <div className="row wrap">
           <Check checked={o.includeTemp} onChange={(v) => setSiOptions({ includeTemp: v })}>
-            温度 (K)
+            {tr('温度 (K)')}
           </Check>
           <Check checked={o.includeAssign} onChange={(v) => setSiOptions({ includeAssign: v })}>
-            帰属
+            {tr('帰属')}
           </Check>
         </div>
       </details>
 
-      <div className="si-output" aria-label="SI テキスト">
-        {formatted.length ? formatted.map((f) => <p key={f.entry.layerId} dangerouslySetInnerHTML={{ __html: f.html }} />) : <p className="muted">表示中のスペクトルがありません</p>}
+      <div className="si-output" aria-label={tr('SI テキスト')}>
+        {formatted.length ? formatted.map((f) => <p key={f.entry.layerId} dangerouslySetInnerHTML={{ __html: f.html }} />) : <p className="muted">{tr('表示中のスペクトルがありません')}</p>}
       </div>
       <div className="row wrap">
-        <button disabled={!formatted.length} onClick={() => void copy(true)} title="上付き・下付き・斜体を残したままコピー">
-          Word 用にコピー
+        <button disabled={!formatted.length} onClick={() => void copy(true)} title={tr('上付き・下付き・斜体を残したままコピー')}>
+          {tr('Word 用にコピー')}
         </button>
-        <button disabled={!formatted.length} onClick={() => void copy(false)} title="¹H, C₆D₆ などは Unicode の文字になります">
-          テキストでコピー
+        <button disabled={!formatted.length} onClick={() => void copy(false)} title={tr('¹H, C₆D₆ などは Unicode の文字になります')}>
+          {tr('テキストでコピー')}
         </button>
       </div>
-      <p className="hint">表示中のスペクトルすべて (¹H → ¹³C → ¹⁹F → ³¹P の順) をまとめて出します。</p>
+      <p className="hint">{tr('表示中のスペクトルすべて (¹H → ¹³C → ¹⁹F → ³¹P の順) をまとめて出します。')}</p>
     </Section>
   );
 }
@@ -120,10 +121,10 @@ function SignalTable({ entry, decimals }: { entry: SiEntry; decimals: number }) 
         <thead>
           <tr>
             <th>δ</th>
-            <th>多重度</th>
+            <th>{tr('多重度')}</th>
             <th>J (Hz)</th>
             {entry.nucleus === '1H' && <th>nH</th>}
-            <th>帰属</th>
+            <th>{tr('帰属')}</th>
           </tr>
         </thead>
         <tbody>
@@ -158,7 +159,7 @@ function SignalRow({ s, isH, decimals, selected }: { s: SiSignal; isH: boolean; 
           list="si-mults"
           value={s.mult}
           placeholder={s.auto.mult || '—'}
-          title={changed ? `自動判定: ${s.auto.mult || 'なし'}` : '自動判定'}
+          title={changed ? tr('自動判定: {v0}', { v0: s.auto.mult || tr('なし') }) : tr('自動判定')}
           className={changed ? 'edited' : ''}
           width={52}
           onCommit={(mult) => updateIntegralSi(id, { mult, J: undefined })}

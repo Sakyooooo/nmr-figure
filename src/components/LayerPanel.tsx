@@ -1,3 +1,4 @@
+import { locale, tr } from '../i18n';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusRich } from '../lib/nuclei';
 import { labReference } from '../lib/settings';
@@ -12,7 +13,7 @@ import { Check, ColorInput, NumberInput, TextInput } from './inputs';
 import { RichHtml } from './RichText';
 import { IconButton, MenuButton } from './ui';
 
-const clock = (t: number) => new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+const clock = (t: number) => new Date(t).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 
 /**
  * 左のパネル: スペクトルの一覧 (色・名前・核種と溶媒・表示の切り替え・その他) と、選んでいるスペクトルの設定。
@@ -25,18 +26,18 @@ export function LayerPanel() {
   const activeMeta = active && doc.spectra.find((s) => s.id === active.spectrumId);
 
   return (
-    <section className="layer-panel" aria-label="スペクトル">
+    <section className="layer-panel" aria-label={tr('スペクトル')}>
       <div className="panel-head">
-        <h2>スペクトル</h2>
+        <h2>{tr('スペクトル')}</h2>
         <span className="count">{doc.layers.length}</span>
         <span className="grow" />
         <MenuButton
-          label="スペクトルを足す"
+          label={tr('スペクトルを足す')}
           className="ibtn sm"
           placement="bottom-end"
           items={[
-            { label: '測定のファイルを開いて足す', icon: 'folder-open', shortcut: 'Ctrl+O', onSelect: () => void openDialog('add') },
-            { label: '文献値から作図', icon: 'book-open', hint: 'SI の NMR データから比較用のスペクトルを作ります', onSelect: () => openSiImport() },
+            { label: tr('測定のファイルを開いて足す'), icon: 'folder-open', shortcut: 'Ctrl+O', onSelect: () => void openDialog('add') },
+            { label: tr('文献値から作図'), icon: 'book-open', hint: tr('SI の NMR データから比較用のスペクトルを作ります'), onSelect: () => openSiImport() },
           ]}
         >
           <Icon name="plus" size={16} />
@@ -63,40 +64,40 @@ function LayerRow({ layer, meta, index, count, active }: { layer: Layer; meta: S
   const name = layer.label || meta.fileName;
   return (
     <li className={`layer-row${active ? ' on' : ''}${layer.visible ? '' : ' hidden-layer'}`}>
-      <ColorInput value={layer.color} onChange={(color) => setLayer({ color })} title={`${name} の線の色`} />
+      <ColorInput value={layer.color} onChange={(color) => setLayer({ color })} title={tr('{name} の線の色', { name })} />
       <button type="button" className="layer-name" onClick={choose} aria-current={active ? 'true' : undefined} title={`${meta.fileName}\n${meta.title}`}>
         <span className="name">{name}</span>
         <span className="meta">
           <RichHtml text={nucleusRich(meta.nucleus)} />
           {meta.solvent ? ` · ${meta.solvent}` : ''}
           {meta.acquiredAt ? ` · ${clock(meta.acquiredAt)}` : ''}
-          {meta.simulated ? ' · 文献値' : ''}
+          {meta.simulated ? tr(' · 文献値') : ''}
         </span>
       </button>
       <IconButton
         icon={layer.visible ? 'eye' : 'eye-off'}
         size="sm"
-        label={layer.visible ? `${name} を隠す` : `${name} を表示する`}
+        label={layer.visible ? tr('{name} を隠す', { name }) : tr('{name} を表示する', { name })}
         onClick={() => setLayer({ visible: !layer.visible })}
       />
       <MenuButton
-        label={`${name} の操作`}
+        label={tr('{name} の操作', { name })}
         className="ibtn sm"
         placement="bottom-end"
         items={[
-          { label: '上へ', icon: 'arrow-up', disabled: index === 0, onSelect: () => moveLayer(layer.id, -1) },
-          { label: '下へ', icon: 'arrow-down', disabled: index === count - 1, onSelect: () => moveLayer(layer.id, 1) },
+          { label: tr('上へ'), icon: 'arrow-up', disabled: index === 0, onSelect: () => moveLayer(layer.id, -1) },
+          { label: tr('下へ'), icon: 'arrow-down', disabled: index === count - 1, onSelect: () => moveLayer(layer.id, 1) },
           {
-            label: '基準合わせ',
+            label: tr('基準合わせ'),
             icon: 'nmr-reference',
-            hint: '溶媒ピークをクリックして合わせる',
+            hint: tr('溶媒ピークをクリックして合わせる'),
             onSelect: () => {
               choose();
               setTool('reference');
             },
           },
           'divider',
-          { label: '図から外す', icon: 'x', onSelect: () => removeLayer(layer.id) },
+          { label: tr('図から外す'), icon: 'x', onSelect: () => removeLayer(layer.id) },
         ]}
       >
         <Icon name="more" size={16} />
@@ -119,40 +120,40 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
       Object.assign(d.spectra.find((s) => s.id === meta.id)!, patch);
     });
   return (
-    <div className="layer-details" aria-label="選んでいるスペクトルの設定">
+    <div className="layer-details" aria-label={tr('選んでいるスペクトルの設定')}>
       <div className="field-grid">
-        <label htmlFor="layer-label">名前</label>
-        <TextInput id="layer-label" value={layer.label} onCommit={(label) => setLayer({ label })} placeholder="例: 0 h, SM" />
+        <label htmlFor="layer-label">{tr('名前')}</label>
+        <TextInput id="layer-label" value={layer.label} onCommit={(label) => setLayer({ label })} placeholder={tr('例: 0 h, SM')} />
 
-        <span title="推移グラフの横軸。空欄なら名前の数値を使います">時間</span>
+        <span title={tr('推移グラフの横軸。空欄なら名前の数値を使います')}>{tr('時間')}</span>
         <span className="row">
           <NumberInput
             value={layer.time ?? null}
             allowEmpty
             step={0.5}
             width={72}
-            title={`時間 (${timeUnit})。空欄なら名前か測定時刻から`}
-            placeholder={String(parseTime(layer.label) ?? (meta.acquiredAt ? '自動' : index))}
+            title={tr('時間 ({timeUnit})。空欄なら名前か測定時刻から', { timeUnit })}
+            placeholder={String(parseTime(layer.label) ?? (meta.acquiredAt ? tr('自動') : index))}
             onCommit={(time) => setLayer({ time })}
           />
           <span className="muted">{timeUnit}</span>
         </span>
 
-        <span>倍率</span>
+        <span>{tr('倍率')}</span>
         <span className="row">
-          <NumberInput value={layer.scale} step={0.1} min={0.01} width={64} title="倍率" onCommit={(v) => setLayer({ scale: v ?? 1 })} />
-          <span className="muted">線幅</span>
-          <NumberInput value={layer.lineWidth} step={0.25} min={0.25} max={5} width={56} title="線幅" onCommit={(v) => setLayer({ lineWidth: v ?? 1 })} />
+          <NumberInput value={layer.scale} step={0.1} min={0.01} width={64} title={tr('倍率')} onCommit={(v) => setLayer({ scale: v ?? 1 })} />
+          <span className="muted">{tr('線幅')}</span>
+          <NumberInput value={layer.lineWidth} step={0.25} min={0.25} max={5} width={56} title={tr('線幅')} onCommit={(v) => setLayer({ lineWidth: v ?? 1 })} />
         </span>
 
-        <span>溶媒</span>
+        <span>{tr('溶媒')}</span>
         <select
           value={meta.solvent ?? ''}
-          aria-label="溶媒"
-          title={`ファイルの溶媒: ${meta.solventRaw || '(なし)'}`}
+          aria-label={tr('溶媒')}
+          title={tr('ファイルの溶媒: {v0}', { v0: meta.solventRaw || tr('(なし)') })}
           onChange={(e) => setMeta({ solvent: (e.target.value || null) as SolventKey | null })}
         >
-          <option value="">溶媒不明</option>
+          <option value="">{tr('溶媒不明')}</option>
           {SOLVENTS.map((s) => (
             <option key={s.key} value={s.key}>
               {s.key}
@@ -160,7 +161,7 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
           ))}
         </select>
 
-        <span title="基準合わせで加えた量">補正</span>
+        <span title={tr('基準合わせで加えた量')}>{tr('補正')}</span>
         <span className="row">
           <span className="num">
             {meta.refOffset >= 0 ? '+' : ''}
@@ -170,13 +171,13 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
             type="button"
             className="mini"
             onClick={() => setTool('reference')}
-            title={ref !== null ? `溶媒ピークをクリックして ${ref} ppm に合わせる` : 'ピークをクリックして値を指定'}
+            title={ref !== null ? tr('溶媒ピークをクリックして {ref} ppm に合わせる', { ref }) : tr('ピークをクリックして値を指定')}
           >
-            基準合わせ
+            {tr('基準合わせ')}
           </button>
           {meta.refOffset !== 0 && (
             <button type="button" className="mini" onClick={() => setMeta({ refOffset: 0 })}>
-              戻す
+              {tr('戻す')}
             </button>
           )}
         </span>
@@ -187,27 +188,27 @@ function LayerDetails({ layer, meta, index }: { layer: Layer; meta: SpectrumMeta
       {meta.simulated && (
         <div className="stack">
           <label className="field block">
-            引用 (図の下に出る)
+            {tr('引用 (図の下に出る)')}
             <TextInput value={meta.simulated.citation} onCommit={(citation) => setMeta({ simulated: { ...meta.simulated!, citation } })} />
           </label>
           <div className="row wrap">
             <button
               type="button"
               className="mini"
-              title="貼り付けた引用を、図に出す形 (著者 et al. 誌名 年, 巻, 頁.) に整えます"
+              title={tr('貼り付けた引用を、図に出す形 (著者 et al. 誌名 年, 巻, 頁.) に整えます')}
               onClick={() => {
                 const tidied = tidyCitation(meta.simulated!.citation);
                 setMeta({ simulated: { ...meta.simulated!, citation: tidied.text } });
-                notify(tidied.formatted ? '引用元を整えました' : '著者・誌名・年を読み取れませんでした', tidied.formatted ? 'info' : 'error');
+                notify(tidied.formatted ? tr('引用元を整えました') : tr('著者・誌名・年を読み取れませんでした'), tidied.formatted ? 'info' : 'error');
               }}
             >
-              引用を整える
+              {tr('引用を整える')}
             </button>
-            <button type="button" className="mini" title="SI の文・線幅・文献の図を直して、このスペクトルを作り直します" onClick={() => openSiImport(meta.id)}>
-              文献データを直す
+            <button type="button" className="mini" title={tr('SI の文・線幅・文献の図を直して、このスペクトルを作り直します')} onClick={() => openSiImport(meta.id)}>
+              {tr('文献データを直す')}
             </button>
             <span className="muted" title={meta.simulated.text}>
-              {meta.simulated.fromImage ? '図から線幅を読み取り済み' : `線幅 ${meta.simulated.lineWidthHz} Hz`}
+              {meta.simulated.fromImage ? tr('図から線幅を読み取り済み') : tr('線幅 {lineWidthHz} Hz', { lineWidthHz: meta.simulated.lineWidthHz })}
             </span>
           </div>
         </div>
@@ -223,31 +224,31 @@ export function ViewPanel() {
   const n = useEditor((s) => s.doc.layers.length);
   if (!n) return null;
   return (
-    <section className="view-panel" aria-label="表示範囲">
+    <section className="view-panel" aria-label={tr('表示範囲')}>
       <div className="panel-head">
-        <h2>表示範囲</h2>
+        <h2>{tr('表示範囲')}</h2>
       </div>
       <div className="field-grid">
-        <span>範囲</span>
+        <span>{tr('範囲')}</span>
         <span className="row">
-          <NumberInput value={round2(view.xMax)} step={0.5} width={72} title="左端 (ppm)" onCommit={(v) => v !== null && setView({ xMax: v })} />
+          <NumberInput value={round2(view.xMax)} step={0.5} width={72} title={tr('左端 (ppm)')} onCommit={(v) => v !== null && setView({ xMax: v })} />
           <span className="muted">–</span>
-          <NumberInput value={round2(view.xMin)} step={0.5} width={72} title="右端 (ppm)" onCommit={(v) => v !== null && setView({ xMin: v })} />
+          <NumberInput value={round2(view.xMin)} step={0.5} width={72} title={tr('右端 (ppm)')} onCommit={(v) => v !== null && setView({ xMin: v })} />
           <span className="muted">ppm</span>
         </span>
-        <span>縦倍率</span>
+        <span>{tr('縦倍率')}</span>
         <span className="row">
-          <NumberInput value={round(view.yZoom)} step={0.1} min={0.01} width={64} title="縦倍率" onCommit={(v) => v !== null && setView({ yZoom: v })} />
-          <IconButton icon="arrow-up" size="sm" label="高くする (小さいピークを見やすく)" onClick={() => scaleY(1.5)} />
-          <IconButton icon="arrow-down" size="sm" label="低くする" onClick={() => scaleY(1 / 1.5)} />
+          <NumberInput value={round(view.yZoom)} step={0.1} min={0.01} width={64} title={tr('縦倍率')} onCommit={(v) => v !== null && setView({ yZoom: v })} />
+          <IconButton icon="arrow-up" size="sm" label={tr('高くする (小さいピークを見やすく)')} onClick={() => scaleY(1.5)} />
+          <IconButton icon="arrow-down" size="sm" label={tr('低くする')} onClick={() => scaleY(1 / 1.5)} />
         </span>
       </div>
       <div className="row wrap">
-        <button type="button" className="mini" onClick={fitY} title="表示範囲の最大ピークに合わせる (F)">
-          縦を自動
+        <button type="button" className="mini" onClick={fitY} title={tr('表示範囲の最大ピークに合わせる (F)')}>
+          {tr('縦を自動')}
         </button>
-        <button type="button" className="mini" onClick={fullRange} title="全体を表示 (0)">
-          全体
+        <button type="button" className="mini" onClick={fullRange} title={tr('全体を表示 (0)')}>
+          {tr('全体')}
         </button>
       </div>
       {n > 1 && (
@@ -259,10 +260,10 @@ export function ViewPanel() {
             })
           }
         >
-          縦に並べる (オフで重ね書き)
+          {tr('縦に並べる (オフで重ね書き)')}
         </Check>
       )}
-      <p className="muted">ホイールで横に拡大縮小、Shift+ホイールで縦</p>
+      <p className="muted">{tr('ホイールで横に拡大縮小、Shift+ホイールで縦')}</p>
     </section>
   );
 }

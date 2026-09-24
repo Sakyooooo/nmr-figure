@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import type { Processing2d } from '../lib/fid2d';
 import type { Processing } from '../lib/fid';
 import type { SolventKey } from '../lib/impurityTypes';
@@ -487,7 +488,7 @@ export function annotationDefaults(kind: AnnotationKind): Omit<Annotation, 'id' 
     strokeWidth: kind === 'text' ? 1 : 1.5,
     dash: 'solid',
     fill: null,
-    text: kind === 'text' ? 'テキスト' : '',
+    text: kind === 'text' ? tr('テキスト') : '',
     fontSize: 14,
   };
 }

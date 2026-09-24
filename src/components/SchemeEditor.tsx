@@ -3,6 +3,7 @@
  * 重いので、描くボタンを押したときだけ読み込む (App からは lazy で呼ぶ)。
  * 計算もブラウザの中だけで行う (Indigo の WebAssembly)。
  */
+import { tr } from '../i18n';
 import { useRef, useState } from 'react';
 import { Editor } from 'ketcher-react';
 import { StandaloneStructServiceProvider } from 'ketcher-standalone';
@@ -45,24 +46,24 @@ export default function SchemeEditor({
       const image = await k.generateImage(text, { outputFormat: 'svg' });
       onSave({ image, source: text });
     } catch (e) {
-      setError(`保存できませんでした: ${(e as Error).message}`);
+      setError(tr('保存できませんでした: {message}', { message: (e as Error).message }));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="scheme-editor" role="dialog" aria-label="スキームを描く">
+    <div className="scheme-editor" role="dialog" aria-label={tr('スキームを描く')}>
       <header>
-        <strong>スキームを描く</strong>
+        <strong>{tr('スキームを描く')}</strong>
         <span className="muted">{sampleKey}</span>
         <span className="spacer" />
         {error && <span className="warn">{error}</span>}
         <button className="primary" onClick={() => void save()} disabled={busy}>
-          {busy ? '保存中…' : 'この内容で保存'}
+          {busy ? tr('保存中…') : tr('この内容で保存')}
         </button>
         <button onClick={onClose} disabled={busy}>
-          閉じる
+          {tr('閉じる')}
         </button>
       </header>
       <div className="scheme-editor-body">

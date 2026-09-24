@@ -1,3 +1,4 @@
+import { tr, trk } from '../i18n';
 import { setInspectorTab, useEditor, type InspectorTab } from '../state/store';
 import { ImpurityPanel, MarkerPanel } from './ImpurityPanel';
 import { IntegralPanel } from './IntegralPanel';
@@ -11,9 +12,9 @@ import { TemplatePanel } from './TemplatePanel';
 import { TrendPanel } from './TrendPanel';
 
 const TABS: { id: InspectorTab; label: string }[] = [
-  { id: 'analysis', label: '解析' },
-  { id: 'figure', label: '図' },
-  { id: 'record', label: '記録' },
+  { id: 'analysis', label: trk('解析') },
+  { id: 'figure', label: trk('図') },
+  { id: 'record', label: trk('記録') },
 ];
 
 /**
@@ -43,7 +44,7 @@ export function Inspector() {
   }
   return (
     <>
-      <div className="tabs" role="tablist" aria-label="右のパネル">
+      <div className="tabs" role="tablist" aria-label={tr('右のパネル')}>
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -55,7 +56,7 @@ export function Inspector() {
             className={`tab${tab === t.id ? ' on' : ''}`}
             onClick={() => setInspectorTab(t.id)}
           >
-            {t.label}
+            {tr(t.label)}
           </button>
         ))}
       </div>

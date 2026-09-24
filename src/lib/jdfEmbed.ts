@@ -10,6 +10,7 @@
  * 中身: 図の JSON を gzip して base64 にし、64 KB 前後に均等に分けたもの。
  * nmrfig_info = "v1 gzip <分けた数> <文字数> <crc32>"、nmrfig_summary = "<本数>|<核種+核種>" (16 文字まで。ホーム画面の一覧用)
  */
+import { tr } from '../i18n';
 import { CONTEXT, buildJdf, readParams, replaceStoragePairs, replaceStringParams, splitJdf, storageStrings } from './jdfSections';
 
 const PARAM_PREFIX = 'nmrfig_';
@@ -39,7 +40,7 @@ export async function embedFigure(source: ArrayBuffer, json: string, summary?: F
   // 足せるパラメーターの数 (パラメーターのうしろから測定データまでの空き)。info と summary の 2 つは別に要る
   const without = replaceStringParams(parts.params, PARAM_PREFIX, []);
   const room = Math.floor((parts.dataStart - parts.header.length - without.length) / PARAM_SIZE) - 2;
-  if (room < 1) throw new EmbedError('このファイルには図を入れる空きがありません');
+  if (room < 1) throw new EmbedError(tr('このファイルには図を入れる空きがありません'));
   // 均等に分ける (最後の 1 つだけ短くならないように。短い値は PARAMETER_STORAGE に置かれない)
   const count = Math.min(room, Math.max(1, Math.ceil(text.length / CHUNK)));
   const size = Math.ceil(text.length / count);
@@ -107,15 +108,15 @@ export async function readEmbeddedFigure(source: ArrayBuffer): Promise<string | 
   const value = (name: string) => long.get(name.toUpperCase()) ?? params.get(name);
   const info = value(INFO) ?? '';
   const [version, codec, count, length, crc] = info.split(' ');
-  if (version !== VERSION || codec !== 'gzip') throw new EmbedError(`このアプリより新しい版で入れた図です (${version})`);
+  if (version !== VERSION || codec !== 'gzip') throw new EmbedError(tr('このアプリより新しい版で入れた図です ({version})', { version }));
   let text = '';
   for (let i = 0; i < Number(count); i++) {
     const chunk = value(dataName(i));
-    if (chunk === undefined) throw new EmbedError('図の中身の一部が見つかりません');
+    if (chunk === undefined) throw new EmbedError(tr('図の中身の一部が見つかりません'));
     text += chunk;
   }
   if (text.length !== Number(length) || crc32(text).toString(16).padStart(8, '0') !== crc) {
-    throw new EmbedError('図の中身が壊れています');
+    throw new EmbedError(tr('図の中身が壊れています'));
   }
   return new TextDecoder().decode(await gunzip(fromBase64(text)));
 }

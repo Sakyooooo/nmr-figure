@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { parseJEOL } from 'jeolconverter';
 import type { SolventKey } from './impurityTypes';
 import type { SpectrumMeta } from '../state/types';
@@ -47,15 +48,15 @@ export function readJdf(buffer: ArrayBuffer, fileName: string, options: ReadOpti
   try {
     parsed = parseJEOL(buffer);
   } catch (e) {
-    throw new JdfError(`${fileName}: JEOL Delta のファイルとして読めませんでした (${(e as Error).message})`);
+    throw new JdfError(tr('{fileName}: JEOL Delta のファイルとして読めませんでした ({message})', { fileName, message: (e as Error).message }));
   }
   const { headers: h, info } = parsed;
-  if (h.fileIdentifier !== 'JEOL.NMR') throw new JdfError(`${fileName}: JEOL Delta のファイルではありません`);
+  if (h.fileIdentifier !== 'JEOL.NMR') throw new JdfError(tr('{fileName}: JEOL Delta のファイルではありません', { fileName }));
   if (h.dataDimensionNumber !== 1) {
-    throw new JdfError(`${fileName}: ${h.dataDimensionNumber}D データはまだ表示できません`);
+    throw new JdfError(tr('{fileName}: {dataDimensionNumber}D データはまだ表示できません', { fileName, dataDimensionNumber: h.dataDimensionNumber }));
   }
   const unit = h.dataUnits[0]?.base;
-  if (unit !== 'Ppm' && unit !== 'Second') throw new JdfError(`${fileName}: 対応していない軸の単位です (${unit})`);
+  if (unit !== 'Ppm' && unit !== 'Second') throw new JdfError(tr('{fileName}: 対応していない軸の単位です ({unit})', { fileName, unit }));
 
   const param = (name: string) => parsed.parameters?.paramArray?.find((p: { name: string }) => p.name === name)?.value;
   const isFid = unit === 'Second';
@@ -87,7 +88,7 @@ export function readJdf(buffer: ArrayBuffer, fileName: string, options: ReadOpti
     const sw = Number(param('x_sweep'));
     const freqHz = Number(param('x_freq'));
     const offsetPpm = Number(param('x_offset') ?? 0);
-    if (!(sw > 0) || !(freqHz > 0)) throw new JdfError(`${fileName}: FID の測定条件 (x_sweep / x_freq) が読めませんでした`);
+    if (!(sw > 0) || !(freqHz > 0)) throw new JdfError(tr('{fileName}: FID の測定条件 (x_sweep / x_freq) が読めませんでした', { fileName }));
     const clipped = Number(param('x_sweep_clipped'));
     // JEOL の FID は虚部の符号が逆 (Delta で処理した結果と比べて確かめた)
     const fid: FidData = {
@@ -120,7 +121,7 @@ export function readJdf(buffer: ArrayBuffer, fileName: string, options: ReadOpti
   // 先頭と末尾はパディング。dataOffsetStart〜Stop の点が dataAxisStart〜Stop に対応する
   const start: number = h.dataOffsetStart[0];
   const stop: number = h.dataOffsetStop[0];
-  if (!(stop > start) || stop >= re.length) throw new JdfError(`${fileName}: データ範囲が不正です`);
+  if (!(stop > start) || stop >= re.length) throw new JdfError(tr('{fileName}: データ範囲が不正です', { fileName }));
   const data = new Float32Array(stop - start + 1);
   let maxAbs = 0;
   for (let i = start; i <= stop; i++) {

@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { beginGesture, endGesture, isGestureOpen } from '../state/store';
 import { Icon } from './Icon';
@@ -196,9 +197,9 @@ export function Section({
         <button
           type="button"
           className={`ibtn sm section-help${showHelp ? ' on' : ''}`}
-          aria-label={`${title} の使い方`}
+          aria-label={tr('{title} の使い方', { title })}
           aria-expanded={showHelp}
-          title="使い方"
+          title={tr('使い方')}
           onClick={() => {
             if (detailsRef.current && !detailsRef.current.open) detailsRef.current.open = true;
             setShowHelp((v) => !v);

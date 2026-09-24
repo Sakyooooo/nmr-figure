@@ -2,6 +2,7 @@
  * 図に置く構造式の編集。ツールバーのボタンや、置いた構造式のダブルクリックで開く。
  * 保存すると SVG のまま図に入るので、Word / PowerPoint で「図形に変換」すると編集できる。
  */
+import { tr } from '../i18n';
 import { lazy, Suspense, useEffect } from 'react';
 import { addFigureImage, closeStructureEditor, notify, updateFigureImage, useEditor } from '../state/store';
 import { svgRatio } from './FigureImages';
@@ -47,9 +48,9 @@ export function StructureEditorHost() {
 
   if (!editing) return null;
   return (
-    <Suspense fallback={<div className="scheme-editor loading">構造式を描く画面を読み込んでいます…</div>}>
+    <Suspense fallback={<div className="scheme-editor loading">{tr('構造式を描く画面を読み込んでいます…')}</div>}>
       <SchemeEditor
-        sampleKey="図に置く構造式"
+        sampleKey={tr('図に置く構造式')}
         source={editing.source}
         onClose={closeStructureEditor}
         onSave={async ({ image, source }) => {
@@ -58,7 +59,7 @@ export function StructureEditorHost() {
           if (editing.imageId) updateFigureImage(editing.imageId, { svg, source, ratio });
           else addFigureImage({ svg, source, ratio });
           closeStructureEditor();
-          notify('構造式を図に置きました。ドラッグで移動、右下の角で大きさを変えられます');
+          notify(tr('構造式を図に置きました。ドラッグで移動、右下の角で大きさを変えられます'));
         }}
       />
     </Suspense>
@@ -82,9 +83,9 @@ async function placePastedImage(file: File) {
   if (file.type === 'image/svg+xml') {
     const svg = await file.text();
     addFigureImage({ svg, ratio: svgRatio(svg) ?? size.h / size.w });
-    notify('構造式を図に置きました (ベクター)');
+    notify(tr('構造式を図に置きました (ベクター)'));
     return;
   }
   addFigureImage({ href, ratio: size.h / (size.w || 1) });
-  notify('画像を図に置きました。Word で編集できる形にするには、ツールバーの構造式ボタンから描き直してください');
+  notify(tr('画像を図に置きました。Word で編集できる形にするには、ツールバーの構造式ボタンから描き直してください'));
 }

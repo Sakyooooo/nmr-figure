@@ -2,12 +2,13 @@
  * 印刷。今の図と、測定条件の表を 1枚にまとめる。
  * 画面には出さず、印刷のときだけ出す (styles.css の @media print)。
  */
+import { locale, tr } from '../i18n';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { figureSvgString } from '../lib/exportFigure';
 import { titleText } from '../lib/layout';
 import { title2d } from '../lib/scene2d';
-import { SIMULATED_WORD } from '../lib/simulate';
+import { simulatedWord } from '../lib/simulate';
 import { solventInfo } from '../lib/solvents';
 import { useEditor } from '../state/store';
 import { RichHtml } from './RichText';
@@ -55,7 +56,7 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
                 solvent: solventInfo(m.solvent)?.label ?? m.solventRaw,
                 scans: m.scans,
                 date: m.date ?? '',
-                note: m.simulated ? `${SIMULATED_WORD}: ${m.simulated.citation}` : m.processing ? 'FID をこのアプリで処理' : '',
+                note: m.simulated ? `${simulatedWord()}: ${m.simulated.citation}` : m.processing ? tr('FID をこのアプリで処理') : '',
               }
             : null;
         })
@@ -71,13 +72,13 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
       <table className="print-table">
         <thead>
           <tr>
-            <th>スペクトル</th>
-            <th>核種</th>
-            <th>周波数</th>
-            <th>溶媒</th>
-            <th>積算</th>
-            <th>測定日</th>
-            <th>備考</th>
+            <th>{tr('スペクトル')}</th>
+            <th>{tr('核種')}</th>
+            <th>{tr('周波数')}</th>
+            <th>{tr('溶媒')}</th>
+            <th>{tr('積算')}</th>
+            <th>{tr('測定日')}</th>
+            <th>{tr('備考')}</th>
           </tr>
         </thead>
         <tbody>
@@ -99,7 +100,7 @@ export function PrintView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | 
         </tbody>
       </table>
       <p className="print-foot">
-        {projectName ?? '未保存の図'} · {new Date().toLocaleString('ja-JP')}
+        {projectName ?? tr('未保存の図')} · {new Date().toLocaleString(locale())}
       </p>
     </div>,
     document.body,

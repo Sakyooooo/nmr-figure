@@ -1,3 +1,4 @@
+import { locale, tr } from '../i18n';
 import type { RefObject } from 'react';
 import { useSync } from '../state/deltaSync';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
@@ -5,7 +6,7 @@ import { printFigure, setCanvasTab, togglePanel, useEditor } from '../state/stor
 import { Icon } from './Icon';
 import { IconButton, Kbd, MenuButton } from './ui';
 
-const time = (t: number) => new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+const time = (t: number) => new Date(t).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 
 /**
  * 編集画面の上の帯。置くのは ホーム・パネルの開閉・図の名前 (ファイルの操作)・表示の切り替え・操作を探す・
@@ -30,42 +31,42 @@ export function TopBar({
 
   return (
     <header className="topbar">
-      <IconButton icon="house" label="ホーム (測定の一覧)。編集中の図はそのまま残ります" onClick={() => useEditor.setState({ screen: 'home' })} />
-      <IconButton icon="panel-left" label="スペクトルの一覧" shortcut="[" pressed={ui.leftOpen} onClick={() => togglePanel('left')} />
+      <IconButton icon="house" label={tr('ホーム (測定の一覧)。編集中の図はそのまま残ります')} onClick={() => useEditor.setState({ screen: 'home' })} />
+      <IconButton icon="panel-left" label={tr('スペクトルの一覧')} shortcut="[" pressed={ui.leftOpen} onClick={() => togglePanel('left')} />
       <span className="topbar-sep" aria-hidden="true" />
       <FileMenu onImportSi={onImportSi} />
       {hasData && !is2d && (
-        <div className="segmented" role="tablist" aria-label="表示の切り替え">
+        <div className="segmented" role="tablist" aria-label={tr('表示の切り替え')}>
           <button type="button" role="tab" aria-selected={tab === 'spectrum'} className={tab === 'spectrum' ? 'on' : ''} onClick={() => setCanvasTab('spectrum')}>
-            スペクトル
+            {tr('スペクトル')}
           </button>
           <button type="button" role="tab" aria-selected={tab === 'trend'} className={tab === 'trend' ? 'on' : ''} onClick={() => setCanvasTab('trend')}>
-            推移グラフ
+            {tr('推移グラフ')}
           </button>
         </div>
       )}
       <span className="grow" />
       <button type="button" className="command-search" onClick={onCommand} aria-keyshortcuts="Control+K">
         <Icon name="search" size={16} />
-        <span className="grow">操作を探す</span>
+        <span className="grow">{tr('操作を探す')}</span>
         <Kbd>Ctrl+K</Kbd>
       </button>
       <span className="grow" />
       <SyncPill />
       <MenuButton
-        label="書き出し"
+        label={tr('書き出し')}
         className="btn"
         placement="bottom-end"
         disabled={!hasData}
         items={[
-          { label: 'SVG で保存', icon: 'download', hint: 'PowerPoint で「図形に変換」すると線や文字を直せます', onSelect: withSvg(exportSvg) },
-          { label: 'PNG で保存', icon: 'image', onSelect: withSvg(exportPng) },
+          { label: tr('SVG で保存'), icon: 'download', hint: tr('PowerPoint で「図形に変換」すると線や文字を直せます'), onSelect: withSvg(exportSvg) },
+          { label: tr('PNG で保存'), icon: 'image', onSelect: withSvg(exportPng) },
           'divider',
-          { label: '印刷 (図と測定条件)', icon: 'printer', hint: 'PDF で保存もできます', onSelect: printFigure },
+          { label: tr('印刷 (図と測定条件)'), icon: 'printer', hint: tr('PDF で保存もできます'), onSelect: printFigure },
         ]}
       >
         <Icon name="download" size={16} />
-        <span className="btn-label">書き出し</span>
+        <span className="btn-label">{tr('書き出し')}</span>
         <Icon name="chevron-down" size={16} />
       </MenuButton>
       <button
@@ -73,13 +74,13 @@ export function TopBar({
         className="btn primary"
         onClick={withSvg(copyFigure)}
         disabled={!hasData}
-        title="表示中の図をコピー。Word / PowerPoint にはベクターの図として貼られます (Ctrl+Shift+C)"
+        title={tr('表示中の図をコピー。Word / PowerPoint にはベクターの図として貼られます (Ctrl+Shift+C)')}
       >
         <Icon name="copy" size={16} />
-        <span>図をコピー</span>
+        <span>{tr('図をコピー')}</span>
       </button>
-      <IconButton icon="settings" label="設定 (研究室の基準値・自作の不純物など)" onClick={onSettings} />
-      <IconButton icon="panel-right" label="右のパネル" shortcut="]" pressed={ui.rightOpen} onClick={() => togglePanel('right')} />
+      <IconButton icon="settings" label={tr('設定 (研究室の基準値・自作の不純物など)')} onClick={onSettings} />
+      <IconButton icon="panel-right" label={tr('右のパネル')} shortcut="]" pressed={ui.rightOpen} onClick={() => togglePanel('right')} />
     </header>
   );
 }
@@ -90,18 +91,18 @@ function FileMenu({ onImportSi }: { onImportSi: () => void }) {
   const dirty = useEditor((s) => s.dirty);
   const autoSavedAt = useEditor((s) => s.autoSavedAt);
   const hasData = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
-  const name = projectName ?? '無題の図';
-  const state = projectName ? (dirty ? '未保存の変更あり' : '保存済み') : 'ファイルに未保存';
+  const name = projectName ?? tr('無題の図');
+  const state = projectName ? (dirty ? tr('未保存の変更あり') : tr('保存済み')) : tr('ファイルに未保存');
   return (
     <MenuButton
-      label={`${name} (ファイルの操作)`}
+      label={tr('{name} (ファイルの操作)', { name })}
       className="file-menu"
       items={[
-        { label: '開く', icon: 'folder-open', shortcut: 'Ctrl+O', hint: '.jdf は今の図に足す、図のファイルは開く', onSelect: () => void openDialog() },
-        { label: projectName ? '上書き保存' : '保存', icon: 'save', shortcut: 'Ctrl+S', disabled: !hasData, onSelect: () => saveProject() },
-        { label: '名前を付けて保存', icon: 'save', shortcut: 'Ctrl+Shift+S', disabled: !hasData, onSelect: () => saveProject(true) },
+        { label: tr('開く'), icon: 'folder-open', shortcut: 'Ctrl+O', hint: tr('.jdf は今の図に足す、図のファイルは開く'), onSelect: () => void openDialog() },
+        { label: projectName ? tr('上書き保存') : tr('保存'), icon: 'save', shortcut: 'Ctrl+S', disabled: !hasData, onSelect: () => saveProject() },
+        { label: tr('名前を付けて保存'), icon: 'save', shortcut: 'Ctrl+Shift+S', disabled: !hasData, onSelect: () => saveProject(true) },
         'divider',
-        { label: '文献値からスペクトルを作る', icon: 'book-open', hint: '論文の SI の NMR データから比較用のスペクトルを作ります', onSelect: onImportSi },
+        { label: tr('文献値からスペクトルを作る'), icon: 'book-open', hint: tr('論文の SI の NMR データから比較用のスペクトルを作ります'), onSelect: onImportSi },
       ]}
     >
       <span className="file-name">
@@ -110,7 +111,7 @@ function FileMenu({ onImportSi }: { onImportSi: () => void }) {
       </span>
       <span className="file-state">
         {state}
-        {autoSavedAt ? ` · 自動保存 ${time(autoSavedAt)}` : ''}
+        {autoSavedAt ? tr(' · 自動保存 {time}', { time: time(autoSavedAt) }) : ''}
       </span>
     </MenuButton>
   );
@@ -127,20 +128,20 @@ function SyncPill() {
   const last = Math.max(0, ...list.map((v) => v.lastSyncAt ?? 0));
   const text = bad
     ? bad.status === 'need-permission'
-      ? 'Delta へは許可が必要'
-      : 'Delta: エラー'
+      ? tr('Delta へは許可が必要')
+      : tr('Delta: エラー')
     : writing
-      ? 'Delta に書き込み中…'
+      ? tr('Delta に書き込み中…')
       : waiting && !last
-        ? 'Delta: 待機中'
-        : `Delta と同期${last ? ` ${time(last)}` : ''}`;
+        ? tr('Delta: 待機中')
+        : tr('Delta と同期{v0}', { v0: last ? ` ${time(last)}` : '' });
   const tone = bad ? ' warn' : waiting && !last ? ' idle' : '';
   return (
     <button
       type="button"
       className={`sync-pill${tone}`}
       aria-label={text}
-      title={bad?.message || waiting?.message || `${text} (右の「記録」で詳しく見られます)`}
+      title={bad?.message || waiting?.message || tr('{text} (右の「記録」で詳しく見られます)', { text })}
       onClick={() => {
         useEditor.setState({ inspectorTab: 'record' });
         if (!useEditor.getState().settings.ui.rightOpen) togglePanel('right');

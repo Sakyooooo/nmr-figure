@@ -2,6 +2,8 @@
  * 論文の SI に書かれた NMR データから、比較用のスペクトルを作る。
  * 実測ではないので、引用元を必ず入れてもらい、図にも出す。
  */
+import { tr } from '../i18n';
+import { trx } from '../i18n/react';
 import { useCallback, useMemo, useState } from 'react';
 import { cleanCitation, shortCitation, tidyCitation } from '../lib/citation';
 import { parseSi } from '../lib/siParse';
@@ -66,13 +68,13 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
       const width = lineWidth ?? defaultLineWidthHz(parsed?.nucleus ?? '1H');
       const full = citation.trim();
       const result = simulateFromSi(text, { full, short: short.trim() || shortCitation(full) }, { lineWidthHz: width, widthsHz: widths });
-      const fromImage = measured ? `。うち ${measured} 本は図から線幅を読みました` : '';
+      const fromImage = measured ? tr('。うち {measured} 本は図から線幅を読みました', { measured }) : '';
       if (editing) {
         updateSimulated(editing.id, result.meta, result.data);
-        notify(`文献のスペクトルを作り直しました (${result.parsed.signals.length} 信号)${fromImage}`);
+        notify(tr('文献のスペクトルを作り直しました ({length} 信号){fromImage}', { length: result.parsed.signals.length, fromImage }));
       } else {
         addSimulated(result.meta, result.data);
-        notify(`文献のスペクトルを作りました (${result.parsed.signals.length} 信号)${fromImage}。引用元は図の下に入ります`);
+        notify(tr('文献のスペクトルを作りました ({length} 信号){fromImage}。引用元は図の下に入ります', { length: result.parsed.signals.length, fromImage }));
       }
       onClose();
     } catch (e) {
@@ -81,14 +83,14 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
   };
 
   return (
-    <Modal title={editing ? '文献のスペクトルを直す' : '文献 (SI) のデータからスペクトルを作る'} onClose={onClose} wide>
+    <Modal title={editing ? tr('文献のスペクトルを直す') : tr('文献 (SI) のデータからスペクトルを作る')} onClose={onClose} wide>
       <section>
         <p className="hint">
-          論文の SI に書かれている NMR データの文を貼り付けると、書かれた δ・多重度・J・H 数から線を作って、自分の測定と重ねられます。
-          実測ではないので、<strong>引用元は図に必ず入ります</strong>。
+          
+          {trx('論文の SI に書かれている NMR データの文を貼り付けると、書かれた δ・多重度・J・H 数から線を作って、自分の測定と重ねられます。実測ではないので、{strong}。', { strong: <strong>{tr('引用元は図に必ず入ります')}</strong> })}
         </p>
         <label className="field block">
-          SI の文
+          {tr('SI の文')}
           <textarea
             className="si-input"
             rows={4}
@@ -102,18 +104,16 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
           <p className="hint">
             {parsed.signals.length ? (
               <>
-                読み取り: {parsed.nucleus}
-                {parsed.freqMHz ? ` ${parsed.freqMHz} MHz` : ''}
-                {parsed.solvent ? ` / ${parsed.solvent}` : ''} / 信号 {parsed.signals.length} 本
-                {parsed.skipped.length ? `。読めなかった部分: ${parsed.skipped.join(' | ')}` : ''}
+                {tr('読み取り: {what} / 信号 {n} 本', { what: `${parsed.nucleus}${parsed.freqMHz ? ` ${parsed.freqMHz} MHz` : ''}${parsed.solvent ? ` / ${parsed.solvent}` : ''}`, n: parsed.signals.length })}
+                {parsed.skipped.length ? tr('。読めなかった部分: {join}', { join: parsed.skipped.join(' | ') }) : ''}
               </>
             ) : (
-              <span className="warn">NMR のデータを読み取れません。「δ 7.30 (d, J = 8.0 Hz, 2H), …」の形で貼り付けてください</span>
+              <span className="warn">{tr('NMR のデータを読み取れません。「δ 7.30 (d, J = 8.0 Hz, 2H), …」の形で貼り付けてください')}</span>
             )}
           </p>
         )}
         <label className="field block">
-          引用元 (図の下に出ます。貼ると自動で整えます。手で直したものはそのまま出ます)
+          {tr('引用元 (図の下に出ます。貼ると自動で整えます。手で直したものはそのまま出ます)')}
           <input
             type="text"
             value={citation}
@@ -126,8 +126,8 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
           />
         </label>
         <div className="row wrap">
-          <button onClick={() => tidy(citation)} disabled={!citation.trim()} title="貼り付けたときは自動で整えます。手で直したあとに押すと、もう一度整えます">
-            形を整える
+          <button onClick={() => tidy(citation)} disabled={!citation.trim()} title={tr('貼り付けたときは自動で整えます。手で直したあとに押すと、もう一度整えます')}>
+            {tr('形を整える')}
           </button>
           {before && (
             <button
@@ -137,7 +137,7 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
                 setBefore(null);
               }}
             >
-              元に戻す
+              {tr('元に戻す')}
             </button>
           )}
         </div>
@@ -145,30 +145,30 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
           <p className={`hint${tidied.formatted ? '' : ' warn'}`}>
             {tidied.formatted ? (
               <>
-                図に出る形: <RichHtml text={citation} />
+                {tr('図に出る形:')}{' '}<RichHtml text={citation} />
               </>
             ) : (
-              '著者・誌名・年を読み取れないので、書いたままの文がそのまま図に出ます'
+              tr('著者・誌名・年を読み取れないので、書いたままの文がそのまま図に出ます')
             )}
           </p>
         )}
         <details className="sub">
-          <summary>文献の図 (スクショ) から線の形を合わせる — 任意{measured ? ` / ${measured} 本を読み取り済み` : ''}</summary>
+          <summary>{tr('文献の図 (スクショ) から線の形を合わせる — 任意')}{measured ? tr(' / {measured} 本を読み取り済み', { measured }) : ''}</summary>
           <TraceImagePicker onTrace={onTrace} />
           {widths && (
             <p className={`hint${measured ? '' : ' warn'}`}>
-              図から線幅を読めた信号: {measured} / {widths.length}
-              {measured ? '' : ' (図が粗いか、枠や ppm の指定が合っていないようです。読めない信号は下の線幅を使います)'}
+              {tr('図から線幅を読めた信号:')}{' '}{measured} / {widths.length}
+              {measured ? '' : tr(' (図が粗いか、枠や ppm の指定が合っていないようです。読めない信号は下の線幅を使います)')}
             </p>
           )}
         </details>
         <div className="row">
           <label className="field">
-            短い引用 (スペクトル名の横)
+            {tr('短い引用 (スペクトル名の横)')}
             <input type="text" value={short} placeholder={shortCitation(citation) || 'Smith 2024'} onChange={(e) => setShort(e.target.value)} />
           </label>
-          <label className="field" title="線の太さ (半値全幅)。実測に近づけたいときに変えます">
-            線幅
+          <label className="field" title={tr('線の太さ (半値全幅)。実測に近づけたいときに変えます')}>
+            {tr('線幅')}
             <NumberInput
               value={lineWidth ?? defaultLineWidthHz(parsed?.nucleus ?? '1H')}
               min={0.1}
@@ -181,9 +181,9 @@ export function SiImportDialog({ onClose, spectrumId }: { onClose: () => void; s
           </label>
         </div>
         <div className="actions">
-          <button onClick={onClose}>キャンセル</button>
-          <button className="primary" disabled={!ready} onClick={add} title={ready ? '' : 'SI の文と引用元を入れてください'}>
-            {editing ? '作り直す' : '図に追加'}
+          <button onClick={onClose}>{tr('キャンセル')}</button>
+          <button className="primary" disabled={!ready} onClick={add} title={ready ? '' : tr('SI の文と引用元を入れてください')}>
+            {editing ? tr('作り直す') : tr('図に追加')}
           </button>
         </div>
       </section>

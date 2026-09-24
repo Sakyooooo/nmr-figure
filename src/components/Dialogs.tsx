@@ -1,13 +1,15 @@
+import { tr } from '../i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusDefaults, nucleusRich } from '../lib/nuclei';
-import { labReference } from '../lib/settings';
+import { labReference, type LangSetting } from '../lib/settings';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
-import { setReferenceOffset, updateSettings, useEditor } from '../state/store';
+import { setLanguage, setReferenceOffset, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { RichHtml } from './RichText';
 import { ICON_LICENSE } from './iconPaths';
 import { IconButton } from './ui';
+import { openOnboarding } from './Onboarding';
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -18,7 +20,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     <dialog ref={ref} className={`modal${wide ? ' wide' : ''}`} onClose={onClose} onCancel={onClose}>
       <header>
         <h2>{title}</h2>
-        <IconButton icon="x" label="閉じる (Esc)" onClick={onClose} />
+        <IconButton icon="x" label={tr('閉じる (Esc)')} onClick={onClose} />
       </header>
       {children}
     </dialog>
@@ -42,7 +44,7 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
   const close = () => useEditor.setState({ pendingReference: null });
   const target = Number(value);
   return (
-    <Modal title="基準合わせ" onClose={close}>
+    <Modal title={tr('基準合わせ')} onClose={close}>
       <form
         method="dialog"
         onSubmit={(e) => {
@@ -51,23 +53,23 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
         }}
       >
         <p>
-          クリックしたピーク: <b>{observed.toFixed(4)} ppm</b>
+          {tr('クリックしたピーク:')}{' '}<b>{observed.toFixed(4)} ppm</b>
         </p>
         <label className="field block">
-          このピークを何 ppm にしますか
+          {tr('このピークを何 ppm にしますか')}
           <input type="number" step="0.001" value={value} autoFocus onChange={(e) => setValue(e.target.value)} />
         </label>
         {suggested !== null && solvent && (
           <p className="hint">
-            {solvent} の基準値 {suggested} ppm を入れています (設定で変更できます)。
+            {tr('{solvent} の基準値 {value} ppm を入れています (設定で変更できます)。', { solvent, value: suggested })}
           </p>
         )}
         <div className="actions">
           <button type="button" onClick={close}>
-            キャンセル
+            {tr('キャンセル')}
           </button>
           <button type="submit" className="primary" disabled={!Number.isFinite(target)}>
-            合わせる ({Number.isFinite(target) ? `${target - observed >= 0 ? '+' : ''}${(target - observed).toFixed(4)}` : '—'} ppm)
+            {tr('合わせる ({shift} ppm)', { shift: Number.isFinite(target) ? `${target - observed >= 0 ? '+' : ''}${(target - observed).toFixed(4)}` : '—' })}
           </button>
         </div>
       </form>
@@ -79,14 +81,33 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useEditor((s) => s.settings);
   const [newName, setNewName] = useState('');
   return (
-    <Modal title="設定" onClose={onClose} wide>
+    <Modal title={tr('設定')} onClose={onClose} wide>
       <section>
-        <h3>研究室の基準値 (溶媒ピーク)</h3>
-        <p className="hint">空欄なら Fulmer et al. (2010) の値を使います。不純物の照合も、この値との差だけずらして行います。</p>
+        <h3>Language / 言語</h3>
+        <div className="row wrap">
+          <select value={settings.ui.lang} aria-label="Language / 言語" onChange={(e) => setLanguage(e.target.value as LangSetting)}>
+            <option value="auto">{tr('自動 (ブラウザの言語に合わせる)')}</option>
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+          <button
+            className="btn"
+            onClick={() => {
+              onClose();
+              openOnboarding();
+            }}
+          >
+            {tr('使い方の説明をもう一度見る')}
+          </button>
+        </div>
+      </section>
+      <section>
+        <h3>{tr('研究室の基準値 (溶媒ピーク)')}</h3>
+        <p className="hint">{tr('空欄なら Fulmer et al. (2010) の値を使います。不純物の照合も、この値との差だけずらして行います。')}</p>
         <table className="table">
           <thead>
             <tr>
-              <th>溶媒</th>
+              <th>{tr('溶媒')}</th>
               <th>
                 <RichHtml text="^{1}H" />
               </th>
@@ -126,7 +147,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       </section>
 
       <section>
-        <h3>照合の許容幅 (ppm)</h3>
+        <h3>{tr('照合の許容幅 (ppm)')}</h3>
         <div className="row">
           {['1H', '13C', '19F', '31P'].map((nuc) => (
             <label key={nuc} className="field">
@@ -146,21 +167,21 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             </label>
           ))}
         </div>
-        <p className="hint">水・OH・NH はこの5倍の幅で探します (濃度や温度で動くため)。</p>
+        <p className="hint">{tr('水・OH・NH はこの5倍の幅で探します (濃度や温度で動くため)。')}</p>
       </section>
 
       <section>
-        <h3>自作の不純物</h3>
+        <h3>{tr('自作の不純物')}</h3>
         <p className="hint">
-          <RichHtml text="^{19}F・^{31}P" /> や研究室でよく見る化合物を登録できます。値は研究室の基準で測ったものをそのまま入れてください。
+          <RichHtml text={tr('^{19}F・^{31}P や研究室でよく見る化合物を登録できます。値は研究室の基準で測ったものをそのまま入れてください。')} />
         </p>
         <table className="table">
           <thead>
             <tr>
-              <th>名前</th>
-              <th>核種</th>
-              <th>溶媒</th>
-              <th>δ (カンマ区切り)</th>
+              <th>{tr('名前')}</th>
+              <th>{tr('核種')}</th>
+              <th>{tr('溶媒')}</th>
+              <th>{tr('δ (カンマ区切り)')}</th>
               <th />
             </tr>
           </thead>
@@ -201,7 +222,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                       })
                     }
                   >
-                    <option value="any">すべて</option>
+                    <option value="any">{tr('すべて')}</option>
                     {SOLVENTS.map((s) => (
                       <option key={s.key} value={s.key}>
                         {s.key}
@@ -246,15 +267,15 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             setNewName('');
           }}
         >
-          <input type="text" placeholder="例: P(OMe)_{3}" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button type="submit">追加</button>
+          <input type="text" placeholder={tr('例: P(OMe)_{3}')} value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <button type="submit">{tr('追加')}</button>
         </form>
       </section>
 
       <section>
-        <h3>書き出し</h3>
+        <h3>{tr('書き出し')}</h3>
         <label className="field">
-          PNG の解像度
+          {tr('PNG の解像度')}
           <NumberInput
             value={settings.pngScale}
             min={1}
@@ -267,15 +288,15 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               })
             }
           />
-          倍
+          {tr('倍')}
         </label>
       </section>
-      <p className="hint">設定はこのブラウザに保存されます (図のファイルには含まれません)。</p>
+      <p className="hint">{tr('設定はこのブラウザに保存されます (図のファイルには含まれません)。')}</p>
       <details className="sub">
-        <summary>使っているもの (ライセンス)</summary>
+        <summary>{tr('使っているもの (ライセンス)')}</summary>
         <p className="hint" style={{ whiteSpace: 'pre-wrap' }}>
-          アイコン: {ICON_LICENSE}
-          {'\n'}構造式エディタ: Ketcher (EPAM Systems、Apache License 2.0)
+          {tr('アイコン:')}{' '}{ICON_LICENSE}
+          {'\n'}{tr('構造式エディタ: Ketcher (EPAM Systems、Apache License 2.0)')}
         </p>
       </details>
     </Modal>

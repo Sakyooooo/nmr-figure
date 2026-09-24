@@ -5,6 +5,7 @@
  * COSY・HMBC・HMQC は絶対値表示が普通なので、位相補正はしない。
  * (絶対値は位相に影響されないので、デジタルフィルターの遅れの補正も要らない)
  */
+import { tr } from '../i18n';
 import { fft } from './fid';
 
 export interface Axis2d {
@@ -78,7 +79,7 @@ function ppmOf(axis: Axis2d, size: number, keep: number, r: number) {
 export function transform2d(fid: Fid2dData, p: Processing2d): Spectrum2dData {
   const n1 = fid.re.length;
   const n2 = fid.re[0]?.length ?? 0;
-  if (!n1 || !n2) throw new Error('2D のデータが空です');
+  if (!n1 || !n2) throw new Error(tr('2D のデータが空です'));
   const size2 = Math.min(pow2ceil(n2) * Math.max(1, p.zf2), 1 << 16);
   const size1 = Math.min(pow2ceil(n1) * Math.max(1, p.zf1), 1 << 14);
   const keep2 = Math.round(size2 * Math.min(1, Math.max(0.05, fid.x.clip)));

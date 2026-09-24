@@ -1,3 +1,4 @@
+import { tr, trk } from '../i18n';
 import { annotationKey, applyAnnotations, fileAnnotations, fileShift, layerAnnotations, shiftAnnotations, summary, syncFileOf } from '../lib/deltaSync';
 import { baseName, copyFigureToClipboard, downloadBlob, figureSvgString, svgToPng } from '../lib/exportFigure';
 import { buildFigureJdf, figureBaseOf, type FigureBase } from '../lib/figureJdf';
@@ -38,13 +39,15 @@ const fsWindow = window as FsWindow;
 
 const OPEN_TYPES = [
   {
-    description: 'NMR データ / プロジェクト',
+    description: trk('NMR データ / プロジェクト'),
     accept: { 'application/octet-stream': ['.jdf', PROJECT_EXT] },
   },
 ];
-const PROJECT_TYPES = [{ description: 'NMR Figure プロジェクト', accept: { 'application/json': [PROJECT_EXT] } }];
-const JDF_TYPES = [{ description: 'Delta のデータ (図入り)', accept: { 'application/octet-stream': ['.jdf'] } }];
+const PROJECT_TYPES = [{ description: trk('NMR Figure プロジェクト'), accept: { 'application/json': [PROJECT_EXT] } }];
+const JDF_TYPES = [{ description: trk('Delta のデータ (図入り)'), accept: { 'application/octet-stream': ['.jdf'] } }];
 const isJdfName = (name: string | null | undefined) => !!name && /\.jdf$/i.test(name);
+/** ファイルを選ぶ画面に出す種類の名前を、今の言語にする */
+const localized = (types: NonNullable<PickerOptions['types']>) => types.map((t) => ({ ...t, description: tr(t.description) }));
 
 /** FID を処理したあとの基準合わせに、研究室の基準値を使う */
 export function readOptions(): ReadOptions {
@@ -55,9 +58,9 @@ export function readOptions(): ReadOptions {
 async function confirmDiscard(): Promise<boolean> {
   const { dirty, doc } = useEditor.getState();
   if (!dirty || !doc.layers.length) return true;
-  const choice = await ask('保存していない図があります', '編集中の図に保存していない変更があります。どうしますか？', [
-    { label: '保存しないで続ける', value: 'discard', kind: 'danger' },
-    { label: '保存してから続ける', value: 'save', kind: 'primary' },
+  const choice = await ask(tr('保存していない図があります'), tr('編集中の図に保存していない変更があります。どうしますか？'), [
+    { label: tr('保存しないで続ける'), value: 'discard', kind: 'danger' },
+    { label: tr('保存してから続ける'), value: 'save', kind: 'primary' },
   ]);
   if (choice === 'discard') return true;
   if (choice === 'save') {
@@ -81,7 +84,7 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         if (!(await confirmDiscard())) continue;
         const { doc, data, fids, fids2d, data2d } = parseProject(await file.text());
         loadDocument(doc, data, file.name, handle ?? null, fids, { data2d, fids2d });
-        notify(`${file.name} を開きました`);
+        notify(tr('{name} を開きました', { name: file.name }));
       } else if (name.endsWith('.jdf')) {
         const buffer = await file.arrayBuffer();
         // このソフトで保存した図入りの .jdf は、図ごと開く (図を編集中に足そうとしたときは、どうするか聞く)
@@ -104,12 +107,12 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         if (handle) registerJdfHandle(file.name, handle);
         if (is2d(buffer)) {
           addSpectrum2d(readJdf2d(buffer, file.name));
-          notify(`${file.name} (2D) を開きました`);
+          notify(tr('{name} (2D) を開きました', { name: file.name }));
           continue;
         }
         spectra.push(readJdf(buffer, file.name, readOptions()));
       } else {
-        notify(`${file.name}: .jdf か ${PROJECT_EXT} を選んでください`, 'error');
+        notify(tr('{name}: .jdf か {PROJECT_EXT} を選んでください', { name: file.name, PROJECT_EXT }), 'error');
       }
     } catch (e) {
       notify(e instanceof JdfError ? e.message : `${file.name}: ${(e as Error).message}`, 'error');
@@ -117,7 +120,7 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
   }
   if (spectra.length) {
     addSpectra(spectra);
-    notify(`${spectra.map((s) => s.meta.fileName).join(', ')} を読み込みました`);
+    notify(tr('{join} を読み込みました', { join: spectra.map((s) => s.meta.fileName).join(', ') }));
     useEditor.setState({ screen: 'editor' });
   }
 }
@@ -128,9 +131,9 @@ function is2d(buffer: ArrayBuffer) {
 }
 
 async function askFigureOrSpectrum(fileName: string): Promise<'figure' | 'spectrum' | null> {
-  const choice = await ask('図の入った .jdf です', `${fileName} には、このソフトで保存した図が入っています。どう開きますか？`, [
-    { label: 'スペクトルだけ今の図に足す', value: 'spectrum' },
-    { label: '図として開く', value: 'figure', kind: 'primary' },
+  const choice = await ask(tr('図の入った .jdf です'), tr('{fileName} には、このソフトで保存した図が入っています。どう開きますか？', { fileName }), [
+    { label: tr('スペクトルだけ今の図に足す'), value: 'spectrum' },
+    { label: tr('図として開く'), value: 'figure', kind: 'primary' },
   ]);
   return choice === 'figure' || choice === 'spectrum' ? choice : null;
 }
@@ -144,10 +147,10 @@ async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: File
   let project;
   try {
     const json = await readEmbeddedFigure(buffer);
-    if (!json) throw new Error('図が見つかりません');
+    if (!json) throw new Error(tr('図が見つかりません'));
     project = parseProject(json);
   } catch (e) {
-    notify(`${fileName}: 図を読めませんでした (${(e as Error).message})。スペクトルだけを開きます`, 'error');
+    notify(tr('{fileName}: 図を読めませんでした ({message})。スペクトルだけを開きます', { fileName, message: (e as Error).message }), 'error');
     loadDocument(emptyDocument(), {}, null, null);
     if (handle) registerJdfHandle(fileName, handle);
     addSpectra([readJdf(buffer, fileName, readOptions())]);
@@ -159,7 +162,7 @@ async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: File
   if (handle) registerJdfHandle(fileName, handle);
   loadDocument(doc, data, fileName, handle, fids, { data2d, fids2d });
   if (base) useEditor.setState((s) => ({ sources: { ...s.sources, [base.id]: buffer } }));
-  notify(`${fileName} (図) を開きました`);
+  notify(tr('{fileName} (図) を開きました', { fileName }));
   // ふつうは Delta との同期 (state/deltaSync.ts) がファイルの中身と合わせる。ファイルに書けない開き方
   // (ファイルを選ぶ画面のない古いブラウザなど) のときだけ、Delta で変えたピーク値・積分を入れるかここで聞く
   if (base && !jdfHandle(fileName)) await offerDeltaChanges(buffer, fileName, base);
@@ -174,11 +177,11 @@ async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: Sp
   const inFigure = layerAnnotations(doc, layer.id);
   if (annotationKey(fromFile, values, base) === annotationKey(inFigure, values, base)) return;
   const choice = await ask(
-    'Delta で変わっています',
-    `${fileName} のピーク値・積分 (${summary(fromFile)}) が、保存したときの図 (${summary(inFigure)}) と違います。Delta で変えた中身を図に入れますか？`,
+    tr('Delta で変わっています'),
+    tr('{fileName} のピーク値・積分 ({summary}) が、保存したときの図 ({summary2}) と違います。Delta で変えた中身を図に入れますか？', { fileName, summary: summary(fromFile), summary2: summary(inFigure) }),
     [
-      { label: '図のままにする', value: 'keep' },
-      { label: 'Delta の中身を入れる', value: 'file', kind: 'primary' },
+      { label: tr('図のままにする'), value: 'keep' },
+      { label: tr('Delta の中身を入れる'), value: 'file', kind: 'primary' },
     ],
   );
   if (choice === 'file') edit((d) => applyAnnotations(d, layer.id, fromFile, base));
@@ -192,13 +195,13 @@ export async function openExperiments(keys: string[], mode: 'new' | 'add') {
     .filter((e): e is NonNullable<typeof e> => !!e && canOpen(e))
     .sort((a, b) => a.measuredAt - b.measuredAt);
   if (!metas.length) {
-    notify('選んだ実験は開けません', 'error');
+    notify(tr('選んだ実験は開けません'), 'error');
     return;
   }
   // このソフトで編集して保存した版 (図) は、図ごと開く (ほかの測定とは重ねない)
   const figure = metas.find((m) => m.figure);
   if (figure) {
-    if (metas.length > 1) notify(`${figure.fileName} (編集した版) だけを開きます。編集した版はほかの測定と一緒には開けません`);
+    if (metas.length > 1) notify(tr('{fileName} (編集した版) だけを開きます。編集した版はほかの測定と一緒には開けません', { fileName: figure.fileName }));
     useLibrary.setState({ selected: [] });
     try {
       if (figure.savedFigureId) await openSavedFigure(figure.savedFigureId);
@@ -211,7 +214,7 @@ export async function openExperiments(keys: string[], mode: 'new' | 'add') {
   // 2D は 1つの図に 1本 (1D と混ぜない)
   const two = metas.find((m) => m.dimension >= 2);
   if (two) {
-    if (metas.length > 1) notify(`${two.fileName} (2D) だけを開きます。2D はほかのスペクトルと重ねられません`);
+    if (metas.length > 1) notify(tr('{fileName} (2D) だけを開きます。2D はほかのスペクトルと重ねられません', { fileName: two.fileName }));
     if (!(await confirmDiscard())) return;
     try {
       addSpectrum2d(await load2dExperiment(two.key));
@@ -242,7 +245,7 @@ export async function openExperiments(keys: string[], mode: 'new' | 'add') {
 export async function openDialog(mode: 'add' | 'new' = 'add') {
   if (fsWindow.showOpenFilePicker) {
     try {
-      const handles = await fsWindow.showOpenFilePicker({ multiple: true, types: OPEN_TYPES });
+      const handles = await fsWindow.showOpenFilePicker({ multiple: true, types: localized(OPEN_TYPES) });
       await openFiles(
         await Promise.all(handles.map(async (h) => ({ file: await h.getFile(), handle: h }))),
         mode,
@@ -294,7 +297,7 @@ async function rememberFigure(json: string, fileName: string, handle: FileHandle
   // ただしブラウザに置けない形 (関数を持つ偽物など) のときは、図の中身だけ残す
   await saveFigure({ ...figure, handle: storable(handle) });
   if (!useLibrary.getState().figures.some((f) => f.id === figure.id)) {
-    notify('図をホーム画面に残せませんでした (ブラウザの保存領域を確認してください)', 'error');
+    notify(tr('図をホーム画面に残せませんでした (ブラウザの保存領域を確認してください)'), 'error');
   }
 }
 
@@ -321,9 +324,9 @@ export async function openSavedFigure(id: string) {
     if (handle && isJdfName(handle.name)) registerJdfHandle(handle.name, handle);
     loadDocument(doc, data, handle?.name ?? savedFileName(figure), handle, fids, { data2d, fids2d });
     useEditor.setState({ screen: 'editor' });
-    notify(`${figure.name} を開きました`);
+    notify(tr('{name} を開きました', { name: figure.name }));
   } catch (e) {
-    notify(`開けませんでした: ${(e as Error).message}`, 'error');
+    notify(tr('開けませんでした: {message}', { message: (e as Error).message }), 'error');
   }
 }
 
@@ -350,7 +353,7 @@ export async function saveProject(saveAs = false) {
 function defaultJdfName(base: FigureBase) {
   const { projectName } = useEditor.getState();
   if (projectName) return baseName(projectName) + '.jdf';
-  return `${baseName(base.meta.fileName)}_図.jdf`;
+  return tr('{baseName}_図.jdf', { baseName: baseName(base.meta.fileName) });
 }
 
 /** 土台のスペクトルの .jdf の中身 (読み込んだときのもの、なければデータフォルダ・覚えているファイルから読む) */
@@ -372,20 +375,20 @@ async function templateOf(meta: SpectrumMeta): Promise<ArrayBuffer | null> {
 async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' | 'fallback'> {
   const template = await templateOf(base.meta);
   if (!template) {
-    notify(`土台の ${base.meta.fileName} が見つからないので、.nmrfig で保存します (ホーム画面でデータフォルダを読み込むと .jdf で保存できます)`);
+    notify(tr('土台の {fileName} が見つからないので、.nmrfig で保存します (ホーム画面でデータフォルダを読み込むと .jdf で保存できます)', { fileName: base.meta.fileName }));
     return 'fallback';
   }
   const { fileHandle } = useEditor.getState();
-  if (!saveAs && fileHandle?.name.endsWith(PROJECT_EXT)) notify(`これからは Delta の形式 (.jdf) で保存します。保存する場所を選んでください (${fileHandle.name} はそのまま残ります)`);
+  if (!saveAs && fileHandle?.name.endsWith(PROJECT_EXT)) notify(tr('これからは Delta の形式 (.jdf) で保存します。保存する場所を選んでください ({name} はそのまま残ります)', { name: fileHandle.name }));
   try {
     let handle = saveAs || !fileHandle || !isJdfName(fileHandle.name) ? null : fileHandle;
     if (handle && !(await canWrite(handle))) {
-      notify('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください', 'error');
+      notify(tr('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください'), 'error');
       handle = null;
     }
     if (!handle && fsWindow.showSaveFilePicker) {
       const near = jdfHandle(base.meta.fileName);
-      handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultJdfName(base), types: JDF_TYPES, ...(near ? { startIn: near } : {}) });
+      handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultJdfName(base), types: localized(JDF_TYPES), ...(near ? { startIn: near } : {}) });
     }
     const name = handle?.name ?? defaultJdfName(base);
     // 土台のスペクトルは、保存したあとこのファイルと同期する (FID から処理したものも)。図の中身にもそう書いておく
@@ -396,7 +399,7 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
     try {
       bytes = await buildFigureJdf(template, doc, base, json, s.fids[base.meta.id]);
     } catch (e) {
-      notify(`.jdf にできなかったので、.nmrfig で保存します (${(e as Error).message})`, 'error');
+      notify(tr('.jdf にできなかったので、.nmrfig で保存します ({message})', { message: (e as Error).message }), 'error');
       return 'fallback';
     }
     if (handle) {
@@ -406,7 +409,7 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
         await w.close();
       } catch (e) {
         if (!writeRefused(e)) throw e;
-        await downloadJdf(bytes, json, handle.name, 'このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)');
+        await downloadJdf(bytes, json, handle.name, tr('このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)'));
         return 'done';
       }
       // 書けてから、同期の相手をこのファイルにする (先に変えると、まだ空のファイルを読みに行ってしまう)
@@ -419,15 +422,15 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
         }, false);
       }
       markSaved(name, handle);
-      notify(`${name} に保存しました (ダブルクリックすると Delta で開けます)`);
+      notify(tr('{name} に保存しました (ダブルクリックすると Delta で開けます)', { name }));
       await rememberFigure(json, name, handle);
       await refreshIfInFolder(handle);
       return 'done';
     }
-    await downloadJdf(bytes, json, name, '保存しました (ダウンロードのフォルダ)');
+    await downloadJdf(bytes, json, name, tr('保存しました (ダウンロードのフォルダ)'));
     return 'done';
   } catch (e) {
-    if ((e as Error).name !== 'AbortError') notify(`保存できませんでした: ${(e as Error).message}`, 'error');
+    if ((e as Error).name !== 'AbortError') notify(tr('保存できませんでした: {message}', { message: (e as Error).message }), 'error');
     return 'done';
   }
 }
@@ -446,11 +449,11 @@ async function saveNmrfig(saveAs: boolean) {
     let handle = saveAs || !fileHandle?.name.endsWith(PROJECT_EXT) ? null : fileHandle;
     // 覚えていた保存先は、書き込みの許可を取り直す (ブラウザを開き直したあとなど)
     if (handle && !(await canWrite(handle))) {
-      notify('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください', 'error');
+      notify(tr('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください'), 'error');
       handle = null;
     }
     if (!handle && fsWindow.showSaveFilePicker) {
-      handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultProjectName(), types: PROJECT_TYPES });
+      handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultProjectName(), types: localized(PROJECT_TYPES) });
     }
     if (handle) {
       try {
@@ -460,17 +463,17 @@ async function saveNmrfig(saveAs: boolean) {
       } catch (e) {
         if (!writeRefused(e)) throw e;
         // ブラウザがファイルへの書き込みを許していない (アプリの中のブラウザなど、許可の確認を出せない所)。ダウンロードで残す
-        await downloadProject(text, handle.name, 'このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)');
+        await downloadProject(text, handle.name, tr('このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)'));
         return;
       }
       markSaved(handle.name, handle);
-      notify(`${handle.name} に上書き保存しました`);
+      notify(tr('{name} に上書き保存しました', { name: handle.name }));
       await rememberFigure(text, handle.name, handle);
       return;
     }
-    await downloadProject(text, defaultProjectName(), '保存しました');
+    await downloadProject(text, defaultProjectName(), tr('保存しました'));
   } catch (e) {
-    if ((e as Error).name !== 'AbortError') notify(`保存できませんでした: ${(e as Error).message}`, 'error');
+    if ((e as Error).name !== 'AbortError') notify(tr('保存できませんでした: {message}', { message: (e as Error).message }), 'error');
   }
 }
 
@@ -519,10 +522,10 @@ export async function copyFigure(svg: SVGSVGElement) {
     const vector = await copyFigureToClipboard(text, png);
     notify(
       vector
-        ? '図をコピーしました (ベクター)。Word / PowerPoint に貼ると拡大しても荒くなりません。PowerPoint で線や文字を編集したいときは「SVG」で保存して挿入し、「図形に変換」してください'
-        : '図をコピーしました (PNG)。このブラウザはベクターのコピーに対応していないので、きれいに使うときは「SVG」で保存して挿入してください',
+        ? tr('図をコピーしました (ベクター)。Word / PowerPoint に貼ると拡大しても荒くなりません。PowerPoint で線や文字を編集したいときは「SVG」で保存して挿入し、「図形に変換」してください')
+        : tr('図をコピーしました (PNG)。このブラウザはベクターのコピーに対応していないので、きれいに使うときは「SVG」で保存して挿入してください'),
     );
   } catch (e) {
-    notify(`コピーできませんでした: ${(e as Error).message}`, 'error');
+    notify(tr('コピーできませんでした: {message}', { message: (e as Error).message }), 'error');
   }
 }

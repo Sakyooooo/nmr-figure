@@ -3,6 +3,7 @@
  * - 「記録を付ける」: 好きなときに今の中身を残す (メモは任意)。一覧の中心はこれ
  * - 自動の控え: 同期のたびに残るもの (上書きされた中身を戻すため)。ふだんは畳んでおく
  */
+import { locale, tr } from '../i18n';
 import { useEffect, useState } from 'react';
 import { summary, syncFileOf } from '../lib/deltaSync';
 import { exportEntry, grantDeltaWrite, recordNow, restoreEntry, restoreOriginal, useSync, type LinkView } from '../state/deltaSync';
@@ -61,14 +62,14 @@ export function SyncPanel() {
 
   return (
     <Section
-      title={synced ? 'Delta との同期・記録' : '編集記録'}
+      title={synced ? tr('Delta との同期・記録') : tr('編集記録')}
       extra={synced ? <StatusBadge view={view} /> : undefined}
       help={
         synced
-          ? `ピーク値・積分を変えると ${view.fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。`
+          ? tr('ピーク値・積分を変えると {fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。', { fileName: view.fileName })
           : fidUnsaved
-            ? '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。FID から処理したスペクトルは、図を保存すると (図入りの .jdf)、その .jdf と Delta の同期が始まります。'
-            : '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。'
+            ? tr('「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。FID から処理したスペクトルは、図を保存すると (図入りの .jdf)、その .jdf と Delta の同期が始まります。')
+            : tr('「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。')
       }
     >
       {synced && <SyncStatus view={view} layerId={layerId} />}
@@ -77,26 +78,26 @@ export function SyncPanel() {
         <input
           type="text"
           value={memo}
-          placeholder="メモ (任意)"
+          placeholder={tr('メモ (任意)')}
           onChange={(e) => setMemo(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) record();
           }}
         />
-        <button onClick={record} title="今のピーク値・積分を記録に残します。あとからこの時点に戻せます">
-          記録を付ける
+        <button onClick={record} title={tr('今のピーク値・積分を記録に残します。あとからこの時点に戻せます')}>
+          {tr('記録を付ける')}
         </button>
       </div>
 
       {records.length > 0 ? (
         <div className="history">
-          <div className="history-head">記録 ({records.length})</div>
+          <div className="history-head">{tr('記録 ({n})', { n: records.length })}</div>
           <ul>
             {records.map((e) => (
               <li key={e.id} className={open === e.id ? 'open' : ''}>
                 <button className="history-row" onClick={() => setOpen(open === e.id ? null : e.id)}>
                   <span className="history-time">{timeText(e.at)}</span>
-                  <span className={`history-note${e.memo ? '' : ' muted'}`}>{e.memo || '(メモなし)'}</span>
+                  <span className={`history-note${e.memo ? '' : ' muted'}`}>{e.memo || tr('(メモなし)')}</span>
                   <span className="muted">{summary(e.annotations)}</span>
                 </button>
                 {open === e.id && <EntryDetail entry={e} fileName={fileName} layerId={layerId} hasFile={hasFile} />}
@@ -105,13 +106,13 @@ export function SyncPanel() {
           </ul>
         </div>
       ) : (
-        <p className="muted">まだ記録はありません</p>
+        <p className="muted">{tr('まだ記録はありません')}</p>
       )}
 
       {(autos.length > 0 || hasOriginal) && (
         <details className="sub">
           <summary>
-            自動の控え ({autos.length}) — 同期のたびに残る中身。上書きされたものを戻すとき用
+            {tr('自動の控え ({n}) — 同期のたびに残る中身。上書きされたものを戻すとき用', { n: autos.length })}
           </summary>
           {autos.length > 0 && (
             <div className="history">
@@ -119,7 +120,7 @@ export function SyncPanel() {
                 {autos.map((e) => (
                   <li key={e.id} className={open === e.id ? 'open' : ''}>
                     <button className="history-row" onClick={() => setOpen(open === e.id ? null : e.id)}>
-                      <span className={`badge from-${e.source}`}>{e.source === 'delta' ? 'Delta' : 'このソフト'}</span>
+                      <span className={`badge from-${e.source}`}>{e.source === 'delta' ? 'Delta' : tr('このソフト')}</span>
                       <span className="history-time">{timeText(e.at)}</span>
                       <span className="history-note">{e.note}</span>
                       <span className="muted">{summary(e.annotations)}</span>
@@ -132,8 +133,8 @@ export function SyncPanel() {
           )}
           {hasOriginal && hasFile && (
             <div className="row">
-              <button className="link" onClick={() => void restoreOriginal(layerId)} title="このソフトで初めて書き込む前のファイル (スペクトルも注釈も) に戻します">
-                このソフトで書き込む前のファイルに戻す
+              <button className="link" onClick={() => void restoreOriginal(layerId)} title={tr('このソフトで初めて書き込む前のファイル (スペクトルも注釈も) に戻します')}>
+                {tr('このソフトで書き込む前のファイルに戻す')}
               </button>
             </div>
           )}
@@ -145,12 +146,12 @@ export function SyncPanel() {
 
 function StatusBadge({ view }: { view: LinkView }) {
   const label: Record<LinkView['status'], string> = {
-    waiting: '待機中',
-    synced: '同期中',
-    pending: '書き込み待ち',
-    'need-permission': '許可が必要',
-    error: 'エラー',
-    duplicate: '同期しない',
+    waiting: tr('待機中'),
+    synced: tr('同期中'),
+    pending: tr('書き込み待ち'),
+    'need-permission': tr('許可が必要'),
+    error: tr('エラー'),
+    duplicate: tr('同期しない'),
   };
   return <span className={`badge sync-${view.status}`}>{label[view.status]}</span>;
 }
@@ -159,38 +160,38 @@ function SyncStatus({ view, layerId }: { view: LinkView; layerId: string }) {
   if (view.status === 'need-permission') {
     return (
       <div className="sync-alert" role="alert">
-        <p className="sync-alert-title">Delta と自動で行き来するには、書き込みの許可が要ります</p>
+        <p className="sync-alert-title">{tr('Delta と自動で行き来するには、書き込みの許可が要ります')}</p>
         <ul className="benefits">
           <li>
             <Icon name="check" size={16} />
-            Delta で直した積分・ピーク値が、ここにも自動で入ります
+            {tr('Delta で直した積分・ピーク値が、ここにも自動で入ります')}
           </li>
           <li>
             <Icon name="check" size={16} />
-            ここで直したものが、Delta で開いたときにも入っています
+            {tr('ここで直したものが、Delta で開いたときにも入っています')}
           </li>
           <li>
             <Icon name="check" size={16} />
-            書き込む前の状態は「記録」からいつでも戻せます
+            {tr('書き込む前の状態は「記録」からいつでも戻せます')}
           </li>
         </ul>
         <p className="hint">
           {view.message}
           {/* 確認を出せないブラウザ (アプリの中のブラウザなど) では、次の確認は出ない */}
-          {!view.message.includes('Chrome か Edge') && '。次にブラウザが確認を出したら「許可」を押してください (許可はこのデータフォルダだけ)'}
+          {!view.message.includes('Chrome') && tr('。次にブラウザが確認を出したら「許可」を押してください (許可はこのデータフォルダだけ)')}
         </p>
         <button className="btn primary" onClick={() => void grantDeltaWrite(layerId)}>
-          書き込みを許可する
+          {tr('書き込みを許可する')}
         </button>
       </div>
     );
   }
   if (view.status === 'synced' || view.status === 'pending') {
     const when = view.lastSyncAt ? timeText(view.lastSyncAt) : '';
-    const dir = view.direction === 'pull' ? 'Delta → このソフト' : view.direction === 'push' ? 'このソフト → Delta' : '同じ中身';
+    const dir = view.direction === 'pull' ? tr('Delta → このソフト') : view.direction === 'push' ? tr('このソフト → Delta') : tr('同じ中身');
     return (
       <p className="hint">
-        {view.status === 'pending' ? '変更を Delta に書き込みます…' : `${view.fileName} と同じ中身です${when ? ` (最後に合わせた: ${when}、${dir})` : ''}`}
+        {view.status === 'pending' ? tr('変更を Delta に書き込みます…') : tr('{fileName} と同じ中身です{v1}', { fileName: view.fileName, v1: when ? tr(' (最後に合わせた: {when}、{dir})', { when, dir }) : '' })}
       </p>
     );
   }
@@ -203,16 +204,16 @@ function EntryDetail({ entry, fileName, layerId, hasFile }: { entry: HistoryEntr
     <div className="history-detail">
       {entry.manual && (
         <label className="field block">
-          メモ
-          <TextInput value={entry.memo ?? ''} placeholder="(メモなし)" onCommit={(v) => void updateMemo(fileName, entry.id, v.trim())} />
+          {tr('メモ')}
+          <TextInput value={entry.memo ?? ''} placeholder={tr('(メモなし)')} onCommit={(v) => void updateMemo(fileName, entry.id, v.trim())} />
         </label>
       )}
       {a.integrals.length > 0 && (
         <table className="table compact">
           <thead>
             <tr>
-              <th>積分 (ppm)</th>
-              <th>値</th>
+              <th>{tr('積分 (ppm)')}</th>
+              <th>{tr('値')}</th>
             </tr>
           </thead>
           <tbody>
@@ -229,29 +230,29 @@ function EntryDetail({ entry, fileName, layerId, hasFile }: { entry: HistoryEntr
       )}
       {a.peaks.length > 0 && (
         <p className="hint">
-          ピーク値: {a.peaks
+          {tr('ピーク値:')}{' '}{a.peaks
             .map((p) => p.ppm)
             .sort((x, y) => y - x)
             .map((p) => p.toFixed(3))
             .join(', ')}
         </p>
       )}
-      {!a.integrals.length && !a.peaks.length && <p className="hint">ピーク値・積分なし</p>}
+      {!a.integrals.length && !a.peaks.length && <p className="hint">{tr('ピーク値・積分なし')}</p>}
       <div className="row wrap">
         <button
           onClick={() => void restoreEntry(layerId, entry)}
-          title={hasFile ? '図と Delta のファイルを、この時点の中身にします (今の中身は自動の控えに残ります)' : '図のピーク値・積分を、この時点の中身にします'}
+          title={hasFile ? tr('図と Delta のファイルを、この時点の中身にします (今の中身は自動の控えに残ります)') : tr('図のピーク値・積分を、この時点の中身にします')}
         >
-          この時点に戻す
+          {tr('この時点に戻す')}
         </button>
         {hasFile && (
-          <button onClick={() => void exportEntry(layerId, entry)} title="この時点の中身で、別の .jdf を作ります (元のファイルは変えません)">
-            別の .jdf に書き出す
+          <button onClick={() => void exportEntry(layerId, entry)} title={tr('この時点の中身で、別の .jdf を作ります (元のファイルは変えません)')}>
+            {tr('別の .jdf に書き出す')}
           </button>
         )}
         {entry.manual && (
-          <button className="danger" onClick={() => void deleteRecord(fileName, entry.id)} title="この記録を消します (図や Delta のファイルは変わりません)">
-            記録を消す
+          <button className="danger" onClick={() => void deleteRecord(fileName, entry.id)} title={tr('この記録を消します (図や Delta のファイルは変わりません)')}>
+            {tr('記録を消す')}
           </button>
         )}
       </div>
@@ -260,5 +261,5 @@ function EntryDetail({ entry, fileName, layerId, hasFile }: { entry: HistoryEntr
 }
 
 function timeText(ms: number) {
-  return new Date(ms).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(ms).toLocaleString(locale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }

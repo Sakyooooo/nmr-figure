@@ -9,6 +9,8 @@ import { join, resolve } from 'node:path';
 
 const BASE = process.env.UI_BASE ?? 'http://localhost:5180';
 const OUT = resolve(process.argv[2] ?? '.dev-output/shots');
+/** 画面の言語 (UI_LANG=en で英語の画面を撮る。名前の末尾に -en が付く) */
+const LANG = process.env.UI_LANG;
 const PORT = 9333;
 
 /** [名前, ?demo, 幅, 高さ, 撮る前にページで動かす式 (任意)] */
@@ -21,12 +23,14 @@ const SHOTS = [
   ['palette-1440', 'palette', 1440, 900],
   ['integral-1440', 'integral', 1440, 900],
   ['selected-1440', 'selected', 1440, 900],
-  ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"]').click()`],
+  ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"], .topbar [aria-label="Export"]').click()`],
   ['figure-tab-1440', 'spectra', 1440, 900, `document.querySelector('#inspector-tab-figure').click()`],
   ['2d-1440', '2d', 1440, 900],
   ['trend-1440', 'trend', 1440, 900],
   ['home-1440', 'home', 1440, 900],
   ['home-1024', 'home', 1024, 768],
+  ['onboarding-1440', 'onboarding', 1440, 900],
+  ['onboarding-800', 'onboarding', 800, 900],
 ];
 
 const browsers = [
@@ -61,7 +65,7 @@ async function main() {
       const s = (method, params) => cdp.send(method, params, sessionId);
       await s('Page.enable');
       await s('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
-      await s('Page.navigate', { url: `${BASE}/?demo=${demo}` });
+      await s('Page.navigate', { url: `${BASE}/?demo=${demo}${LANG ? `&lang=${LANG}` : ''}` });
       let ready = false;
       for (let i = 0; i < 100 && !ready; i++) {
         await sleep(200);
@@ -75,7 +79,7 @@ async function main() {
         await sleep(400);
       }
       const { data } = await s('Page.captureScreenshot', { format: 'png' });
-      writeFileSync(join(OUT, `${name}.png`), Buffer.from(data, 'base64'));
+      writeFileSync(join(OUT, `${name}${LANG ? `-${LANG}` : ''}.png`), Buffer.from(data, 'base64'));
       console.log(`${name} (${w}×${h})`);
       await cdp.send('Target.closeTarget', { targetId });
       await cdp.send('Target.disposeBrowserContext', { browserContextId });

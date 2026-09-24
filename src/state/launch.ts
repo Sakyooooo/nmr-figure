@@ -3,6 +3,7 @@
  * Windows がこのソフトを開き、ブラウザが launchQueue でファイルを渡してくる。開いている窓があればそこに渡す
  * (launch_handler の focus-existing)。.jdf は Delta で開くので、ここには来ない
  */
+import { tr } from '../i18n';
 import { openFiles } from './fileOps';
 import { notify, type FileHandle } from './store';
 
@@ -20,7 +21,7 @@ export function startFileLaunch() {
       const files = await Promise.all(params.files.map(async (handle) => ({ file: await handle.getFile(), handle })));
       await openFiles(files, 'new');
     } catch (e) {
-      notify(`ファイルを開けませんでした: ${(e as Error).message}`, 'error');
+      notify(tr('ファイルを開けませんでした: {message}', { message: (e as Error).message }), 'error');
     }
   });
 }

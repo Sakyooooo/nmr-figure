@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 import { useMemo } from 'react';
 import { baseName, downloadBlob } from '../lib/exportFigure';
 import { computeTrend, trendCsv } from '../lib/trend';
@@ -26,9 +27,9 @@ export function TrendPanel() {
 
   return (
     <Section
-      title="推移グラフ"
+      title={tr('推移グラフ')}
       defaultOpen={tab === 'trend'}
-      help="範囲ツール (G) でスペクトル上を左右にドラッグすると、追跡する範囲を追加できます。時間は左の一覧でスペクトルを選んで入れるか、名前 (例: 24 h) から読み取ります。"
+      help={tr('範囲ツール (G) でスペクトル上を左右にドラッグすると、追跡する範囲を追加できます。時間は左の一覧でスペクトルを選んで入れるか、名前 (例: 24 h) から読み取ります。')}
     >
       <div className="row wrap">
         <button
@@ -37,14 +38,14 @@ export function TrendPanel() {
             setTool('region');
           }}
         >
-          ＋ 範囲を追加
+          {tr('＋ 範囲を追加')}
         </button>
         {tab === 'spectrum' ? (
           <button onClick={() => setCanvasTab('trend')}>
-            グラフを表示
+            {tr('グラフを表示')}
           </button>
         ) : (
-          <button onClick={() => setCanvasTab('spectrum')}>スペクトルに戻る</button>
+          <button onClick={() => setCanvasTab('spectrum')}>{tr('スペクトルに戻る')}</button>
         )}
       </div>
 
@@ -53,9 +54,9 @@ export function TrendPanel() {
           <thead>
             <tr>
               <th />
-              <th>名前</th>
+              <th>{tr('名前')}</th>
               <th>ppm</th>
-              <th title="プロトン数など。この数で割ってから比べます">nH</th>
+              <th title={tr('プロトン数など。この数で割ってから比べます')}>nH</th>
               <th />
             </tr>
           </thead>
@@ -97,31 +98,31 @@ export function TrendPanel() {
 
       <div className="grid2">
         <label className="field">
-          測り方
+          {tr('測り方')}
           <select value={t.measure} onChange={(e) => set({ measure: e.target.value as TrendSettings['measure'] })}>
-            <option value="area">面積</option>
-            <option value="height">高さ</option>
+            <option value="area">{tr('面積')}</option>
+            <option value="height">{tr('高さ')}</option>
           </select>
         </label>
         <label className="field">
-          単位
+          {tr('単位')}
           <TextInput value={unit} onCommit={(timeUnit) => set({ timeUnit })} width={48} />
         </label>
       </div>
       <label className="field block">
-        縦軸の値
+        {tr('縦軸の値')}
         <select value={t.normalize} onChange={(e) => set({ normalize: e.target.value as TrendSettings['normalize'] })}>
-          <option value="sum">合計を 100% (転化率・生成比)</option>
-          <option value="reference">基準の範囲との比 (内部標準)</option>
-          <option value="first">最初の時点を 100%</option>
-          <option value="none">そのままの値</option>
+          <option value="sum">{tr('合計を 100% (転化率・生成比)')}</option>
+          <option value="reference">{tr('基準の範囲との比 (内部標準)')}</option>
+          <option value="first">{tr('最初の時点を 100%')}</option>
+          <option value="none">{tr('そのままの値')}</option>
         </select>
       </label>
       {(t.normalize === 'reference' || t.normalize === 'sum') && (
         <label className="field block">
-          {t.normalize === 'reference' ? '基準の範囲' : '合計から除く範囲 (内部標準など)'}
+          {t.normalize === 'reference' ? tr('基準の範囲') : tr('合計から除く範囲 (内部標準など)')}
           <select value={t.referenceId ?? ''} onChange={(e) => set({ referenceId: e.target.value || null })}>
-            <option value="">{t.normalize === 'reference' ? '選んでください' : 'なし'}</option>
+            <option value="">{t.normalize === 'reference' ? tr('選んでください') : tr('なし')}</option>
             {t.regions.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -141,7 +142,7 @@ export function TrendPanel() {
           <table className="table compact">
             <thead>
               <tr>
-                <th>時間 ({unit})</th>
+                <th>{tr('時間 ({unit})', { unit })}</th>
                 {result.series.map((r) => (
                   <th key={r.id} style={{ color: r.color }}>
                     <RichHtml text={r.name} />
@@ -152,7 +153,7 @@ export function TrendPanel() {
             <tbody>
               {result.rows.map((row) => (
                 <tr key={row.layer.id}>
-                  <td title={{ set: '入力した時間', label: '名前から読み取った時間', acquired: '測定時刻から求めた時間', order: '並び順' }[row.timeSource]}>
+                  <td title={{ set: tr('入力した時間'), label: tr('名前から読み取った時間'), acquired: tr('測定時刻から求めた時間'), order: tr('並び順') }[row.timeSource]}>
                     {row.time}
                     {row.timeSource !== 'set' && <span className="muted">*</span>}
                   </td>
@@ -168,27 +169,27 @@ export function TrendPanel() {
       )}
 
       <details className="sub">
-        <summary>グラフの見た目</summary>
+        <summary>{tr('グラフの見た目')}</summary>
         <label className="field block">
-          横軸のラベル
+          {tr('横軸のラベル')}
           <TextInput value={t.xLabel} onCommit={(xLabel) => set({ xLabel })} placeholder={`Time (${unit})`} />
         </label>
         <label className="field block">
-          縦軸のラベル
+          {tr('縦軸のラベル')}
           <TextInput value={t.yLabel} onCommit={(yLabel) => set({ yLabel })} placeholder={result.yLabel} />
         </label>
         <div className="row">
           <label className="field">
-            幅
+            {tr('幅')}
             <NumberInput value={t.width} min={200} max={3000} step={10} width={60} onCommit={(v) => set({ width: v ?? 560 })} />
           </label>
           <label className="field">
-            高さ
+            {tr('高さ')}
             <NumberInput value={t.height} min={150} max={3000} step={10} width={60} onCommit={(v) => set({ height: v ?? 380 })} />
           </label>
         </div>
         <Check checked={t.showOnSpectrum} onChange={(v) => set({ showOnSpectrum: v })}>
-          スペクトル上に範囲を表示 (書き出しには出ません)
+          {tr('スペクトル上に範囲を表示 (書き出しには出ません)')}
         </Check>
       </details>
 
@@ -201,7 +202,7 @@ export function TrendPanel() {
             downloadBlob(new Blob([new Uint8Array([0xef, 0xbb, 0xbf]), trendCsv(result, t.regions)], { type: 'text/csv' }), name);
           }}
         >
-          表を CSV で保存
+          {tr('表を CSV で保存')}
         </button>
       </div>
     </Section>
