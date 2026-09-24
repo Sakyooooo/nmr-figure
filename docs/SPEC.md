@@ -196,6 +196,16 @@ B = このアプリで処理した 1H + ピーク値・積分 + 図、C = この
 - 画面での確認 (5180、偽の保存ダイアログ): 2 本重ね → 保存 → 開き直しで層・積分・色が戻り、土台は図のファイルと同期済み。
   13C (FID) → 保存 → Delta でピークを足したことにして開くと、取り込むか聞く。list_header / convert.exe でも読めて図が残る
 
+## アプリとして入れる (public/manifest.webmanifest, state/launch.ts)
+2026-09-24 本人の希望: .jdf にできない図 (2D・文献だけ) の .nmrfig も、ダブルクリックでこのソフトが開くように。
+- Web App Manifest (name・192/512 の PNG アイコン・start_url・display standalone) で Edge / Chrome に入れられる。
+  Edge を DevTools (CDP) で動かし、Page.getInstallabilityErrors が空・manifest のエラーなしを確かめた。サービスワーカーは使わない
+- file_handlers で .nmrfig だけを受け持つ (.jdf は Delta のまま)。launch_handler は focus-existing (開いている窓に渡す)
+- 渡されたファイルは launchQueue.setConsumer で受け取り、openFiles(…, 'new') で開く。前回の作業を読み込んだあとに始める
+  (先に開くと、前回の図の読み込みで上書きされる)
+- アイコンは design/app-icon.svg (ファビコンと同じ絵柄) を scripts/make-icons.mjs が Edge で描いて public/icon-192.png / icon-512.png にする
+- CSP の default-src 'self' で manifest も読める。配布用の serve.ps1 に .webmanifest の種類を足した
+
 ## Delta との同期 (state/deltaSync.ts, lib/deltaSync.ts)
 2026-09-23。ボタンで書き出すのではなく、図と .jdf を自動で行き来させる (本人の希望: 「勝手に相互編集」)。
 Delta も「同じファイルに上書き」で保存するので、このアプリも開いた .jdf に上書きする。

@@ -5,6 +5,7 @@ import { figureSvgString, svgToPng } from './lib/exportFigure';
 import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
+import { startFileLaunch } from './state/launch';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
 import { addAnnotation, autoDetectSignals, select, useEditor } from './state/store';
 import { annotationDefaults } from './state/types';
@@ -28,6 +29,8 @@ void restoreWork().finally(() => {
   startAutoSave();
   // Delta との同期は、前回の図を読み込んでから始める (図の中の .jdf を見に行くため)
   startDeltaSync();
+  // アプリとして入れたとき、ダブルクリックした .nmrfig を開く (前回の図を読み込んだあとに)
+  startFileLaunch();
   if (import.meta.env.DEV) void openDemo();
 });
 

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- アプリのアイコン (index.html のファビコンと同じ絵柄を大きくしたもの)。scripts/make-icons.mjs で public/ の PNG にする -->
+  <rect x="16" y="16" width="480" height="480" rx="104" fill="#ffffff" stroke="#d6dbe1" stroke-width="8" />
+  <g transform="translate(64 64) scale(12)">
+    <path d="M2 28h28" stroke="#333333" stroke-width="0.9" stroke-linecap="round" />
+    <path d="M4 27L9 27L10 12L11 27L17 27L18 4L19 27L28 27" fill="none" stroke="#1a8f1a" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" />
+  </g>
+</svg>
