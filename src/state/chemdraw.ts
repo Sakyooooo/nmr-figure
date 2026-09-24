@@ -4,14 +4,19 @@
  *    ブラウザからは ChemDraw を起動できず、描いている途中の中身も見えないので、この PC に入れた連携 (tools/chemdraw-link) を
  *    nmrfig-chemdraw: のリンクで呼ぶ。連携が構造式を NMR の保存先の「ChemDraw」フォルダに置いて ChemDraw で開き、
  *    描いている間 1 秒ごとにそのファイルへ書く。アプリはそのファイルを見て図を直す
+ *  - 連携の準備 (「ChemDraw と連携する」、初めての説明・設定・構造式ボタン): NMR の保存先に ChemDraw フォルダを作り、
+ *    ChemDraw連携を入れる.cmd を置く。本人がダブルクリックすると連携が入り、ChemDraw フォルダに .nmrfig-link.json ができる
  *  - 貼る: ChemDraw の「Edit > Copy As > CDXML Text」を図の上で貼る、または .cdxml をドロップ。選んだまま貼ると置き換える
  * 書き出し (「ChemDraw で開く」) は chemdrawExport.ts
  */
+import { create } from 'zustand';
 import { tr } from '../i18n';
 import { cdxmlToSvg, drawCdxml, looksLikeCdxml } from '../lib/cdxml';
+import { downloadBlob } from '../lib/exportFigure';
+import { buildLinkInstaller, LINK_INSTALLER_NAME } from '../lib/linkInstaller';
 import { imageRect, PX_PER_PT } from '../lib/scene';
 import { ask } from './dialog';
-import { dataFolderName, folderChildFile, folderReadPermission, pickFolder } from './library';
+import { dataFolderName, folderChildFile, folderReadPermission, folderWriteChildFile, folderWritePermission, pickFolder } from './library';
 import { addFigureImage, edit, notify, openStructureEditor, select, setStructureTool, useEditor } from './store';
 
 /** ChemDraw でふつうにコピーしたもの (ブラウザで読める形がない) を貼ったときの案内 */
@@ -95,8 +100,18 @@ const EMPTY_CDXML = `<?xml version="1.0" encoding="UTF-8" ?>
 
 /** 連携が構造式を置くフォルダ (NMR の保存先の中) */
 export const CHEMDRAW_DIR = 'ChemDraw';
-/** 連携の入れ方の案内に出す場所 */
-export const LINK_INSTALLER = 'tools\\chemdraw-link\\ChemDraw連携を入れる.bat';
+/** 連携が入ったら、連携が ChemDraw フォルダに置く印 */
+const LINK_MARKER = '.nmrfig-link.json';
+
+/** 連携ができているか (NMR の保存先の ChemDraw フォルダに印があるか)。null = まだ調べていない */
+export const useChemDrawLink = create<{ ready: boolean | null }>(() => ({ ready: null }));
+
+/** 連携ができているかを調べる (NMR の保存先の読み取りの許可がないときは、できていないとみなす) */
+export async function refreshLinkStatus(): Promise<boolean> {
+  const ready = !!dataFolderName() && !!(await folderChildFile(CHEMDRAW_DIR, LINK_MARKER));
+  useChemDrawLink.setState({ ready });
+  return ready;
+}
 
 interface Watch {
   name: string;
@@ -146,7 +161,7 @@ async function pack(text: string) {
 }
 
 /** 構造式を読むための NMR の保存先 (開いていなければ選んでもらう) */
-async function readyFolder(): Promise<boolean> {
+async function readyFolder(write = false): Promise<boolean> {
   if (!dataFolderName()) {
     const choice = await ask(tr('NMR の保存先を開いてください'), tr('ChemDraw で描いた構造式は、NMR の保存先の中の「ChemDraw」フォルダを通して図に入ります。NMR の保存先 (ホーム画面で開くフォルダ) を選んでください。'), [
       { label: tr('NMR の保存先を選ぶ'), value: 'pick', kind: 'primary' },
@@ -160,7 +175,64 @@ async function readyFolder(): Promise<boolean> {
     notify(tr('NMR の保存先の読み取りが許可されませんでした'), 'error');
     return false;
   }
+  if (write && (await folderWritePermission(true)) !== 'granted') {
+    notify(tr('NMR の保存先への書き込みが許可されませんでした'), 'error');
+    return false;
+  }
   return true;
+}
+
+let linkTimer: number | null = null;
+
+/**
+ * ChemDraw と連携する: NMR の保存先に ChemDraw フォルダを作り、ChemDraw連携を入れる.cmd を置く。
+ * 本人がダブルクリックすると連携が入る (置かれた場所から NMR の保存先がわかるので、フォルダは聞かれない)。
+ * ブラウザがこの種類のファイルを書かせてくれなければ、ダウンロードにする (そのときは開いたときに保存先を選ぶ)
+ */
+export async function setupChemDrawLink() {
+  if (!(await readyFolder(true))) return;
+  const folder = dataFolderName() ?? '';
+  const [installer, helper, vbs] = await Promise.all([
+    import('../../tools/chemdraw-link/installer.ps1?raw'),
+    import('../../tools/chemdraw-link/helper.ps1?raw'),
+    import('../../tools/chemdraw-link/launch.vbs?raw'),
+  ]);
+  const text = buildLinkInstaller({ installer: installer.default, helper: helper.default, vbs: vbs.default });
+  // ChemDraw で描くと決めたことにする (まだ決めていなければ)
+  if (!useEditor.getState().settings.ui.structureTool) setStructureTool('chemdraw');
+  let placed = true;
+  try {
+    await folderWriteChildFile(CHEMDRAW_DIR, LINK_INSTALLER_NAME, text);
+  } catch {
+    placed = false;
+  }
+  if (!placed) downloadBlob(new Blob([text], { type: 'application/octet-stream' }), LINK_INSTALLER_NAME);
+  waitForLink();
+  await ask(
+    tr('ChemDraw と連携する'),
+    placed
+      ? tr('NMR の保存先「{folder}」の中の「ChemDraw」フォルダに「{name}」を置きました。エクスプローラーでこのファイルをダブルクリックしてください (1 回だけ)。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。', { folder, name: LINK_INSTALLER_NAME })
+      : tr('「{name}」をダウンロードしました。開いてください (1 回だけ)。NMR の保存先を聞かれたら「{folder}」を選んでください。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。', { folder, name: LINK_INSTALLER_NAME }),
+    [{ label: tr('閉じる'), value: 'ok', kind: 'primary' }],
+    { cancel: false },
+  );
+}
+
+/** 連携が入るのを待って知らせる (15 分まで) */
+function waitForLink() {
+  if (linkTimer !== null) window.clearInterval(linkTimer);
+  const started = Date.now();
+  const before = useChemDrawLink.getState().ready;
+  linkTimer = window.setInterval(async () => {
+    const file = await folderChildFile(CHEMDRAW_DIR, LINK_MARKER);
+    const fresh = file && (!before || file.lastModified >= started - 2000);
+    if (fresh || Date.now() - started > 15 * 60_000) {
+      window.clearInterval(linkTimer!);
+      linkTimer = null;
+      useChemDrawLink.setState({ ready: !!file });
+      if (fresh) notify(tr('ChemDraw と連携できました。構造式ボタンを押すと ChemDraw が開きます'));
+    }
+  }, 2000);
 }
 
 /**
@@ -171,6 +243,14 @@ export async function drawInChemDraw(imageId: string | null) {
   const image = imageId ? useEditor.getState().doc.figureImages.find((x) => x.id === imageId) : null;
   if (imageId && !image?.cdxml) return;
   if (!(await readyFolder())) return;
+  if (!(await refreshLinkStatus())) {
+    const choice = await ask(tr('ChemDraw との連携がまだです'), tr('ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。'), [
+      { label: tr('ChemDraw と連携する'), value: 'link', kind: 'primary' },
+      { label: tr('やめる'), value: 'cancel' },
+    ]);
+    if (choice === 'link') await setupChemDrawLink();
+    return;
+  }
   const id = imageId ?? crypto.randomUUID();
   const name = fileKey(id);
   const text = image?.cdxml ?? EMPTY_CDXML;
@@ -216,12 +296,11 @@ export async function pollChemDraw() {
           w.warned = true;
           void ask(
             tr('ChemDraw が開きませんでしたか'),
-            tr('ChemDraw 連携がこの PC に入っていないか、連携に選んだ NMR の保存先が、アプリで開いているフォルダ ({folder}) と違います。アプリのフォルダの {installer} をダブルクリックして入れて (入れ直して) ください。', {
-              folder: dataFolderName() ?? '',
-              installer: LINK_INSTALLER,
-            }),
-            [{ label: tr('閉じる'), value: 'ok', kind: 'primary' }],
-          );
+            tr('ChemDraw との連携がうまく動いていないようです (Edge の「開きますか」を許可しなかった、連携を外した、など)。もう一度「ChemDraw と連携する」を行ってください。'),
+            [{ label: tr('ChemDraw と連携する'), value: 'link', kind: 'primary' }],
+          ).then((v) => {
+            if (v === 'link') void setupChemDrawLink();
+          });
         }
         continue;
       }

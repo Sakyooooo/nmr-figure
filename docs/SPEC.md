@@ -95,9 +95,19 @@ x(i) = axisStart + (i - offsetStart) * (axisStop - axisStart) / (offsetStop - of
 - ChemDraw で描く (本人の希望 2026-09-24「アプリからケムドロ作成」「保存先は NMR の保存先でよい」「すぐ開いて編集。Word に貼った
   ChemDraw のように保存しなくてよいように」、state/chemdraw.ts + tools/chemdraw-link/):
   - ブラウザからは ChemDraw を起動できず (chemdraw: のリンクは Signals のサインイン用)、描いている途中の中身も見えない。
-    そこで、この PC に連携を 1 回だけ入れてもらう (tools/chemdraw-link/ChemDraw連携を入れる.bat。管理者の権限は要らない)。
-    入れると、NMR の保存先を聞き、%LOCALAPPDATA%\NMRFigure\chemdraw-link に helper.ps1 と launch.vbs を置き、
-    nmrfig-chemdraw: のリンクを HKCU\Software\Classes に登録する。外すときは ChemDraw連携を外す.bat
+    そこで、この PC に連携を 1 回だけ入れてもらう (管理者の権限は要らない)。
+  - 連携の準備 (本人の希望 2026-09-24「初回と設定に ChemDraw リンクボタン、フォルダは勝手に用意してよい」):
+    初めて開いたときの説明の 5 枚目・設定・構造式ボタン (連携がまだのとき) の「ChemDraw と連携する」→
+    NMR の保存先 (書き込みの許可を取る) に「ChemDraw」フォルダを作り、ChemDraw連携を入れる.cmd を置く (lib/linkInstaller.ts)。
+    本人がダブルクリックすると、置かれた場所から NMR の保存先がわかるので、フォルダは聞かない (保存先の食い違いが起きない)。
+    ブラウザが書かせてくれないときはダウンロードにし、開いたときに保存先を選んでもらう
+  - ChemDraw連携を入れる.cmd: ASCII だけの cmd。起動の行が自分を読み、最後の ::NMRFIG:: のあとの base64 (installer.ps1 と、
+    helper.ps1・launch.vbs の base64) を PowerShell で実行する。改行は CRLF にそろえる (公開版は Linux でビルドするため)
+  - 連携 (tools/chemdraw-link/installer.ps1): %LOCALAPPDATA%\NMRFigure\chemdraw-link に helper.ps1 と launch.vbs と config.json
+    (NMR の保存先) を置き、nmrfig-chemdraw: を HKCU\Software\Classes に登録し、NMR の保存先\ChemDraw\.nmrfig-link.json を置く。
+    アプリはこの印で「連携できた」と知る (2 秒ごとに見て知らせる。設定にも出す)。同じフォルダに入っていれば、入れ直すか外すかを聞く。
+    環境変数 NMRFIG_DRYRUN があればレジストリに触らず %TEMP% に書く (試験用)。
+    このリポジトリの tools/chemdraw-link の .bat からも入れる・外すができる (そのときは NMR の保存先を聞く)
   - 構造式ボタン (初めて押したときにどちらで描くか聞く。設定で変えられる)・ChemDraw の構造式のダブルクリック・「ChemDraw で直す」→
     `nmrfig-chemdraw:open?name=structure-<id の 16 進 16 字>&data=<CDXML を deflate して base64url>` を開く。
     連携 (helper.ps1) がそれを NMR の保存先\ChemDraw\ に書き、開いている ChemDraw の中に開く (なければ起動)。

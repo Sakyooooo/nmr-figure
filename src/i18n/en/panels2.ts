@@ -236,7 +236,11 @@ export const EN_PANELS2: Record<string, string> = {
   '。線が見つからない列が多いので、枠を線に合わせて囲み直してください': '. The trace was not found in many columns; redraw the box around the trace',
   "構造式を描くソフト": "Structure drawing program",
   "構造式ボタンを押したときに聞く": "Ask when the structure button is pressed",
-  "ChemDraw (保存すると図に入る)": "ChemDraw (saving puts it in the figure)",
   "このアプリ (Ketcher)": "This app (Ketcher)",
-  "ChemDraw で描くには、この PC に ChemDraw 連携を 1 回だけ入れます (アプリのフォルダの {installer} をダブルクリック)。構造式は NMR の保存先の中の「{dir}」フォルダに置かれ、描いた内容は保存しなくても図に入ります。": "To draw in ChemDraw, install the ChemDraw link on this PC once (double-click {installer} in the app folder). Structures are kept in the \"{dir}\" folder inside your NMR folder, and what you draw goes into the figure without saving.",
+  "ChemDraw (描いた内容がそのまま図に入る)": "ChemDraw (what you draw goes straight into the figure)",
+  "ChemDraw と連携し直す": "Link ChemDraw again",
+  "ChemDraw と連携する": "Link ChemDraw",
+  "連携できています": "Linked",
+  "まだ連携していません": "Not linked yet",
+  "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。": "To draw in ChemDraw, set up the ChemDraw link once on this PC. The app makes a \"{dir}\" folder in your NMR folder; just double-click the installer file in it. What you draw goes into the figure without saving.",
 };

@@ -102,7 +102,7 @@ type DirHandle = {
   requestPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   /** このフォルダの中のファイルなら、フォルダからの道のり (違えば null) */
   resolve?(h: FileHandle): Promise<string[] | null>;
-  getDirectoryHandle?(name: string): Promise<{ getFileHandle(name: string): Promise<FileHandle> }>;
+  getDirectoryHandle?(name: string, o?: { create?: boolean }): Promise<{ getFileHandle(name: string, o?: { create?: boolean }): Promise<FileHandle> }>;
 };
 type PickerWindow = Window & { showDirectoryPicker?: (o: { id?: string; mode?: 'read'; startIn?: DirHandle }) => Promise<DirHandle> };
 
@@ -358,6 +358,16 @@ export async function folderChildFile(dir: string, name: string): Promise<File |
   } catch {
     return null;
   }
+}
+
+/** データフォルダの中の子フォルダ (なければ作る) にファイルを書く。書き込みの許可は先に取っておく */
+export async function folderWriteChildFile(dir: string, name: string, text: string) {
+  if (!folder?.getDirectoryHandle) throw new Error(tr('フォルダが開かれていません'));
+  const sub = await folder.getDirectoryHandle(dir, { create: true });
+  const handle = await sub.getFileHandle(name, { create: true });
+  const w = await handle.createWritable();
+  await w.write(text);
+  await w.close();
 }
 
 /** 2D の実験を読む */

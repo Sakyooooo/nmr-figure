@@ -1,5 +1,5 @@
 /**
- * 初めて開いたときの使い方の説明 (5 枚)。閉じると settings.ui.onboardingDone を覚えて、次からは出さない。
+ * 初めて開いたときの使い方の説明 (6 枚)。閉じると settings.ui.onboardingDone を覚えて、次からは出さない。
  * ホーム画面の「使い方」・設定・操作を探す (Ctrl+K) から、いつでも見直せる。
  * 1 枚目で言語 (日本語 / English) を選べる (英語を使う人が最初に見る画面なので)。
  * 書くのは本当にある操作だけ (以前、見本に無い操作を描いてしまったことがある)。
@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { tr, trk, useLang } from '../i18n';
+import { setupChemDrawLink, useChemDrawLink } from '../state/chemdraw';
 import { setLanguage, setOnboardingDone, useEditor } from '../state/store';
 
 export const useOnboarding = create<{ open: boolean }>(() => ({ open: false }));
@@ -15,7 +16,7 @@ export function openOnboarding() {
   useOnboarding.setState({ open: true });
 }
 
-const STEPS: { title: string; text: string; art: () => ReactNode }[] = [
+const STEPS: { title: string; text: string; art: () => ReactNode; chemdraw?: boolean }[] = [
   {
     title: trk('NMR Figure Editor へようこそ'),
     text: trk('JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。'),
@@ -35,6 +36,12 @@ const STEPS: { title: string; text: string; art: () => ReactNode }[] = [
     title: trk('Delta と行き来する'),
     text: trk('ピーク値と積分は、開いた .jdf と自動で同期します (Delta で保存した中身もこちらに入ります)。保存すると図の入った .jdf になり、ダブルクリックすると Delta でも開けます。'),
     art: ArtDelta,
+  },
+  {
+    title: trk('ChemDraw で構造式を描く'),
+    text: trk('ChemDraw を使うなら、ここで連携を準備します (この PC で 1 回だけ)。構造式ボタンを押すと ChemDraw が開き、描いた内容が保存しなくてもそのまま図に入ります。使わないときは「次へ」で進めます。'),
+    art: ArtChemDraw,
+    chemdraw: true,
   },
   {
     title: trk('Word・PowerPoint に貼る'),
@@ -89,6 +96,7 @@ function OnboardingDialog() {
         <h2 id="onboarding-title">{tr(s.title)}</h2>
         <p>{tr(s.text)}</p>
         {step === 0 && <LanguageChoice />}
+        {s.chemdraw && <ChemDrawLinkChoice />}
       </div>
       <footer className="onboarding-foot">
         {!last && (
@@ -139,6 +147,19 @@ function LanguageChoice() {
         </button>
       </div>
       {setting === 'auto' && <span className="muted">{tr('(ブラウザの言語に合わせています)')}</span>}
+    </div>
+  );
+}
+
+/** ChemDraw との連携を準備する (説明の中から) */
+function ChemDrawLinkChoice() {
+  const ready = useChemDrawLink((s) => s.ready);
+  return (
+    <div className="onboarding-lang">
+      <button type="button" className="btn" onClick={() => void setupChemDrawLink()}>
+        {ready ? tr('ChemDraw と連携し直す') : tr('ChemDraw と連携する')}
+      </button>
+      {ready && <span className="muted">{tr('連携できています')}</span>}
     </div>
   );
 }
@@ -252,6 +273,24 @@ function ArtDelta() {
       <text x={240} y={141} className="art-label" textAnchor="middle">
         .jdf
       </text>
+    </Frame>
+  );
+}
+
+/** 構造式 (六角形) → ChemDraw の窓 → 図 */
+function ArtChemDraw() {
+  const hex = (cx: number, cy: number, r: number) =>
+    Array.from({ length: 6 }, (_, i) => `${cx + r * Math.cos((Math.PI / 3) * i + Math.PI / 6)},${cy + r * Math.sin((Math.PI / 3) * i + Math.PI / 6)}`).join(' ');
+  return (
+    <Frame>
+      <rect x={40} y={24} width={150} height={120} rx={8} className="art-card" />
+      <rect x={40} y={24} width={150} height={20} rx={8} className="art-chip" />
+      <polygon points={hex(115, 94, 30)} fill="none" stroke="var(--data-spectrum-1)" strokeWidth={2.5} />
+      <line x1={141} y1={79} x2={168} y2={63} stroke="var(--data-spectrum-1)" strokeWidth={2.5} />
+      <Arrow x1={204} x2={248} y={92} />
+      <rect x={262} y={14} width={186} height={146} rx={6} className="art-page" />
+      <Spectrum x={280} y={132} w={150} h={70} />
+      <polygon points={hex(390, 50, 14)} fill="none" stroke="var(--data-spectrum-1)" strokeWidth={2} />
     </Frame>
   );
 }

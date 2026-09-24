@@ -1,2 +1,2 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0install.ps1" -Uninstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -Command "$NmrfigSelf='%~f0'; $NmrfigUninstall=$true; . '%~dp0installer.ps1'"

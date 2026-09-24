@@ -11,15 +11,16 @@ export interface DialogAction {
 }
 
 interface DialogState {
-  current: { title: string; message: string; actions: DialogAction[]; resolve: (v: string | null) => void } | null;
+  /** cancel = false なら「キャンセル」を出さない (知らせるだけのとき) */
+  current: { title: string; message: string; actions: DialogAction[]; cancel: boolean; resolve: (v: string | null) => void } | null;
 }
 
 export const useDialog = create<DialogState>(() => ({ current: null }));
 
-export function ask(title: string, message: string, actions: DialogAction[]): Promise<string | null> {
+export function ask(title: string, message: string, actions: DialogAction[], options: { cancel?: boolean } = {}): Promise<string | null> {
   return new Promise((resolve) => {
     useDialog.getState().current?.resolve(null);
-    useDialog.setState({ current: { title, message, actions, resolve } });
+    useDialog.setState({ current: { title, message, actions, cancel: options.cancel !== false, resolve } });
   });
 }
 

@@ -1,2 +1,2 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0install.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -Command "$NmrfigSelf='%~f0'; . '%~dp0installer.ps1'"

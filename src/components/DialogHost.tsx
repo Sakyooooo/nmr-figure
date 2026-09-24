@@ -17,7 +17,7 @@ export function DialogHost() {
       <div className="dialog-body">
         <p>{current.message}</p>
         <div className="actions">
-          <button onClick={() => answer(null)}>{tr('キャンセル')}</button>
+          {current.cancel && <button onClick={() => answer(null)}>{tr('キャンセル')}</button>}
           {current.actions.map((a) => (
             <button key={a.value} className={a.kind ?? ''} onClick={() => answer(a.value)}>
               {a.label}

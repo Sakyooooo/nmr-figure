@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusDefaults, nucleusRich } from '../lib/nuclei';
 import { labReference, type LangSetting, type StructureTool } from '../lib/settings';
-import { CHEMDRAW_DIR, LINK_INSTALLER } from '../state/chemdraw';
+import { CHEMDRAW_DIR, refreshLinkStatus, setupChemDrawLink, useChemDrawLink } from '../state/chemdraw';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
 import { setLanguage, setReferenceOffset, setStructureTool, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
@@ -80,6 +80,10 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useEditor((s) => s.settings);
+  const linkReady = useChemDrawLink((s) => s.ready);
+  useEffect(() => {
+    void refreshLinkStatus();
+  }, []);
   const [newName, setNewName] = useState('');
   return (
     <Modal title={tr('設定')} onClose={onClose} wide>
@@ -111,13 +115,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => e.target.value && setStructureTool(e.target.value as StructureTool)}
           >
             <option value="">{tr('構造式ボタンを押したときに聞く')}</option>
-            <option value="chemdraw">{tr('ChemDraw (保存すると図に入る)')}</option>
+            <option value="chemdraw">{tr('ChemDraw (描いた内容がそのまま図に入る)')}</option>
             <option value="ketcher">{tr('このアプリ (Ketcher)')}</option>
           </select>
         </div>
+        <div className="row wrap">
+          <button className="btn" onClick={() => void setupChemDrawLink()}>
+            {linkReady ? tr('ChemDraw と連携し直す') : tr('ChemDraw と連携する')}
+          </button>
+          <span className="muted">{linkReady ? tr('連携できています') : tr('まだ連携していません')}</span>
+        </div>
         <p className="hint">
-          {tr('ChemDraw で描くには、この PC に ChemDraw 連携を 1 回だけ入れます (アプリのフォルダの {installer} をダブルクリック)。構造式は NMR の保存先の中の「{dir}」フォルダに置かれ、描いた内容は保存しなくても図に入ります。', {
-            installer: LINK_INSTALLER,
+          {tr('ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。', {
             dir: CHEMDRAW_DIR,
           })}
         </p>

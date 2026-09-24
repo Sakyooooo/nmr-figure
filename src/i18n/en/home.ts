@@ -159,4 +159,6 @@ export const EN_HOME: Record<string, string> = {
     'Waiting to open the browser storage. If this app (an older version) is open in another tab, close or reload that tab and loading will continue here.',
   'samples (開発用)': 'samples (development)',
   図がありません: 'There is no figure',
+  "ChemDraw で構造式を描く": "Draw structures in ChemDraw",
+  "ChemDraw を使うなら、ここで連携を準備します (この PC で 1 回だけ)。構造式ボタンを押すと ChemDraw が開き、描いた内容が保存しなくてもそのまま図に入ります。使わないときは「次へ」で進めます。": "If you use ChemDraw, set up the link here (once on this PC). The structure button then opens ChemDraw, and what you draw goes straight into the figure without saving. If not, just press Next.",
 };
