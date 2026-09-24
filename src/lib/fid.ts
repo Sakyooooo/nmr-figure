@@ -140,6 +140,20 @@ export function phaseReal(spec: Spectrum, ph0: number, ph1: number, pivot: numbe
   return out;
 }
 
+/** 位相補正した虚部 (Delta に処理済みのスペクトルとして渡すとき、Delta でも位相を直せるように) */
+export function phaseImag(spec: Spectrum, ph0: number, ph1: number, pivot: number): Float64Array {
+  const n = spec.re.length;
+  const out = new Float64Array(n);
+  const pivotIndex = ((spec.first - pivot) / (spec.first - spec.last)) * (n - 1);
+  const a0 = (ph0 * Math.PI) / 180;
+  const a1 = (ph1 * Math.PI) / 180 / n;
+  for (let r = 0; r < n; r++) {
+    const phi = a0 + a1 * (r - pivotIndex);
+    out[r] = spec.re[r] * Math.sin(phi) + spec.im[r] * Math.cos(phi);
+  }
+  return out;
+}
+
 /** 一番大きいピークの ppm (1次位相の中心に使う) */
 export function tallestPpm(spec: Spectrum): number {
   let best = 0;

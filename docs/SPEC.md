@@ -127,6 +127,50 @@ Delta が鎖をたどり終わらずに固まっていた。ピークだけの�
 - 実機の Delta で開けることを確認済み (2026-09-23: 積分だけ・ピーク値だけ・両方・注釈つきの書き直し・注釈の場所が無いファイル)。
   ほかの注釈を残す書き方 (v3) は確認待ち
 
+## 図を .jdf として保存する (lib/jdfSections.ts, lib/jdfEmbed.ts, lib/jdfProcessed.ts)
+2026-09-24 本人の希望: 「保存したものも Delta の形式にしたい。フォルダでダブルクリックしたら Delta で開く」
+(ファイルを 1 種類にしたい / 図の情報は .jdf の中に / 重ね書きもできれば .jdf、無理なら .nmrfig をこのアプリで開けるように /
+このアプリで FID から処理したものも Delta で開ける .jdf に)。
+
+**手がかり: この PC には Delta 6.5 が入っていて、付属の道具で Delta 自身の読み方を確かめられる**
+(`C:\Program Files\JEOL\Delta 6.5.0.app\Contents\WinNT\`)。
+- `list_header.exe +a +c +p ファイル` … ヘッダ・注釈 (項目名つき: AT_HEADER / AT_ASSIGNMENT、ml_text、int_list …)・文脈の名前・パラメーターを出す
+- `convert.exe -delta -file 入力 -delta -file 出力` … Delta の読み書きの部品で読み、書き直す (出力は「出力-1.jdf」)。
+  文脈は PARAMETER_STORAGE だけ残る (画面での保存とは違う)。フルパス (Windows の書き方) で渡す
+
+.jdf の並び (234 ファイルすべて同じ): ヘッダ 1360 バイト → パラメーター (1360〜) → 0 埋め → 測定データ (16384〜) → 文脈 → 注釈 →
+64 バイト境界まで 0。total_size = ファイルの大きさ。区画に分けて組み直すと元と 1 バイトも違わない (jdfEmbed.test.ts)。
+- **文脈 (context)** は [種類 u32][長さ u32][中身] の並びで 16 バイト境界。種類の名前 (list_header +c):
+  1 = EXPERIMENT_SRC (パルスプログラム)、2 = PROCESSING_LIST (当てた処理)、3 = UNAPPLIED_PROCESSING_LIST (これから当てる処理。生データだけ)、
+  15 = FILE_VIEW、16 = 一覧表 (INTEGRAL LISTING。1 件だけ)、33 = PARAMETER_STORAGE
+- **PARAMETER_STORAGE** は 16 文字に収まらない文字のパラメーターの全文の置き場。キーはパラメーター名の大文字 (SAMPLE_ID、EXPERIMENT_PATH …)。
+  中身はビッグエンディアンの [タグ][数] で、0x2b2a = リスト、0x271d = 文字 (長さ + 文字)、0x2725 = 真偽
+- **パラメーター**は 64 バイトの記録: +1 群の中の番号 / +2 群 (0x2b = DEV_USER_ANALYSIS) / +16 値 (16 バイト、文字は空白埋め) /
+  +32 値の形 (0 = 文字) / +36 名前 (28 文字)
+
+**図の入れ場所**: 名前 `nmrfig_info` / `nmrfig_data_001…` の文字のパラメーター (群 0x2b) を足し、全文を PARAMETER_STORAGE に置く。
+中身は .nmrfig と同じ JSON を gzip → base64 → 64 KB ずつ。info = "v1 gzip 分けた数 文字数 crc32"。
+試した置き場と convert.exe で読み書きし直したあと:
+| 置き場 | Delta で読める | 書き直したあと |
+|---|---|---|
+| 注釈のうしろ (total_size に含める) | 読める | 消える |
+| 知らない種類 (99) の文脈 | 読める (名前は空) | 消える |
+| PARAMETER_STORAGE に組だけ足す | 読める | 消える (パラメーターのない組は捨てられる) |
+| **パラメーター + PARAMETER_STORAGE** | 読める (list_header +p に全文が出る) | **1 文字も変わらず残る** (200 KB を 1 つでも 25 に分けても) |
+
+**FID から処理したものを処理済みの .jdf にする** (Delta の処理前 -1-1 と処理後 -1-2 の 113 組を比べた):
+- ヘッダの違いは、軸の単位 (秒 → ppm、+33 = 26)・点の数・有効な点の範囲・軸の両端・base_freq・zero_point と区画の長さだけ。
+  パラメーターは処理の結果 (machinephase_x_p0 など 11 個) が増えるだけで、ほかはそのまま。文脈は 3 が消えて 2 が増える
+- データは 64 bit の複素数 (実部を全部、続けて虚部)。点の数は 16 の倍数に 0 で埋め、前に半分 (切り上げ) を置く (13107 点 → 13120、7〜13113)
+- base_freq = 0 ppm の周波数 × (1 + (x_offset − 基準合わせでずらした ppm) × 10⁻⁶)。zero_point = ずらした ppm × base_freq (Hz)。
+  Delta の 1H で ずらした量 0.0118 ppm → zero_point 4.72、0.0586 → 23.41 (どれも一致)
+- このアプリの書き方: 元の FID の .jdf を複製し、ヘッダの軸とデータを差し替え、文脈の 3 を外し、注釈は空。強度は最大を 1 にそろえる。
+  同じ FID を Delta が処理したファイルと、一番高いピークの位置が 0.005 ppm 以内・zero_point が一致 (jdfEmbed.test.ts)
+
+Delta の画面で開いて確かめるファイル: samples/delta-test-v4/ (A = Delta で処理した 1H に 2 本重ねた図を入れたもの、
+B = このアプリで処理した 1H + ピーク値・積分 + 図、C = このアプリで処理した 13C + ピーク値 + 図)。どれも convert.exe を通しても図が残る。
+**画面での確認待ち (2026-09-24)**。
+
 ## Delta との同期 (state/deltaSync.ts, lib/deltaSync.ts)
 2026-09-23。ボタンで書き出すのではなく、図と .jdf を自動で行き来させる (本人の希望: 「勝手に相互編集」)。
 Delta も「同じファイルに上書き」で保存するので、このアプリも開いた .jdf に上書きする。
