@@ -24,10 +24,14 @@ export interface Settings {
     lang: LangSetting;
     /** 初めて開いたときの使い方の説明を見終わった (閉じた) */
     onboardingDone: boolean;
+    /** 構造式を描くソフト。null はまだ決めていない (初めて構造式ボタンを押したときに聞く) */
+    structureTool: StructureTool | null;
   };
 }
 
 export type LangSetting = 'auto' | 'ja' | 'en';
+/** chemdraw = ChemDraw で描いて保存すると図に入る / ketcher = このアプリの中で描く */
+export type StructureTool = 'chemdraw' | 'ketcher';
 
 /** ホーム画面の並び順 */
 export interface HomeSort {
@@ -77,7 +81,7 @@ export function defaultSettings(): Settings {
     pngScale: 4,
     templates: [],
     defaultTemplateId: null,
-    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false },
+    ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false, structureTool: null },
   };
 }
 

@@ -1,5 +1,6 @@
 import { currentLang, tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { drawInChemDraw, drawStructure } from '../state/chemdraw';
 import { openInChemDraw } from '../state/chemdrawExport';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import {
@@ -187,7 +188,9 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
       run: () => setTool(t.id),
       enabled: hasData && tab === 'spectrum' && (!is2d || t.id === 'select' || t.id === 'zoom'),
     })),
-    { group: tr('道具'), label: tr('構造式を描いて置く'), icon: 'hexagon', keywords: 'ketcher chemdraw', run: () => openStructureEditor(null), enabled: spectrum },
+    { group: tr('道具'), label: tr('構造式を描いて置く'), icon: 'hexagon', keywords: 'ketcher chemdraw', run: () => void drawStructure(), enabled: spectrum },
+    { group: tr('道具'), label: tr('構造式を ChemDraw で描く'), icon: 'hexagon', keywords: 'chemdraw ケムドロー cdxml', run: () => void drawInChemDraw(null), enabled: spectrum },
+    { group: tr('道具'), label: tr('構造式をこのアプリで描く'), icon: 'hexagon', keywords: 'ketcher', run: () => openStructureEditor(null), enabled: spectrum },
 
     {
       group: tr('解析'),

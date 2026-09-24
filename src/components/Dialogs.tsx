@@ -2,9 +2,10 @@ import { tr } from '../i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusDefaults, nucleusRich } from '../lib/nuclei';
-import { labReference, type LangSetting } from '../lib/settings';
+import { labReference, type LangSetting, type StructureTool } from '../lib/settings';
+import { chooseChemDrawFolder, useChemDrawLink } from '../state/chemdraw';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
-import { setLanguage, setReferenceOffset, updateSettings, useEditor } from '../state/store';
+import { setLanguage, setReferenceOffset, setStructureTool, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
 import { RichHtml } from './RichText';
 import { ICON_LICENSE } from './iconPaths';
@@ -79,6 +80,7 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useEditor((s) => s.settings);
+  const chemdrawFolder = useChemDrawLink((s) => s.folderName);
   const [newName, setNewName] = useState('');
   return (
     <Modal title={tr('設定')} onClose={onClose} wide>
@@ -100,6 +102,27 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             {tr('使い方の説明をもう一度見る')}
           </button>
         </div>
+      </section>
+      <section>
+        <h3>{tr('構造式を描くソフト')}</h3>
+        <div className="row wrap">
+          <select
+            value={settings.ui.structureTool ?? ''}
+            aria-label={tr('構造式を描くソフト')}
+            onChange={(e) => e.target.value && setStructureTool(e.target.value as StructureTool)}
+          >
+            <option value="">{tr('構造式ボタンを押したときに聞く')}</option>
+            <option value="chemdraw">{tr('ChemDraw (保存すると図に入る)')}</option>
+            <option value="ketcher">{tr('このアプリ (Ketcher)')}</option>
+          </select>
+        </div>
+        <p className="hint">
+          {tr('ChemDraw の保存先: {folder}', { folder: chemdrawFolder ?? tr('まだ選んでいません') })}{' '}
+          <button className="btn sm" onClick={() => void chooseChemDrawFolder()}>
+            {chemdrawFolder ? tr('選び直す') : tr('ダウンロード フォルダを選ぶ')}
+          </button>
+        </p>
+        <p className="hint">{tr('ChemDraw 用のファイルはダウンロード フォルダに保存されます。ChemDraw で上書き保存すると、アプリがそこから読んで図に入れます。')}</p>
       </section>
       <section>
         <h3>{tr('研究室の基準値 (溶媒ピーク)')}</h3>

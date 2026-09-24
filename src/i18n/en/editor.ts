@@ -202,4 +202,6 @@ export const EN_EDITOR: Record<string, string> = {
   '印刷: {time}': 'Printed: {time}',
   'ChemDraw で開く': 'Open in ChemDraw',
   'ChemDraw でコピーして Word に貼ると、Word の上で構造式を ChemDraw で直せます': 'Copy it in ChemDraw and paste into Word to keep the structure editable in ChemDraw',
+  "構造式を ChemDraw で描く": "Draw a structure in ChemDraw",
+  "構造式をこのアプリで描く": "Draw a structure in this app",
 };

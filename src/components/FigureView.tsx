@@ -28,7 +28,7 @@ import {
   updateIntegral,
   useEditor,
 } from '../state/store';
-import { editInChemDraw } from '../state/chemdraw';
+import { drawInChemDraw } from '../state/chemdraw';
 import { annotationDefaults, type AnnotationKind, type NmrDocument, type ViewState } from '../state/types';
 import { AnnotationShape, FigureContent } from './FigureContent';
 import { imageRect } from './FigureImages';
@@ -453,7 +453,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       // アプリで描いた構造式は、ダブルクリックで描き直せる
       if (value.startsWith('image:')) {
         const image = doc.figureImages.find((x) => x.id === value.slice('image:'.length));
-        if (image?.cdxml) editInChemDraw(image.id);
+        if (image?.cdxml) void drawInChemDraw(image.id);
         else if (image?.source) openStructureEditor(image.id);
       }
       return;

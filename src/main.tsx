@@ -1,3 +1,4 @@
+import { initChemDrawLink } from './state/chemdraw';
 import { resolveLang, setLang, tr, useLang } from './i18n';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -30,6 +31,7 @@ window.addEventListener('nmr-db-blocked', () => {
 });
 window.addEventListener('nmr-db-open', () => document.getElementById('db-blocked')?.remove());
 void initLibrary();
+void initChemDrawLink();
 // 前回の作業を読み込んでから、変更を自動で保存し始める
 void restoreWork().finally(() => {
   startAutoSave();

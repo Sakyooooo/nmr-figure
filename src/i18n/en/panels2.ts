@@ -234,4 +234,13 @@ export const EN_PANELS2: Record<string, string> = {
   右端: 'Right',
   '読み取り: {n} 画素 / 1 画素 = {ppm} ppm': 'Read: {n} px / 1 px = {ppm} ppm',
   '。線が見つからない列が多いので、枠を線に合わせて囲み直してください': '. The trace was not found in many columns; redraw the box around the trace',
+  "構造式を描くソフト": "Structure drawing program",
+  "構造式ボタンを押したときに聞く": "Ask when the structure button is pressed",
+  "ChemDraw (保存すると図に入る)": "ChemDraw (saving puts it in the figure)",
+  "このアプリ (Ketcher)": "This app (Ketcher)",
+  "ChemDraw の保存先: {folder}": "ChemDraw save folder: {folder}",
+  "まだ選んでいません": "not chosen yet",
+  "選び直す": "Choose again",
+  "ダウンロード フォルダを選ぶ": "Choose the Downloads folder",
+  "ChemDraw 用のファイルはダウンロード フォルダに保存されます。ChemDraw で上書き保存すると、アプリがそこから読んで図に入れます。": "Files for ChemDraw are saved to the Downloads folder. When you save in ChemDraw, the app reads the file there and puts the structure in the figure.",
 };

@@ -1,5 +1,6 @@
 import { tr, trk } from '../i18n';
-import { openStructureEditor, redo, setTool, undo, useEditor } from '../state/store';
+import { drawStructure } from '../state/chemdraw';
+import { redo, setTool, undo, useEditor } from '../state/store';
 import type { Tool } from '../state/types';
 import { Icon, type IconName } from './Icon';
 import { IconButton, MenuButton } from './ui';
@@ -70,7 +71,7 @@ export function Dock() {
               <span className="tool-caret" aria-hidden="true" />
             </MenuButton>
             {toolButton('text')}
-            <IconButton icon="hexagon" label={tr('構造式を描いて置く')} onClick={() => openStructureEditor(null)} disabled={onTrend} className="tool" />
+            <IconButton icon="hexagon" label={tr('構造式を描いて置く')} onClick={() => void drawStructure()} disabled={onTrend} className="tool" />
           </>
         )}
       </div>

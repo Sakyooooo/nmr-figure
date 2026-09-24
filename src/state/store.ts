@@ -7,7 +7,7 @@ import { deltaReference } from '../lib/jdfAnnotations';
 import { isAutoSimulatedLabel, simulatedLabel } from '../lib/simulate';
 import { autoYZoom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
-import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StyleTemplate } from '../lib/settings';
+import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StructureTool, type StyleTemplate } from '../lib/settings';
 import { detectSignals, exclusions } from '../lib/siText';
 import { findPeaks, maxInRange, noiseLevel } from '../lib/spectrum';
 import { autoPhase, finish, referenceShift, tallestPpm, transform, type FidData, type Processing, type Spectrum } from '../lib/fid';
@@ -899,6 +899,13 @@ export function setLanguage(lang: LangSetting) {
 export function setOnboardingDone(done: boolean) {
   updateSettings((s) => {
     s.ui.onboardingDone = done;
+  });
+}
+
+/** 構造式を描くソフト (ChemDraw / このアプリ) */
+export function setStructureTool(tool: StructureTool) {
+  updateSettings((s) => {
+    s.ui.structureTool = tool;
   });
 }
 
