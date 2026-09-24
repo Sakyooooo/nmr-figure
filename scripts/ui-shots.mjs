@@ -28,6 +28,8 @@ const SHOTS = [
   ['export-menu-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"], .topbar [aria-label="Export"]').click()`],
   ['figure-tab-1440', 'spectra', 1440, 900, `document.querySelector('#inspector-tab-figure').click()`],
   ['chemdraw-1440', 'chemdraw', 1440, 900],
+  ['chemdraw-onboarding-1440', 'onboarding', 1440, 900, `document.querySelectorAll('dialog.onboarding .onboarding-dots button')[4].click()`],
+  ['chemdraw-settings-1440', 'spectra', 1440, 900, `document.querySelector('.topbar [aria-label^="設定"], .topbar [aria-label^="Settings"]').click()`],
   ['chemdraw-export-1440', 'chemdraw', 1440, 900, `document.querySelector('.topbar [aria-label="書き出し"], .topbar [aria-label="Export"]').click()`],
   ['2d-1440', '2d', 1440, 900],
   ['trend-1440', 'trend', 1440, 900],
