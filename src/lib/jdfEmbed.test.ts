@@ -7,7 +7,7 @@ import { checkAnnotationLinks } from './jdfAnnoteCheck';
 import { readAnnotations } from './jdfAnnotations';
 import { embedFigure, hasEmbeddedFigure, readEmbeddedFigure, removeFigure } from './jdfEmbed';
 import { writeProcessedJdf } from './jdfProcessed';
-import { buildJdf, readParamNames, replaceStoragePairs, splitJdf, storageStrings } from './jdfSections';
+import { buildJdf, readParams, replaceStoragePairs, splitJdf, storageStrings } from './jdfSections';
 import { writeAnnotations } from './jdfWrite';
 
 const dir = join(import.meta.dirname, '../../samples');
@@ -59,7 +59,7 @@ describe.skipIf(!samples.length)('実データ (samples/)', () => {
     // 入れ直すと置き換わる (増えない)。取り除くと元のファイルに戻る
     const again = await embedFigure(out, '{"short":true}');
     expect(await readEmbeddedFigure(again)).toBe('{"short":true}');
-    expect(readParamNames(splitJdf(again).params).filter((p) => p.name.startsWith('nmrfig_')).map((p) => p.name)).toEqual(['nmrfig_info', 'nmrfig_data_001']);
+    expect(readParams(splitJdf(again).params).filter((p) => p.name.startsWith('nmrfig_')).map((p) => p.name)).toEqual(['nmrfig_info', 'nmrfig_data_001']);
     expect(same(removeFigure(again), source)).toBe(true);
   });
 

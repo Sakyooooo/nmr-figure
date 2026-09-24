@@ -16,11 +16,16 @@ import { CONTEXT, HEADER, JdfFormatError, UNIT_PPM, UNIT_SECOND, buildJdf, split
 
 const POINT_ALIGN = 16;
 
-export function writeProcessedJdf(raw: ArrayBuffer, fid: FidData, processing: Processing, refOffset: number): ArrayBuffer {
-  const parts = splitJdf(raw);
+/**
+ * template は元の FID の .jdf。前にこの関数で書いた処理済みの .jdf (図を開き直して保存し直すとき) でもよい
+ * (ヘッダ・パラメーター・パルスプログラムは同じで、軸とデータだけを差し替えるので)
+ */
+export function writeProcessedJdf(template: ArrayBuffer, fid: FidData, processing: Processing, refOffset: number): ArrayBuffer {
+  const parts = splitJdf(template);
   const head = new DataView(parts.header.buffer, parts.header.byteOffset, parts.header.byteLength);
   if (parts.header[HEADER.dimensions] !== 1) throw new JdfFormatError('1D の FID だけを処理済みのファイルにできます');
-  if (parts.header[HEADER.unitBase] !== UNIT_SECOND) throw new JdfFormatError('FID (時間の軸) のファイルではありません');
+  const unit = parts.header[HEADER.unitBase];
+  if (unit !== UNIT_SECOND && unit !== UNIT_PPM) throw new JdfFormatError('対応していない軸の単位のファイルです');
 
   const spec = transform(fid, processing.lb);
   const real = finish(spec, processing);

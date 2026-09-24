@@ -109,7 +109,7 @@ export default function App() {
       <div className="home-root" {...dropProps('new')}>
         <Home />
         <StructureEditorHost />
-      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は新しい図で開く、{PROJECT_EXT} は図を開く)</div>}
+      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は新しい図で開く、図入りの .jdf と {PROJECT_EXT} は図を開く)</div>}
         <DialogHost />
         <Toast />
       </div>
@@ -159,7 +159,7 @@ export default function App() {
         <Toast />
       </main>
       <StructureEditorHost />
-      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は追加、{PROJECT_EXT} は開く)</div>}
+      {dragging && <div className="drop-overlay">ここにドロップ (.jdf は追加、図入りの .jdf と {PROJECT_EXT} は図を開く)</div>}
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}

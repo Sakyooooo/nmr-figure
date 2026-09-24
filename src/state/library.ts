@@ -46,6 +46,8 @@ interface LibraryState {
   /** 覚えているフォルダの読み取り許可。denied はブラウザが拒否を覚えている (選び直しが要る) */
   folderPermission: PermissionState | null;
   experiments: ExperimentMeta[];
+  /** データフォルダの中の、このソフトで保存した図入りの .jdf (測定とは別に、サンプルのカードに図として出す) */
+  figureFiles: ExperimentMeta[];
   failed: { fileName: string; message: string }[];
   progress: { done: number; total: number } | null;
   notes: Record<string, SampleNote>;
@@ -69,6 +71,7 @@ export const useLibrary = create<LibraryState>(() => ({
   temporary: false,
   folderPermission: null,
   experiments: [],
+  figureFiles: [],
   failed: [],
   progress: null,
   notes: {},
@@ -92,6 +95,8 @@ type DirHandle = {
   values(): AsyncIterable<FileEntry | { kind: 'directory'; name: string }>;
   queryPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+  /** このフォルダの中のファイルなら、フォルダからの道のり (違えば null) */
+  resolve?(h: FileHandle): Promise<string[] | null>;
 };
 type PickerWindow = Window & { showDirectoryPicker?: (o: { id?: string; mode?: 'read'; startIn?: DirHandle }) => Promise<DirHandle> };
 
@@ -240,6 +245,7 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
   const cache = await dbEntries<ExperimentMeta>('meta');
   const seen = new Set<string>();
   const experiments: ExperimentMeta[] = [];
+  const figureFiles: ExperimentMeta[] = [];
   const failed: LibraryState['failed'] = [];
   sources.clear();
   let done = 0;
@@ -253,7 +259,8 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
         meta = await readJdfMeta(file);
         if (persist) await dbSet('meta', key, meta);
       }
-      experiments.push(meta);
+      // このソフトで保存した図入りの .jdf は、測定ではなく図として並べる
+      (meta.figure ? figureFiles : experiments).push(meta);
       sources.set(key, entry.getFile);
     } catch (e) {
       failed.push({ fileName: entry.name, message: (e as Error).message });
@@ -264,11 +271,13 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
   // 消えたファイルのキャッシュは捨てる
   if (persist) for (const key of cache.keys()) if (!seen.has(key)) await dbDelete('meta', key);
   experiments.sort((a, b) => b.measuredAt - a.measuredAt);
+  figureFiles.sort((a, b) => b.lastModified - a.lastModified);
   const alive = new Set(experiments.map((e) => e.key));
   set((s) => ({
     status: 'ready',
     progress: null,
     experiments,
+    figureFiles,
     failed,
     selected: s.selected.filter((k) => alive.has(k)),
     focus: s.focus && alive.has(s.focus) ? s.focus : null,
@@ -285,6 +294,25 @@ export async function loadExperiment(key: string, options?: ReadOptions): Promis
 /** データフォルダの中のファイル (読み込んだフォルダにあるときだけ) */
 export function folderFileHandle(fileName: string): FileHandle | null {
   return handles.get(fileName) ?? null;
+}
+
+/** 一覧の図入りの .jdf を開くためのファイル */
+export async function figureFileOf(key: string): Promise<{ file: File; handle?: FileHandle }> {
+  const source = sources.get(key);
+  if (!source) throw new Error('ファイルが見つかりません。フォルダを読み直してください');
+  const file = await source();
+  return { file, handle: handles.get(file.name) };
+}
+
+/** 保存したファイルがデータフォルダの中なら、一覧を読み直す (保存した図がホーム画面に出るように) */
+export async function refreshIfInFolder(handle: FileHandle) {
+  if (!folder?.resolve) return;
+  try {
+    const path = await folder.resolve(handle);
+    if (path?.length === 1) await scanFolder();
+  } catch {
+    // 調べられなければ、次にフォルダを読み込んだときに出る
+  }
 }
 
 /**

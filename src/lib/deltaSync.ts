@@ -15,7 +15,12 @@ type Axis = Pick<SpectrumMeta, 'first' | 'last' | 'n' | 'refOffset'>;
 
 /** Delta と行き来できるスペクトルか (Delta で処理済みの 1D。FID をこのアプリで処理したものや文献のものは不可) */
 export function canSyncDelta(meta: SpectrumMeta | undefined): meta is SpectrumMeta {
-  return !!meta && !meta.processing && !meta.simulated && /\.jdf$/i.test(meta.fileName);
+  return !!meta && !meta.processing && !meta.simulated && /\.jdf$/i.test(syncFileOf(meta));
+}
+
+/** 同期する .jdf の名前 (図を .jdf に保存したあとの土台のスペクトルは、その図のファイル) */
+export function syncFileOf(meta: SpectrumMeta): string {
+  return meta.syncFile || meta.fileName;
 }
 
 /** 図のスペクトル 1 本ぶんのピーク値・積分 (積分は作った順。基準の積分とその値も) */

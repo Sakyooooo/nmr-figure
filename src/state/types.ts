@@ -35,6 +35,8 @@ export interface SpectrumMeta {
   simulated?: Simulated | null;
   /** .jdf に入っていた Delta のピーク値・積分 (取り込みに使う) */
   delta?: DeltaAnnotations | null;
+  /** Delta と同期する .jdf の名前。図を .jdf に保存したあとの土台のスペクトルは、その図のファイル (無ければ fileName) */
+  syncFile?: string | null;
 }
 
 /** Delta が .jdf に残した注釈 (lib/jdfAnnotations.ts で読む) */

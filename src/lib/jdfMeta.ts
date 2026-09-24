@@ -1,4 +1,5 @@
 import type { SolventKey } from './impurityTypes';
+import { parseSummary, type FigureSummary } from './jdfEmbed';
 import { normalizeNucleus } from './nuclei';
 import { detectSolvent } from './solvents';
 
@@ -25,6 +26,8 @@ export interface ExperimentMeta {
   measuredAt: number;
   /** FT 済みか (未処理の FID は開けない) */
   processed: boolean;
+  /** このソフトで保存した図入りの .jdf なら、その本数と核種 (測定ではなく図として並べる) */
+  figure?: FigureSummary | null;
 }
 
 export function experimentKey(file: { name: string; size: number; lastModified: number }) {
@@ -93,6 +96,7 @@ export async function readJdfMeta(file: File): Promise<ExperimentMeta> {
     temperatureC: num('temp_get'),
     measuredAt: start && start > 0 ? JEOL_EPOCH_MS + start * 1000 : file.lastModified,
     processed: unitBase === UNIT_PPM,
+    figure: params.has('nmrfig_info') ? (parseSummary(str('nmrfig_summary')) ?? { layers: 1, nuclei }) : null,
   };
 }
 

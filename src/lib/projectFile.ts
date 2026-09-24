@@ -15,6 +15,8 @@ interface ProjectFileV1 {
   fids?: Record<string, Omit<FidData, 're' | 'im'> & { re: string; im: string }>;
   /** 2D の生データ。開いたときに FT し直す (処理後の行列は大きいので入れない) */
   fids2d?: Record<string, Omit<Fid2dData, 're' | 'im'> & { re: string; im: string; rows: number }>;
+  /** 図入りの .jdf に入れたとき、その .jdf の土台のスペクトル (spectrumId) */
+  jdfBase?: string;
 }
 
 /** 元の .jdf を移動しても開けるように、スペクトルデータもファイルに含める */
@@ -23,6 +25,7 @@ export function serializeProject(
   data: Record<string, Float32Array>,
   fids: Record<string, FidData> = {},
   fids2d: Record<string, Fid2dData> = {},
+  extra: { jdfBase?: string } = {},
 ): string {
   const used: Record<string, string> = {};
   const usedFids: NonNullable<ProjectFileV1['fids']> = {};
@@ -45,6 +48,7 @@ export function serializeProject(
     data: used,
     fids: usedFids,
     fids2d: used2d,
+    ...(extra.jdfBase ? { jdfBase: extra.jdfBase } : {}),
   };
   return JSON.stringify(file);
 }
@@ -55,6 +59,7 @@ export function parseProject(text: string): {
   fids: Record<string, FidData>;
   fids2d: Record<string, Fid2dData>;
   data2d: Record<string, Spectrum2dData>;
+  jdfBase: string | null;
 } {
   const file = JSON.parse(text) as ProjectFileV1;
   if (file?.format !== 'nmr-figure-editor') throw new Error('NMR Figure Editor のプロジェクトファイルではありません');
@@ -74,7 +79,7 @@ export function parseProject(text: string): {
     const meta = doc.spectra2d.find((s2) => s2.id === id);
     if (meta) data2d[id] = transform2d(fid, meta.processing);
   }
-  return { doc, data, fids, fids2d, data2d };
+  return { doc, data, fids, fids2d, data2d, jdfBase: file.jdfBase ?? null };
 }
 
 /** 行ごとの配列を 1本につなぐ / 戻す */

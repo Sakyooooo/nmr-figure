@@ -9,7 +9,7 @@
  */
 import { create } from 'zustand';
 import { dbGet, dbPut } from '../lib/db';
-import { annotationKey, applyAnnotations, canSyncDelta, fileAnnotations, layerAnnotations, shownValues, summary } from '../lib/deltaSync';
+import { annotationKey, applyAnnotations, canSyncDelta, fileAnnotations, layerAnnotations, shownValues, summary, syncFileOf } from '../lib/deltaSync';
 import { downloadBlob, baseName } from '../lib/exportFigure';
 import { readJdf } from '../lib/jdf';
 import { annotationBlock, withAnnotationBlock, writeAnnotations, type WritableAnnotations } from '../lib/jdfWrite';
@@ -68,6 +68,11 @@ export function registerJdfHandle(fileName: string, handle: FileHandle) {
   extraHandles.set(fileName, handle);
 }
 
+/** その名前の .jdf のファイル (データフォルダの中、またはドロップ・「開く」・保存で覚えたもの) */
+export function jdfHandle(fileName: string): FileHandle | null {
+  return folderFileHandle(fileName) ?? extraHandles.get(fileName) ?? null;
+}
+
 // ---------------------------------------------------------------- 始める
 
 export function startDeltaSync() {
@@ -98,12 +103,13 @@ function reconcile() {
     const meta = doc.spectra.find((s) => s.id === layer.spectrumId);
     if (!canSyncDelta(meta) || !data[meta.id]) continue;
     // 同じファイルを 2 本入れたときは、最初の 1 本だけ同期する
-    if (byFile.has(meta.fileName)) {
+    const fileName = syncFileOf(meta);
+    if (byFile.has(fileName)) {
       duplicates.push(layer.id);
       continue;
     }
-    byFile.add(meta.fileName);
-    wanted.set(layer.id, { spectrumId: meta.id, fileName: meta.fileName });
+    byFile.add(fileName);
+    wanted.set(layer.id, { spectrumId: meta.id, fileName });
   }
   for (const [layerId, link] of links) {
     const w = wanted.get(layerId);
@@ -218,7 +224,7 @@ function settle(link: Link, mtime: number, key: string, direction: LinkView['dir
 // ---------------------------------------------------------------- 始めて見るとき
 
 async function attach(link: Link) {
-  const handle = folderFileHandle(link.fileName) ?? extraHandles.get(link.fileName) ?? null;
+  const handle = jdfHandle(link.fileName);
   if (!handle) {
     show(link, { status: 'waiting', message: 'データフォルダにこの .jdf が見つからないので、まだ同期していません (ホーム画面でフォルダを読み込むと始まります)' });
     return;
@@ -493,7 +499,7 @@ export async function recordNow(layerId: string, memo: string) {
       // ファイルが読めなくても、図の中身だけで記録する
     }
   }
-  await addHistory(state.meta.fileName, { ...entryOf('app', '記録', state.ann, state.key, state, block), manual: true, memo: memo.trim() });
+  await addHistory(syncFileOf(state.meta), { ...entryOf('app', '記録', state.ann, state.key, state, block), manual: true, memo: memo.trim() });
   notify(memo.trim() ? `記録を付けました: ${memo.trim()}` : '記録を付けました');
 }
 

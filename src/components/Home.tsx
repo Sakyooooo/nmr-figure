@@ -2,12 +2,13 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 're
 import type { ExperimentMeta } from '../lib/jdfMeta';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
-import { openDialog, openExperiments, openSavedFigure, readOptions } from '../state/fileOps';
+import { openDialog, openExperiments, openFiles, openSavedFigure, readOptions } from '../state/fileOps';
 import {
   NUCLEUS_FILTERS,
   canOpen,
   chosenFile,
   deleteFigure,
+  figureFileOf,
   fileVersion,
   filteredExperiments,
   grantPermission,
@@ -248,7 +249,16 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
   const note = useLibrary((s) => s.notes[sampleKey]);
   // セレクタで filter すると毎回別の配列になって再描画が止まらないので、取り出してから絞る
   const allFigures = useLibrary((s) => s.figures);
-  const figures = useMemo(() => allFigures.filter((f) => f.sampleKeys.includes(sampleKey)), [allFigures, sampleKey]);
+  const allFigureFiles = useLibrary((s) => s.figureFiles);
+  // データフォルダの図入りの .jdf。同じファイルに保存した図 (ブラウザの中の一覧) は、ファイルの方だけ出す
+  const figureFiles = useMemo(() => allFigureFiles.filter((f) => sampleKeyOf(f) === sampleKey), [allFigureFiles, sampleKey]);
+  const figures = useMemo(
+    () =>
+      allFigures.filter(
+        (f) => f.sampleKeys.includes(sampleKey) && !figureFiles.some((ff) => ff.fileName === f.handle?.name || ff.fileName === `${f.name}.jdf`),
+      ),
+    [allFigures, figureFiles, sampleKey],
+  );
   const selected = useLibrary((s) => s.selected);
   const focus = useLibrary((s) => s.focus);
   const choice = useLibrary((s) => s.versionChoice);
@@ -287,6 +297,9 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
               checked={m.files.some((f) => selected.includes(f.key))}
               focused={m.files.some((f) => f.key === focus)}
             />
+          ))}
+          {figureFiles.map((f) => (
+            <FigureFileChip key={f.key} file={f} />
           ))}
           {figures.map((f) => (
             <FigureChip key={f.id} figure={f} />
@@ -402,6 +415,36 @@ function FigureChip({ figure }: { figure: SavedFigure }) {
         {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
       </button>
       <IconButton icon="x" size="sm" label={`${figure.name} をホーム画面から消す (測定データは消えません)`} onClick={() => void deleteFigure(figure.id)} />
+    </div>
+  );
+}
+
+/** データフォルダの中の、図入りの .jdf のチップ。クリックで図ごと開く (Delta ではスペクトルとして開ける) */
+function FigureFileChip({ file }: { file: ExperimentMeta }) {
+  const figure = file.figure ?? { layers: 1, nuclei: file.nuclei };
+  const open = async () => {
+    try {
+      await openFiles([await figureFileOf(file.key)], 'new');
+    } catch (e) {
+      notify(`${file.fileName}: ${(e as Error).message}`, 'error');
+    }
+  };
+  return (
+    <div className="exp figure" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
+      <button
+        type="button"
+        className="exp-open"
+        title={`${file.fileName}\n${figure.layers} 本を重ねた図 (${formatStamp(file.lastModified)})。Delta でも開けます`}
+        aria-label={`保存した図 ${file.fileName} を開く`}
+        onClick={() => void open()}
+      >
+        <Icon name="file-text" size={16} />
+        <span className="exp-nuc">
+          図 <RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
+        </span>
+        <span className="exp-time">{formatTime(file.lastModified)}</span>
+        {figure.layers > 1 && <span className="badge">{figure.layers} 本</span>}
+      </button>
     </div>
   );
 }

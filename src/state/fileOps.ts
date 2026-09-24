@@ -1,18 +1,23 @@
+import { annotationKey, applyAnnotations, fileAnnotations, layerAnnotations, summary, syncFileOf } from '../lib/deltaSync';
 import { baseName, copyFigureToClipboard, downloadBlob, figureSvgString, svgToPng } from '../lib/exportFigure';
+import { buildFigureJdf, figureBaseOf, type FigureBase } from '../lib/figureJdf';
 import { JdfError, readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
 import { readJdf2d } from '../lib/jdf2d';
+import { hasEmbeddedFigure, readEmbeddedFigure } from '../lib/jdfEmbed';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
 import { ask } from './dialog';
-import { canOpen, load2dExperiment, loadExperiment, sampleKeyOf, saveFigure, useLibrary } from './library';
-import { registerJdfHandle } from './deltaSync';
-import { addSpectra, addSpectrum2d, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
-import { emptyDocument } from './types';
+import { canOpen, load2dExperiment, loadExperiment, refreshIfInFolder, sampleKeyOf, saveFigure, useLibrary } from './library';
+import { jdfHandle, registerJdfHandle } from './deltaSync';
+import { addSpectra, addSpectrum2d, edit, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
+import { emptyDocument, type SpectrumMeta } from './types';
 
 type PickerOptions = {
   suggestedName?: string;
   multiple?: boolean;
   types?: { description: string; accept: Record<string, string[]> }[];
+  /** このファイルがあるフォルダでダイアログを開く */
+  startIn?: FileHandle;
 };
 type FsWindow = Window & {
   showOpenFilePicker?: (o: PickerOptions) => Promise<FileHandle[]>;
@@ -27,6 +32,8 @@ const OPEN_TYPES = [
   },
 ];
 const PROJECT_TYPES = [{ description: 'NMR Figure プロジェクト', accept: { 'application/json': [PROJECT_EXT] } }];
+const JDF_TYPES = [{ description: 'Delta のデータ (図入り)', accept: { 'application/octet-stream': ['.jdf'] } }];
+const isJdfName = (name: string | null | undefined) => !!name && /\.jdf$/i.test(name);
 
 /** FID を処理したあとの基準合わせに、研究室の基準値を使う */
 export function readOptions(): ReadOptions {
@@ -65,6 +72,18 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         loadDocument(doc, data, file.name, handle ?? null, fids, { data2d, fids2d });
         notify(`${file.name} を開きました`);
       } else if (name.endsWith('.jdf')) {
+        const buffer = await file.arrayBuffer();
+        // このソフトで保存した図入りの .jdf は、図ごと開く (図を編集中に足そうとしたときは、どうするか聞く)
+        if (hasEmbeddedFigure(buffer)) {
+          const editing = mode === 'add' && useEditor.getState().doc.layers.length > 0;
+          const choice = editing ? await askFigureOrSpectrum(file.name) : 'figure';
+          if (!choice) continue;
+          if (choice === 'figure') {
+            await openFigureJdf(buffer, file.name, handle ?? null);
+            cleared = true;
+            continue;
+          }
+        }
         if (mode === 'new' && !cleared && useEditor.getState().doc.layers.length) {
           if (!(await confirmDiscard())) return;
           loadDocument(emptyDocument(), {}, null, null);
@@ -72,7 +91,6 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         cleared = true;
         // ドロップ・「開く」で開いた .jdf も、Delta と同期できるようにファイルを覚えておく
         if (handle) registerJdfHandle(file.name, handle);
-        const buffer = await file.arrayBuffer();
         if (is2d(buffer)) {
           addSpectrum2d(readJdf2d(buffer, file.name));
           notify(`${file.name} (2D) を開きました`);
@@ -96,6 +114,62 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
 /** .jdf のヘッダーだけ見て 2D かどうか調べる (13 バイト目が次元の数) */
 function is2d(buffer: ArrayBuffer) {
   return buffer.byteLength > 16 && new DataView(buffer).getUint8(12) >= 2;
+}
+
+async function askFigureOrSpectrum(fileName: string): Promise<'figure' | 'spectrum' | null> {
+  const choice = await ask('図の入った .jdf です', `${fileName} には、このソフトで保存した図が入っています。どう開きますか？`, [
+    { label: 'スペクトルだけ今の図に足す', value: 'spectrum' },
+    { label: '図として開く', value: 'figure', kind: 'primary' },
+  ]);
+  return choice === 'figure' || choice === 'spectrum' ? choice : null;
+}
+
+/**
+ * 図入りの .jdf を図ごと開く。土台のスペクトルは、このファイルと Delta の同期をする
+ * (ファイルの名前を変えたり写したりしていても、開いたファイルが相手になる)
+ */
+async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: FileHandle | null) {
+  if (!(await confirmDiscard())) return;
+  let project;
+  try {
+    const json = await readEmbeddedFigure(buffer);
+    if (!json) throw new Error('図が見つかりません');
+    project = parseProject(json);
+  } catch (e) {
+    notify(`${fileName}: 図を読めませんでした (${(e as Error).message})。スペクトルだけを開きます`, 'error');
+    loadDocument(emptyDocument(), {}, null, null);
+    if (handle) registerJdfHandle(fileName, handle);
+    addSpectra([readJdf(buffer, fileName, readOptions())]);
+    return;
+  }
+  const { doc, data, fids, fids2d, data2d, jdfBase } = project;
+  const base = doc.spectra.find((s) => s.id === jdfBase);
+  if (base && !base.processing) base.syncFile = fileName;
+  if (handle) registerJdfHandle(fileName, handle);
+  loadDocument(doc, data, fileName, handle, fids, { data2d, fids2d });
+  if (base) useEditor.setState((s) => ({ sources: { ...s.sources, [base.id]: buffer } }));
+  notify(`${fileName} (図) を開きました`);
+  // FID から処理した土台は自動では同期しないので、Delta で変えたピーク値・積分があれば、入れるか聞く
+  if (base?.processing) await offerDeltaChanges(buffer, fileName, base);
+}
+
+async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: SpectrumMeta) {
+  const { doc, data } = useEditor.getState();
+  const layer = doc.layers.find((l) => l.spectrumId === base.id);
+  const values = data[base.id];
+  if (!layer || !values) return;
+  const fromFile = fileAnnotations(buffer);
+  const inFigure = layerAnnotations(doc, layer.id);
+  if (annotationKey(fromFile, values, base) === annotationKey(inFigure, values, base)) return;
+  const choice = await ask(
+    'Delta で変わっています',
+    `${fileName} のピーク値・積分 (${summary(fromFile)}) が、保存したときの図 (${summary(inFigure)}) と違います。Delta で変えた中身を図に入れますか？`,
+    [
+      { label: '図のままにする', value: 'keep' },
+      { label: 'Delta の中身を入れる', value: 'file', kind: 'primary' },
+    ],
+  );
+  if (choice === 'file') edit((d) => applyAnnotations(d, layer.id, fromFile, base));
 }
 
 /** ホーム画面で選んだ実験を開く。new は新しい図、add は編集中の図に追加 (測定順に並べる) */
@@ -213,7 +287,10 @@ export async function openSavedFigure(id: string) {
   if (!(await confirmDiscard())) return;
   try {
     const { doc, data, fids, fids2d, data2d } = parseProject(figure.json);
-    loadDocument(doc, data, `${figure.name}${PROJECT_EXT}`, figure.handle ?? null, fids, { data2d, fids2d });
+    const handle = figure.handle ?? null;
+    // 図入りの .jdf に保存した図は、そのファイルと同期できるように覚えておく
+    if (handle && isJdfName(handle.name)) registerJdfHandle(handle.name, handle);
+    loadDocument(doc, data, handle?.name ?? `${figure.name}${PROJECT_EXT}`, handle, fids, { data2d, fids2d });
     useEditor.setState({ screen: 'editor' });
     notify(`${figure.name} を開きました`);
   } catch (e) {
@@ -223,17 +300,122 @@ export async function openSavedFigure(id: string) {
 
 function defaultProjectName() {
   const { doc, projectName } = useEditor.getState();
-  if (projectName) return projectName;
+  if (projectName) return baseName(projectName) + PROJECT_EXT;
   const first = doc.spectra[0]?.fileName ?? doc.spectra2d[0]?.fileName;
   return (first ? baseName(first) : 'figure') + PROJECT_EXT;
 }
 
+/**
+ * 保存。.jdf にできる図 (1D で、土台にできる .jdf のスペクトルがある) は図入りの .jdf にする。
+ * 2D・文献だけの図、土台の .jdf が見つからないときは .nmrfig
+ */
 export async function saveProject(saveAs = false) {
-  const { doc, data, fids, fids2d, fileHandle } = useEditor.getState();
+  const { doc } = useEditor.getState();
   if (!doc.layers.length && !doc.plot2d) return;
+  const base = figureBaseOf(doc);
+  if (base && (await saveFigureJdf(base, saveAs)) !== 'fallback') return;
+  await saveNmrfig(saveAs);
+}
+
+/** 図の下書きの .jdf の名前 (前に保存した名前、なければ土台のファイル名 + _図) */
+function defaultJdfName(base: FigureBase) {
+  const { projectName } = useEditor.getState();
+  if (projectName) return baseName(projectName) + '.jdf';
+  return `${baseName(base.meta.fileName)}_図.jdf`;
+}
+
+/** 土台のスペクトルの .jdf の中身 (読み込んだときのもの、なければデータフォルダ・覚えているファイルから読む) */
+async function templateOf(meta: SpectrumMeta): Promise<ArrayBuffer | null> {
+  const { sources, fileHandle } = useEditor.getState();
+  if (sources[meta.id]) return sources[meta.id];
+  const candidates = [jdfHandle(syncFileOf(meta)), jdfHandle(meta.fileName), fileHandle && isJdfName(fileHandle.name) ? fileHandle : null];
+  for (const handle of candidates) {
+    if (!handle) continue;
+    try {
+      return await (await handle.getFile()).arrayBuffer();
+    } catch {
+      // 読めなければ次の候補
+    }
+  }
+  return null;
+}
+
+async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' | 'fallback'> {
+  const template = await templateOf(base.meta);
+  if (!template) {
+    notify(`土台の ${base.meta.fileName} が見つからないので、.nmrfig で保存します (ホーム画面でデータフォルダを読み込むと .jdf で保存できます)`);
+    return 'fallback';
+  }
+  const { fileHandle } = useEditor.getState();
+  if (!saveAs && fileHandle?.name.endsWith(PROJECT_EXT)) notify(`これからは Delta の形式 (.jdf) で保存します。保存する場所を選んでください (${fileHandle.name} はそのまま残ります)`);
+  try {
+    let handle = saveAs || !fileHandle || !isJdfName(fileHandle.name) ? null : fileHandle;
+    if (handle && !(await canWrite(handle))) {
+      notify('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください', 'error');
+      handle = null;
+    }
+    if (!handle && fsWindow.showSaveFilePicker) {
+      const near = jdfHandle(base.meta.fileName);
+      handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultJdfName(base), types: JDF_TYPES, ...(near ? { startIn: near } : {}) });
+    }
+    const name = handle?.name ?? defaultJdfName(base);
+    // 土台のスペクトル (Delta で処理したもの) は、保存したあとこのファイルと同期する。図の中身にもそう書いておく
+    const syncable = !base.meta.processing;
+    const s = useEditor.getState();
+    const doc = syncable ? { ...s.doc, spectra: s.doc.spectra.map((m) => (m.id === base.meta.id ? { ...m, syncFile: name } : m)) } : s.doc;
+    const json = serializeProject(doc, s.data, s.fids, s.fids2d, { jdfBase: base.meta.id });
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await buildFigureJdf(template, doc, base, json, s.fids[base.meta.id]);
+    } catch (e) {
+      notify(`.jdf にできなかったので、.nmrfig で保存します (${(e as Error).message})`, 'error');
+      return 'fallback';
+    }
+    if (handle) {
+      try {
+        const w = await handle.createWritable();
+        await w.write(new Blob([bytes]));
+        await w.close();
+      } catch (e) {
+        if (!writeRefused(e)) throw e;
+        await downloadJdf(bytes, json, handle.name, 'このブラウザではファイルに直接書き込めないので、ダウンロードとして保存しました (Chrome か Edge で開くと、同じファイルに上書き保存できます)');
+        return 'done';
+      }
+      // 書けてから、同期の相手をこのファイルにする (先に変えると、まだ空のファイルを読みに行ってしまう)
+      registerJdfHandle(name, handle);
+      useEditor.setState((st) => ({ sources: { ...st.sources, [base.meta.id]: bytes } }));
+      if (syncable && base.meta.syncFile !== name) {
+        edit((d) => {
+          const m = d.spectra.find((x) => x.id === base.meta.id);
+          if (m) m.syncFile = name;
+        }, false);
+      }
+      markSaved(name, handle);
+      notify(`${name} に保存しました (ダブルクリックすると Delta で開けます)`);
+      await rememberFigure(json, name, handle);
+      await refreshIfInFolder(handle);
+      return 'done';
+    }
+    await downloadJdf(bytes, json, name, '保存しました (ダウンロードのフォルダ)');
+    return 'done';
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') notify(`保存できませんでした: ${(e as Error).message}`, 'error');
+    return 'done';
+  }
+}
+
+async function downloadJdf(bytes: ArrayBuffer, json: string, name: string, message: string) {
+  downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }), name);
+  markSaved(name, null);
+  notify(message);
+  await rememberFigure(json, name, null);
+}
+
+async function saveNmrfig(saveAs: boolean) {
+  const { doc, data, fids, fids2d, fileHandle } = useEditor.getState();
   const text = serializeProject(doc, data, fids, fids2d);
   try {
-    let handle = saveAs ? null : fileHandle;
+    let handle = saveAs || !fileHandle?.name.endsWith(PROJECT_EXT) ? null : fileHandle;
     // 覚えていた保存先は、書き込みの許可を取り直す (ブラウザを開き直したあとなど)
     if (handle && !(await canWrite(handle))) {
       notify('保存先のファイルに書き込めませんでした。保存する場所をもう一度選んでください', 'error');

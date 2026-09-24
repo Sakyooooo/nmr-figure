@@ -249,15 +249,22 @@ export interface ParamInfo {
   name: string;
   /** 値の形 (0 = 文字、1 = 整数、2 = 実数) */
   valueType: number;
+  /** 文字の値の先頭 16 文字 (右の空白は除く)。長い値の全文は PARAMETER_STORAGE にある */
+  text: string;
 }
 
-export function readParamNames(params: Uint8Array): ParamInfo[] {
+export function readParams(params: Uint8Array): ParamInfo[] {
   const { size, count } = paramHead(params);
   const out: ParamInfo[] = [];
   for (let i = 0; i < count; i++) {
     const at = PARAM_HEAD + i * size;
     const v = new DataView(params.buffer, params.byteOffset + at, size);
-    out.push({ name: latin1(params.subarray(at + PARAM.name, at + PARAM.name + PARAM.nameLength)).trim(), valueType: v.getInt32(PARAM.valueType, true) });
+    const valueType = v.getInt32(PARAM.valueType, true);
+    out.push({
+      name: latin1(params.subarray(at + PARAM.name, at + PARAM.name + PARAM.nameLength)).trim(),
+      valueType,
+      text: valueType === 0 ? latin1(params.subarray(at + PARAM.value, at + PARAM.value + PARAM.valueLength)).replace(/[ \0]+$/, '') : '',
+    });
   }
   return out;
 }

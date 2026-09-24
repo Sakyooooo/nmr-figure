@@ -4,7 +4,7 @@
  * - 自動の控え: 同期のたびに残るもの (上書きされた中身を戻すため)。ふだんは畳んでおく
  */
 import { useEffect, useState } from 'react';
-import { summary } from '../lib/deltaSync';
+import { summary, syncFileOf } from '../lib/deltaSync';
 import { exportEntry, grantDeltaWrite, recordNow, restoreEntry, restoreOriginal, useSync, type LinkView } from '../state/deltaSync';
 import { deleteRecord, historyOf, originalOf, updateMemo, useHistory, type HistoryEntry } from '../state/history';
 import { useEditor } from '../state/store';
@@ -18,7 +18,7 @@ export function SyncPanel() {
   const layerFile = useEditor((s) => {
     const layer = s.doc.layers.find((l) => l.id === s.activeLayerId);
     const meta = layer && s.doc.spectra.find((x) => x.id === layer.spectrumId);
-    return meta && !meta.simulated ? meta.fileName : '';
+    return meta && !meta.simulated ? syncFileOf(meta) : '';
   });
   const synced = !!view && view.status !== 'duplicate';
   // .jdf のファイルに届いている (書き出し・最初のファイルに戻すが使える)
