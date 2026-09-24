@@ -102,6 +102,7 @@ type DirHandle = {
   requestPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
   /** このフォルダの中のファイルなら、フォルダからの道のり (違えば null) */
   resolve?(h: FileHandle): Promise<string[] | null>;
+  getDirectoryHandle?(name: string): Promise<{ getFileHandle(name: string): Promise<FileHandle> }>;
 };
 type PickerWindow = Window & { showDirectoryPicker?: (o: { id?: string; mode?: 'read'; startIn?: DirHandle }) => Promise<DirHandle> };
 
@@ -328,6 +329,34 @@ export async function folderWritePermission(ask: boolean): Promise<PermissionSta
     return (await folder.requestPermission?.({ mode: 'readwrite' })) ?? 'granted';
   } catch {
     return 'denied';
+  }
+}
+
+/** データフォルダ (NMR の保存先) の名前。開いていなければ null */
+export function dataFolderName(): string | null {
+  return folder?.name ?? null;
+}
+
+/** データフォルダの読み取りの許可。ask = true はボタンを押したときなど、ブラウザが確認を出してよいときだけ */
+export async function folderReadPermission(ask: boolean): Promise<PermissionState> {
+  if (!folder) return 'denied';
+  try {
+    const now = (await folder.queryPermission?.({ mode: 'read' })) ?? 'granted';
+    if (now === 'granted' || !ask) return now;
+    return (await folder.requestPermission?.({ mode: 'read' })) ?? 'granted';
+  } catch {
+    return 'denied';
+  }
+}
+
+/** データフォルダの中の子フォルダのファイル (ChemDraw 連携の構造式)。なければ null */
+export async function folderChildFile(dir: string, name: string): Promise<File | null> {
+  if (!folder?.getDirectoryHandle) return null;
+  try {
+    const sub = await folder.getDirectoryHandle(dir);
+    return await (await sub.getFileHandle(name)).getFile();
+  } catch {
+    return null;
   }
 }
 

@@ -238,9 +238,5 @@ export const EN_PANELS2: Record<string, string> = {
   "構造式ボタンを押したときに聞く": "Ask when the structure button is pressed",
   "ChemDraw (保存すると図に入る)": "ChemDraw (saving puts it in the figure)",
   "このアプリ (Ketcher)": "This app (Ketcher)",
-  "ChemDraw の保存先: {folder}": "ChemDraw save folder: {folder}",
-  "まだ選んでいません": "not chosen yet",
-  "選び直す": "Choose again",
-  "ダウンロード フォルダを選ぶ": "Choose the Downloads folder",
-  "ChemDraw 用のファイルはダウンロード フォルダに保存されます。ChemDraw で上書き保存すると、アプリがそこから読んで図に入れます。": "Files for ChemDraw are saved to the Downloads folder. When you save in ChemDraw, the app reads the file there and puts the structure in the figure.",
+  "ChemDraw で描くには、この PC に ChemDraw 連携を 1 回だけ入れます (アプリのフォルダの {installer} をダブルクリック)。構造式は NMR の保存先の中の「{dir}」フォルダに置かれ、描いた内容は保存しなくても図に入ります。": "To draw in ChemDraw, install the ChemDraw link on this PC once (double-click {installer} in the app folder). Structures are kept in the \"{dir}\" folder inside your NMR folder, and what you draw goes into the figure without saving.",
 };

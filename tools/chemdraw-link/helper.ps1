@@ -1,0 +1,87 @@
+﻿# NMR Figure Editor と ChemDraw をつなぐ (アプリの構造式ボタン → nmrfig-chemdraw: のリンク → これ)。
+#  1. リンクの構造式を NMR の保存先の ChemDraw フォルダに書き、ChemDraw で開く (開いている ChemDraw があればその中に)
+#  2. 描いている間、1 秒ごとに ChemDraw の中身を読み、変わっていればファイルに書く (アプリがそれを読んで図を直す)。
+#     書いたら「変更あり」を消すので、閉じるときに保存を聞かれない
+#  3. 書類を閉じたら終わる (自分で起動した ChemDraw は閉じる)
+# リンク: nmrfig-chemdraw:open?name=structure-<16進>&data=<deflate して base64url にした CDXML>
+param([string]$Url)
+$ErrorActionPreference = 'Stop'
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$log = Join-Path $here 'helper.log'
+function Log($m) { try { Add-Content -Path $log -Value ("{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $m) -Encoding UTF8 } catch {} }
+
+try {
+  $config = Get-Content (Join-Path $here 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+  if (-not ($Url -match '^nmrfig-chemdraw:(//)?open\?(.*)$')) { Log "bad url"; exit 1 }
+  $query = @{}
+  foreach ($pair in $Matches[2].Split('&')) {
+    $kv = $pair.Split('=', 2)
+    if ($kv.Length -eq 2) { $query[$kv[0]] = [Uri]::UnescapeDataString($kv[1]) }
+  }
+  $name = $query['name']
+  # ほかのサイトから呼ばれても、決まった名前のファイルしか扱わない
+  if (-not ($name -match '^structure-[0-9a-f]{8,32}$')) { Log "bad name"; exit 1 }
+  $dir = Join-Path $config.folder 'ChemDraw'
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  $path = Join-Path $dir "$name.cdxml"
+  $utf8 = New-Object System.Text.UTF8Encoding($false)
+
+  # 同じ構造式をもう見ているときは、その書類を前に出すだけ
+  $mutex = New-Object System.Threading.Mutex($false, "Local\nmrfig-chemdraw-$name")
+  $owner = $mutex.WaitOne(0)
+
+  if ($owner -and $query['data']) {
+    $b64 = $query['data'].Replace('-', '+').Replace('_', '/')
+    switch ($b64.Length % 4) { 2 { $b64 += '==' } 3 { $b64 += '=' } }
+    $raw = New-Object System.IO.MemoryStream(, [Convert]::FromBase64String($b64))
+    $inflate = New-Object System.IO.Compression.DeflateStream($raw, [System.IO.Compression.CompressionMode]::Decompress)
+    $reader = New-Object System.IO.StreamReader($inflate, $utf8)
+    $text = $reader.ReadToEnd()
+    $reader.Close()
+    if (-not ($text -match '<CDXML[\s>]')) { Log "data is not CDXML"; exit 1 }
+    [IO.File]::WriteAllText($path, $text, $utf8)
+  }
+  if (-not (Test-Path $path)) { Log "no file $path"; exit 1 }
+
+  # 開いている ChemDraw があればその中に開く。なければ起動する
+  $own = $false
+  try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('ChemDraw_x64.Application') }
+  catch { $app = New-Object -ComObject ChemDraw_x64.Application; $own = $true }
+  $app.Visible = $true
+
+  function Find-Doc {
+    foreach ($d in $app.Documents) { try { if ($d.FullName -eq $path) { return $d } } catch {} }
+    return $null
+  }
+  $doc = Find-Doc
+  if (-not $doc) { $doc = $app.Documents.Open($path) }
+  try { $doc.Activate() } catch {}
+  try { (New-Object -ComObject WScript.Shell).AppActivate('ChemDraw') | Out-Null } catch {}
+  if (-not $owner) { Log "already watching $name"; exit 0 }
+  Log "open $name"
+
+  $last = $null
+  try { $last = [string]$doc.Objects.Data('chemical/x-cdxml') } catch {}
+  $started = Get-Date
+  while (((Get-Date) - $started).TotalHours -lt 12) {
+    Start-Sleep -Milliseconds 900
+    # 書類を閉じた・ChemDraw を終えたら終わる
+    $open = $false
+    try { foreach ($d in $app.Documents) { if ($d.FullName -eq $path) { $open = $true; break } } } catch { break }
+    if (-not $open) { break }
+    $now = $null
+    try { $now = [string]$doc.Objects.Data('chemical/x-cdxml') } catch { continue }
+    if (-not $now -or $now -eq $last) { continue }
+    $tmp = "$path.tmp"
+    [IO.File]::WriteAllText($tmp, $now, $utf8)
+    Move-Item -Force -Path $tmp -Destination $path
+    $last = $now
+    try { $doc.Modified = $false } catch {}
+  }
+  Log "done $name"
+  if ($own) { try { if ($app.Documents.Count -eq 0) { $app.Quit() } } catch {} }
+  $mutex.ReleaseMutex()
+} catch {
+  Log ("error: " + $_.Exception.Message)
+  exit 1
+}

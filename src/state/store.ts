@@ -691,8 +691,8 @@ export function updateAnnotation(id: string, patch: Partial<Annotation>, record 
  * 図に構造式・画像を置く。位置は図の左上からの割合。
  * ratio (高さ÷幅) は、SVG の viewBox や画像の大きさから計算して渡す
  */
-export function addFigureImage(item: { svg?: string | null; href?: string | null; source?: string | null; cdxml?: string | null; ratio: number; w?: number }) {
-  const id = crypto.randomUUID();
+export function addFigureImage(item: { id?: string; svg?: string | null; href?: string | null; source?: string | null; cdxml?: string | null; ratio: number; w?: number }) {
+  const id = item.id ?? crypto.randomUUID();
   edit((d) => {
     // 少しずつずらして置く (重ならないように)
     const k = d.figureImages.length;

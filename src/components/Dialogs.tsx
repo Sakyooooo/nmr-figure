@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SolventKey } from '../lib/impurityTypes';
 import { nucleusDefaults, nucleusRich } from '../lib/nuclei';
 import { labReference, type LangSetting, type StructureTool } from '../lib/settings';
-import { chooseChemDrawFolder, useChemDrawLink } from '../state/chemdraw';
+import { CHEMDRAW_DIR, LINK_INSTALLER } from '../state/chemdraw';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
 import { setLanguage, setReferenceOffset, setStructureTool, updateSettings, useEditor } from '../state/store';
 import { NumberInput } from './inputs';
@@ -80,7 +80,6 @@ function ReferenceForm({ observed, suggested, solvent, layerId }: { observed: nu
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useEditor((s) => s.settings);
-  const chemdrawFolder = useChemDrawLink((s) => s.folderName);
   const [newName, setNewName] = useState('');
   return (
     <Modal title={tr('設定')} onClose={onClose} wide>
@@ -117,12 +116,11 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </select>
         </div>
         <p className="hint">
-          {tr('ChemDraw の保存先: {folder}', { folder: chemdrawFolder ?? tr('まだ選んでいません') })}{' '}
-          <button className="btn sm" onClick={() => void chooseChemDrawFolder()}>
-            {chemdrawFolder ? tr('選び直す') : tr('ダウンロード フォルダを選ぶ')}
-          </button>
+          {tr('ChemDraw で描くには、この PC に ChemDraw 連携を 1 回だけ入れます (アプリのフォルダの {installer} をダブルクリック)。構造式は NMR の保存先の中の「{dir}」フォルダに置かれ、描いた内容は保存しなくても図に入ります。', {
+            installer: LINK_INSTALLER,
+            dir: CHEMDRAW_DIR,
+          })}
         </p>
-        <p className="hint">{tr('ChemDraw 用のファイルはダウンロード フォルダに保存されます。ChemDraw で上書き保存すると、アプリがそこから読んで図に入れます。')}</p>
       </section>
       <section>
         <h3>{tr('研究室の基準値 (溶媒ピーク)')}</h3>
