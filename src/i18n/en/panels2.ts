@@ -242,5 +242,10 @@ export const EN_PANELS2: Record<string, string> = {
   "連携できています": "Linked",
   "まだ連携していません": "Not linked yet",
   "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。NMR の保存先の中に「{dir}」フォルダを作り、その中の「連携を入れる」ファイルをダブルクリックするだけです。描いた内容は保存しなくても図に入ります。要らなくなったファイルはアプリが自動で消します。": "To draw in ChemDraw, set up the ChemDraw link once on this PC. The app makes a \"{dir}\" folder in your NMR folder; just double-click the installer file in it. What you draw goes into the figure without saving. The app deletes files that are no longer needed.",
-  "前の版の連携です。連携し直すと、描き終わったファイルが自動で片付きます": "This is an older version of the link. Link again so finished files are cleaned up automatically",
+  "前の版の連携です。連携し直してください (前の版は、NMR の保存先の名前に日本語などがあると、描いた内容が図に入りません)":
+    "This is an older version of the link. Please link again (with the older version, drawings do not reach the figure when the NMR data folder name contains Japanese or other non-English characters)",
+  "ChemDraw との連携を新しくしてください": "Please update the ChemDraw link",
+  "今の連携は前の版です。NMR の保存先の名前に日本語などがあると、ChemDraw で描いた内容が図に入らず、ChemDraw が「ファイルがもうありません」と出します。連携し直してください (1 回だけ)。":
+    "The installed link is an older version. When the NMR data folder name contains Japanese or other non-English characters, drawings in ChemDraw do not reach the figure and ChemDraw says the file is no longer available. Please link again (once).",
+  "このまま開く": "Open anyway",
 };

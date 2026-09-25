@@ -50,9 +50,26 @@ try {
   catch { $app = New-Object -ComObject ChemDraw_x64.Application; $own = $true }
   $app.Visible = $true
 
+  # 書類はファイルの名前で探す。ChemDraw の FullName はフォルダ名の日本語を文字化けさせる
+  # (「研究室データ」→「遐皮ｩｶ…」) ので、場所の文字列では見つからない。名前は structure-<16進> で他と重ならない
+  $file = "$name.cdxml"
   function Find-Doc {
-    foreach ($d in $app.Documents) { try { if ($d.FullName -eq $path) { return $d } } catch {} }
+    foreach ($d in $app.Documents) { try { if ([string]$d.Name -eq $file) { return $d } } catch {} }
     return $null
+  }
+  # open = 開いている / closed = 閉じた / gone = ChemDraw を終えた /
+  # busy = ChemDraw が答えない (描いている最中・ダイアログを出しているなど。閉じたとみなさない)
+  function Doc-State {
+    try {
+      foreach ($d in $app.Documents) { if ([string]$d.Name -eq $file) { return 'open' } }
+      return 'closed'
+    } catch {
+      $e = $_.Exception
+      while ($e.InnerException) { $e = $e.InnerException }
+      # RPC サーバーがない・切れた = ChemDraw が終わった
+      if (@('800706BA', '800706BE', '80010108', '80010114') -contains ('{0:X8}' -f $e.HResult)) { return 'gone' }
+      return 'busy'
+    }
   }
   $doc = Find-Doc
   if (-not $doc) { $doc = $app.Documents.Open($path) }
@@ -67,12 +84,28 @@ try {
   $last = $null
   try { $last = [string]$doc.Objects.Data('chemical/x-cdxml') } catch {}
   $started = Get-Date
+  $closedCount = 0
+  $busySince = $null
   while (((Get-Date) - $started).TotalHours -lt 12) {
     Start-Sleep -Milliseconds 900
-    # 書類を閉じた・ChemDraw を終えたら終わる
-    $open = $false
-    try { foreach ($d in $app.Documents) { if ($d.FullName -eq $path) { $open = $true; break } } } catch { break }
-    if (-not $open) { break }
+    # 書類を閉じた・ChemDraw を終えたら終わる。ChemDraw が答えないだけのときは閉じたとみなさない
+    # (閉じたとみなすと、アプリがファイルを片付けて ChemDraw が「ファイルがもうありません」と出す)
+    $state = Doc-State
+    if ($state -eq 'gone') { break }
+    if ($state -eq 'busy') {
+      if (-not $busySince) { $busySince = Get-Date }
+      # 30 分答えなければあきらめる
+      if (((Get-Date) - $busySince).TotalMinutes -gt 30) { break }
+      continue
+    }
+    $busySince = $null
+    if ($state -eq 'closed') {
+      # 2 回続けて見えないときだけ閉じたとみなす
+      $closedCount++
+      if ($closedCount -ge 2) { break }
+      continue
+    }
+    $closedCount = 0
     $now = $null
     try { $now = [string]$doc.Objects.Data('chemical/x-cdxml') } catch { continue }
     if (-not $now -or $now -eq $last) { continue }
@@ -82,7 +115,7 @@ try {
     $last = $now
     try { $doc.Modified = $false } catch {}
   }
-  Log "done $name"
+  Log "done $name ($state)"
   # 閉じた印: アプリが最後の中身を図に入れてから、この構造式のファイルと一緒に消す
   [IO.File]::WriteAllText($closed, (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss'), $utf8)
   if ($own) { try { if ($app.Documents.Count -eq 0) { $app.Quit() } } catch {} }

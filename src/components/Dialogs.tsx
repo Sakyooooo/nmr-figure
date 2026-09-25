@@ -136,7 +136,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             {linkReady ? tr('ChemDraw と連携し直す') : tr('ChemDraw と連携する')}
           </button>
           <span className="muted">
-            {linkOutdated ? tr('前の版の連携です。連携し直すと、描き終わったファイルが自動で片付きます') : linkReady ? tr('連携できています') : tr('まだ連携していません')}
+            {linkOutdated ? tr('前の版の連携です。連携し直してください (前の版は、NMR の保存先の名前に日本語などがあると、描いた内容が図に入りません)') : linkReady ? tr('連携できています') : tr('まだ連携していません')}
           </span>
         </div>
         <p className="hint">

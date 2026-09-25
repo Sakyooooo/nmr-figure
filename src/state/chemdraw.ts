@@ -119,12 +119,15 @@ export const CHEMDRAW_DIR = 'ChemDraw';
 /** 連携が入ったら、連携が ChemDraw フォルダに置く印 */
 const LINK_MARKER = '.nmrfig-link.json';
 
-/** 連携の版 (installer.ps1 が印に書く version と合わせる)。2 = 閉じた印を置く (アプリがファイルを片付けられる) */
-const LINK_VERSION = 2;
+/**
+ * 連携の版 (installer.ps1 が印に書く version と合わせる)。2 = 閉じた印を置く (アプリがファイルを片付けられる)、
+ * 3 = NMR の保存先に日本語などがあっても書類を見失わない (2 までは開いた直後に閉じたとみなし、描いた内容が図に入らなかった)
+ */
+const LINK_VERSION = 3;
 
 /**
  * 連携ができているか (NMR の保存先の ChemDraw フォルダに印があるか)。null = まだ調べていない。
- * outdated = 前の版の連携 (動くが、描き終わったファイルが片付かない。入れ直してもらう)
+ * outdated = 前の版の連携 (入れ直してもらう)
  */
 export const useChemDrawLink = create<{ ready: boolean | null; outdated: boolean }>(() => ({ ready: null, outdated: false }));
 
@@ -288,6 +291,21 @@ export async function drawInChemDraw(imageId: string | null) {
     ]);
     if (choice === 'link') await setupChemDrawLink();
     return;
+  }
+  if (useChemDrawLink.getState().outdated) {
+    const choice = await ask(
+      tr('ChemDraw との連携を新しくしてください'),
+      tr('今の連携は前の版です。NMR の保存先の名前に日本語などがあると、ChemDraw で描いた内容が図に入らず、ChemDraw が「ファイルがもうありません」と出します。連携し直してください (1 回だけ)。'),
+      [
+        { label: tr('ChemDraw と連携し直す'), value: 'link', kind: 'primary' },
+        { label: tr('このまま開く'), value: 'open' },
+      ],
+    );
+    if (choice === 'link') {
+      await setupChemDrawLink();
+      return;
+    }
+    if (choice !== 'open') return;
   }
   const id = imageId ?? crypto.randomUUID();
   const name = fileKey(id);

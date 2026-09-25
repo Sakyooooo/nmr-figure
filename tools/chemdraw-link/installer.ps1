@@ -89,8 +89,8 @@ if (-not $dry) {
 # アプリが「連携できた」と知るための印
 $cdDir = Join-Path $folder 'ChemDraw'
 New-Item -ItemType Directory -Force -Path $cdDir | Out-Null
-# version: アプリの LINK_VERSION (chemdraw.ts) と合わせる。2 = 閉じた印を置く
-$marker = @{ version = 2; installed = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss') } | ConvertTo-Json
+# version: アプリの LINK_VERSION (chemdraw.ts) と合わせる。2 = 閉じた印を置く、3 = 日本語を含むフォルダでも書類を見失わない
+$marker = @{ version = 3; installed = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss') } | ConvertTo-Json
 [IO.File]::WriteAllText((Join-Path $cdDir '.nmrfig-link.json'), $marker, $utf8)
 
 Say ("ChemDraw 連携を入れました。`nNMR の保存先: {0}`n`nアプリで構造式ボタンを押すと ChemDraw が開きます。初めてのときは Edge が「開きますか」と聞くので、許可してください。`n`nThe ChemDraw link is installed. Press the structure button in the app to open ChemDraw." -f $folder) | Out-Null
