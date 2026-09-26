@@ -35,7 +35,7 @@ import { annotationDefaults, type AnnotationKind, type NmrDocument, type ViewSta
 import { AnnotationShape, FigureContent } from './FigureContent';
 import { imageRect } from './FigureImages';
 
-type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p1' | 'p2';
+export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p1' | 'p2';
 
 type Gesture =
   | {
@@ -58,6 +58,8 @@ type Gesture =
   | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; at: Anchor; token: number }
   | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; at: Anchor; token: number }
   | { type: 'legend'; x0: number; y0: number; lx: number; ly: number; token: number }
+  /** 凡例の右下の角: 文字の大きさを変える (枠の高さが指の位置に合うように) */
+  | { type: 'legendResize'; y0: number; h0: number; fs0: number; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
   | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
 
@@ -211,6 +213,12 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
           hitKind === 'imageHandle'
             ? { type: 'imageResize', id: hitId, x0: x, w0: image.w, token: beginGesture() }
             : { type: 'imageMove', id: hitId, x0: x, y0: y, ox: image.x, oy: image.y, token: beginGesture() };
+        capture();
+        return;
+      }
+      if (hitKind === 'legendHandle' && scene.legend) {
+        select({ kind: 'legend', id: 'legend' });
+        gesture.current = { type: 'legendResize', y0: y, h0: scene.legend.h, fs0: doc.figure.legendFontSize, token: beginGesture() };
         capture();
         return;
       }
@@ -409,6 +417,16 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
         updateFigureImage(cur.id, { w: Math.max(0.03, cur.w0 + (x - cur.x0) / layout.width) }, false);
         break;
       }
+      case 'legendResize': {
+        // 行の高さは文字の大きさに比例するので、枠の高さの伸び縮みの割合で文字を大きくする
+        const k = Math.max(0.3, (cur.h0 + y - cur.y0) / cur.h0);
+        const fs = Math.round(Math.min(40, Math.max(6, cur.fs0 * k)));
+        if (fs !== doc.figure.legendFontSize)
+          edit((d) => {
+            d.figure.legendFontSize = fs;
+          }, false);
+        break;
+      }
       case 'legend': {
         const { plot } = layout;
         const lx = cur.lx + x - cur.x0;
@@ -458,7 +476,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     } else if (cur.type === 'move') {
       reanchor(cur.id);
       endGesture(cur.token);
-    } else if (cur.type === 'resize' || cur.type === 'legend' || cur.type === 'imageMove' || cur.type === 'imageResize') {
+    } else if (cur.type === 'resize' || cur.type === 'legend' || cur.type === 'legendResize' || cur.type === 'imageMove' || cur.type === 'imageResize') {
       endGesture(cur.token);
     }
   };
@@ -548,7 +566,8 @@ function zoomToBox(box: { x0: number; x1: number; y0: number; y1: number }, layo
   setView({ ...x, yZoom: (yZoom * 0.95 * band) / above });
 }
 
-function constrain(c: Extract<Gesture, { type: 'create' }>) {
+/** [Shift] で描くとき: 丸・四角は正円・正方形、線・矢印は水平・垂直 (2D の図でも使う) */
+export function constrain(c: { kind: AnnotationKind; x0: number; y0: number; x1: number; y1: number }) {
   const dx = c.x1 - c.x0;
   const dy = c.y1 - c.y0;
   if (c.kind === 'ellipse' || c.kind === 'rect') {
@@ -559,7 +578,7 @@ function constrain(c: Extract<Gesture, { type: 'create' }>) {
   else c.x1 = c.x0;
 }
 
-function resizePoints(orig: PlacedAnnotation, handle: Handle, x: number, y: number, keepRatio: boolean) {
+export function resizePoints(orig: PlacedAnnotation, handle: Handle, x: number, y: number, keepRatio: boolean) {
   const { p1, p2 } = orig;
   if (handle === 'p1') return { p1: { px: x, py: y }, p2 };
   if (handle === 'p2') return { p1, p2: { px: x, py: y } };
@@ -726,7 +745,13 @@ function SelectionOverlay({ scene, selected, doc }: { scene: Scene; selected?: P
   }
   if (selection.kind === 'legend') {
     const l = scene.legend;
-    return l ? <rect data-ui="sel" x={l.x - 3} y={l.y - 3} width={l.w + 6} height={l.h + 6} className="sel-outline" /> : null;
+    return l ? (
+      <g data-ui="sel">
+        <rect x={l.x - 3} y={l.y - 3} width={l.w + 6} height={l.h + 6} className="sel-outline" />
+        {/* 右下の角で大きさ (文字とマーカー) を変える */}
+        {tool === 'select' && <rect data-hit="legendHandle:legend" x={l.x + l.w - 1} y={l.y + l.h - 1} width={8} height={8} className="handle handle-se" />}
+      </g>
+    ) : null;
   }
   if (!selected) return null;
   const { a, p1, p2 } = selected;

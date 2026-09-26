@@ -91,7 +91,21 @@ export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
   if (selection.kind === 'legend') {
     return (
       <Section title={tr('凡例')}>
-        <p className="hint">{tr('ドラッグで移動できます。')}</p>
+        <p className="hint">{tr('ドラッグで移動、右下の角をドラッグで大きさ (文字とマーカー) を変えられます。')}</p>
+        <label className="field">
+          {tr('大きさ')}
+          <NumberInput
+            value={doc.figure.legendFontSize}
+            min={6}
+            max={40}
+            width={48}
+            onCommit={(v) =>
+              edit((d) => {
+                d.figure.legendFontSize = v ?? 13;
+              })
+            }
+          />
+        </label>
         <button
           onClick={() =>
             edit((d) => {
@@ -116,6 +130,7 @@ const KIND_LABEL: Record<Annotation['kind'], string> = {
   arrow: trk('矢印'),
   line: trk('線'),
   text: trk('テキスト'),
+  cross: trk('交点の線'),
 };
 
 function AnnotationProps({ a }: { a: Annotation }) {
@@ -162,6 +177,11 @@ function AnnotationProps({ a }: { a: Annotation }) {
                 <option value="dotted">{tr('点線')}</option>
               </select>
             </label>
+            {a.kind === 'cross' && (
+              <Check checked={!!a.showValues} onChange={(v) => set({ showValues: v })}>
+                {tr('ppm の値を書く')}
+              </Check>
+            )}
             {(a.kind === 'ellipse' || a.kind === 'rect') && (
               <>
                 <Check checked={a.fill !== null} onChange={(v) => set({ fill: v ? '#ffe9a8' : null })}>

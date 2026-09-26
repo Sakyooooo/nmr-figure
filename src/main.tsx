@@ -61,7 +61,8 @@ async function openDemo() {
     const res = await fetch(path);
     await openFiles([{ file: new File([await res.arrayBuffer()], decodeURIComponent(path.split('/').pop()!)) }]);
   };
-  if (demo === '2d') await load('/samples/cosy-2d.jdf');
+  // 2D は ?file=… で samples/ の別のファイルも開ける (HMQC などを試すとき)
+  if (demo === '2d') await load(`/samples/${new URLSearchParams(location.search).get('file') ?? 'cosy-2d.jdf'}`);
   else if (demo !== 'empty' && demo !== 'onboarding') {
     await load('/samples/sample-c6d6-1h.jdf');
     await load('/samples/sample-c6d6-1h-b.jdf');

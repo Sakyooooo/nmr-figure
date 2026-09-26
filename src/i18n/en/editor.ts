@@ -84,7 +84,25 @@ export const EN_EDITOR: Record<string, string> = {
   '図形 ({join})': 'Shapes ({join})',
   '・': ' / ',
   '範囲を拡大: ドラッグ · ダブルクリックで全体': 'Zoom to area: drag · double-click for the full view',
-  'ドラッグで移動 · ホイールで拡大縮小': 'Drag to pan · wheel to zoom',
+  'ドラッグで移動 · ホイールで拡大縮小 · 図形・線は押して選ぶ': 'Drag to move · wheel to zoom · click a shape or line to select it',
+  交点の線: 'Cross-peak lines',
+  '交点の線: クロスピークをクリック (いちばん近い山に合わせて、上と右の投影まで線を引く)':
+    'Cross-peak lines: click a cross peak (snaps to the nearest maximum and draws lines to the top and right projections)',
+  'クロスピークが、どの横軸・縦軸の値で交わっているかを線で見せます。下の道具の「交点の線」(X) でクロスピークを押すと、いちばん近い山に合わせて上と右の投影まで線を引きます。自動で引くときは、縦軸の値 (¹³C の SI の文でも、数を並べただけでもよい) を入れると、その値に当たるクロスピークだけに線を引きます (空なら拾ったクロスピーク全部)。':
+    'Lines show at which horizontal and vertical values each cross peak lies. With the “Cross-peak lines” tool (X) below, click a cross peak to draw lines from the nearest maximum to the top and right projections. To draw them automatically, enter the vertical-axis values (¹³C SI text or just a list of numbers); only cross peaks matching those values get lines (all picked cross peaks if empty).',
+  '縦軸 ({nucleus}) の値': 'Vertical-axis ({nucleus}) values',
+  '例: 151.8, 137.8, 123.4 (SI の文をそのまま貼ってもよい)': 'e.g. 151.8, 137.8, 123.4 (you can paste the SI text as is)',
+  'データフォルダに同じサンプル名の {nucleus} がありません': 'No {nucleus} spectrum with the same sample name in the data folder',
+  '{file} から {n} 本の値を読みました (溶媒のピークは除きました)': 'Read {n|value|values} from {file} (solvent peaks excluded)',
+  'データフォルダの、同じサンプル名の 1D からピークの値を読みます': 'Reads peak values from the 1D spectrum with the same sample name in the data folder',
+  '同じサンプルの {nucleus} から読む': 'Read from the sample’s {nucleus}',
+  自動で線を引く: 'Draw lines automatically',
+  自動の線を消す: 'Remove automatic lines',
+  'ppm の値を書く': 'Show ppm values',
+  '交点の線を {n} 本引きました{more}': 'Drew {n|cross-peak line|cross-peak lines}{more}',
+  ' (多いので {limit} 本まで)': ' (limited to {limit})',
+  '値に当たるクロスピークがありませんでした (表示範囲と値を確かめてください)': 'No cross peak matches the values (check the view range and the values)',
+  クロスピークが見つかりませんでした: 'No cross peaks found',
 
   // CommandPalette.tsx (操作を探す)
   操作を探す: 'Find command',

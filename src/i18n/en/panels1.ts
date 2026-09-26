@@ -70,7 +70,8 @@ export const EN_PANELS1: Record<string, string> = {
   '貼り付けた画像です。Word では編集できません。編集したいときは、構造式ボタンから描き直してください。':
     'This is a pasted image and cannot be edited in Word. To edit it, redraw it with the structure button.',
   凡例: 'Legend',
-  'ドラッグで移動できます。': 'Drag to move.',
+  'ドラッグで移動、右下の角をドラッグで大きさ (文字とマーカー) を変えられます。': 'Drag to move; drag the bottom-right corner to resize (text and markers).',
+  '凡例の文字の大きさ (右下の角をドラッグしても変わります)': 'Legend text size (you can also drag the bottom-right corner)',
   右上に戻す: 'Reset to top right',
   テキスト: 'Text',
   '図形: {v0}': 'Shape: {v0}',

@@ -24,7 +24,7 @@ import {
   undo,
   useEditor,
 } from '../state/store';
-import { TOOLS } from './Dock';
+import { TOOLS, toolUsable } from './Dock';
 import { Icon, type IconName } from './Icon';
 import { Kbd } from './ui';
 import { openOnboarding } from './Onboarding';
@@ -188,7 +188,7 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
       shortcut: t.key,
       keywords: `${tr(t.hint)} ${t.label} ${READINGS[t.id] ?? ''}`,
       run: () => setTool(t.id),
-      enabled: hasData && tab === 'spectrum' && (!is2d || t.id === 'select' || t.id === 'zoom'),
+      enabled: hasData && tab === 'spectrum' && toolUsable(t.id, is2d),
     })),
     { group: tr('道具'), label: tr('構造式を描いて置く'), icon: 'hexagon', keywords: 'ketcher chemdraw', run: () => void drawStructure(), enabled: spectrum },
     { group: tr('道具'), label: tr('構造式を ChemDraw で描く'), icon: 'hexagon', keywords: 'chemdraw ケムドロー cdxml', run: () => void drawInChemDraw(null), enabled: spectrum },

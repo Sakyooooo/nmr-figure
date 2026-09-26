@@ -3,9 +3,10 @@ import { experimentLabel2d } from '../lib/jdf2d';
 import { autoTitle2d, fullView2d, squareHeight } from '../lib/scene2d';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
-import { edit, setPlot2d, setProcessing2d, setView2d, useEditor } from '../state/store';
+import { autoCrossLines, clearCrossLines, parseValues, valuesFromLibrary } from '../state/cross2d';
+import { edit, notify, setPlot2d, setProcessing2d, setView2d, useEditor } from '../state/store';
 import type { Processing2d } from '../lib/fid2d';
-import { Check, ColorInput, NumberInput, Section } from './inputs';
+import { Check, ColorInput, NumberInput, Section, TextInput } from './inputs';
 import { RichHtml } from './RichText';
 
 /** 左パネル: 開いている 2D の中身 */
@@ -141,6 +142,33 @@ export function Plot2dPanel() {
               {tr('対角線')}
             </Check>
           )}
+        </div>
+      </Section>
+
+      <Section
+        title={tr('交点の線')}
+        help={tr('クロスピークが、どの横軸・縦軸の値で交わっているかを線で見せます。下の道具の「交点の線」(X) でクロスピークを押すと、いちばん近い山に合わせて上と右の投影まで線を引きます。自動で引くときは、縦軸の値 (¹³C の SI の文でも、数を並べただけでもよい) を入れると、その値に当たるクロスピークだけに線を引きます (空なら拾ったクロスピーク全部)。')}
+      >
+        <label className="field block">
+          {tr('縦軸 ({nucleus}) の値', { nucleus: meta.y.nucleus })}
+          <TextInput value={plot.crossValues ?? ''} multiline placeholder={tr('例: 151.8, 137.8, 123.4 (SI の文をそのまま貼ってもよい)')} onCommit={(crossValues) => setPlot2d({ crossValues })} />
+        </label>
+        <div className="row wrap">
+          <button
+            onClick={async () => {
+              const got = await valuesFromLibrary();
+              if (!got) return notify(tr('データフォルダに同じサンプル名の {nucleus} がありません', { nucleus: meta.y.nucleus }), 'error');
+              setPlot2d({ crossValues: got.values.join(', ') });
+              notify(tr('{file} から {n} 本の値を読みました (溶媒のピークは除きました)', { file: got.fileName, n: got.values.length }), 'info');
+            }}
+            title={tr('データフォルダの、同じサンプル名の 1D からピークの値を読みます')}
+          >
+            {tr('同じサンプルの {nucleus} から読む', { nucleus: meta.y.nucleus })}
+          </button>
+          <button className="primary" onClick={() => autoCrossLines(parseValues(plot.crossValues ?? ''))}>
+            {tr('自動で線を引く')}
+          </button>
+          <button onClick={() => clearCrossLines(false)}>{tr('自動の線を消す')}</button>
         </div>
       </Section>
 

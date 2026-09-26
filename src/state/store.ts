@@ -794,8 +794,10 @@ export function pasteAnnotation(source?: Annotation) {
   const { doc } = get();
   // 構造式に固定したものは枠に対する割合で、スペクトルに固定したものは ppm と強度でずらす
   const onImage = !!a.imageId && doc.figureImages.some((x) => x.id === a.imageId);
-  const dx = onImage ? -0.04 : (doc.view.xMax - doc.view.xMin) * 0.015;
-  const dy = onImage ? -0.04 : 0.03;
+  // 2D に置いたものは表示範囲の割合でずらす (x, y とも ppm)
+  const v2 = a.space === '2d' ? doc.plot2d?.view : null;
+  const dx = onImage ? -0.04 : v2 ? (v2.xMax - v2.xMin) * 0.015 : (doc.view.xMax - doc.view.xMin) * 0.015;
+  const dy = onImage ? -0.04 : v2 ? -(v2.yMax - v2.yMin) * 0.015 : 0.03;
   const copy: Omit<Annotation, 'id'> & { id?: string } = { ...a, x1: a.x1 - dx, x2: a.x2 - dx, y1: a.y1 - dy, y2: a.y2 - dy };
   if (a.imageId && !onImage) return false;
   delete copy.id;

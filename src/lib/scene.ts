@@ -1,4 +1,4 @@
-import type { Annotation, Dash, FigureImage, MarkerStyle, NmrDocument } from '../state/types';
+import type { Annotation, Dash, FigureImage, FigureStyle, MarkerStyle, NmrDocument } from '../state/types';
 import { cdxmlAtomSites, drawCdxml } from './cdxml';
 import { decimalsFor, niceStep, spreadLabels, ticks } from './labels';
 import { cumulative, integralValues } from './integrals';
@@ -225,7 +225,9 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
   if (f.showLegend && usedStyles.length) {
     const lfs = f.legendFontSize;
     const rowH = Math.round(lfs * 1.45);
-    const w = size + 8 + Math.max(...usedStyles.map((s) => estimateWidth(s.name, lfs))) + 6;
+    // 凡例の印は文字の大きさに合わせる (既定の 13 pt で図のマーカーと同じ大きさ)
+    const glyph = legendGlyphSize(f);
+    const w = glyph + 8 + Math.max(...usedStyles.map((s) => estimateWidth(s.name, lfs))) + 6;
     const h = rowH * usedStyles.length + 4;
     const x = f.legendPos ? plot.x + f.legendPos.x * plot.w : plot.x + plot.w - w - 10;
     const y = f.legendPos ? plot.y + f.legendPos.y * plot.h : plot.y + 8;
@@ -267,6 +269,11 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
     citations: citations(doc),
     title: titleText(doc),
   };
+}
+
+/** 凡例の印の大きさ (凡例の文字の大きさに合わせる。既定の 13 pt で図のマーカーと同じ) */
+export function legendGlyphSize(f: FigureStyle): number {
+  return (f.markerSize * f.legendFontSize) / 13;
 }
 
 /** 注釈の枠 (px)。テキストは文字幅から概算 */

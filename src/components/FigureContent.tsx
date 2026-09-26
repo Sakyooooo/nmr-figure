@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { arrowHead, dashArray, markerPath, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { arrowHead, dashArray, legendGlyphSize, markerPath, type PlacedAnnotation, type Scene } from '../lib/scene';
 import { simulatedWord } from '../lib/simulate';
 import { tracePath } from '../lib/tracePath';
 import type { FigureImage, FigureStyle } from '../state/types';
@@ -137,10 +137,10 @@ export const FigureContent = memo(function FigureContent({
             const cy = scene.legend!.y + scene.legend!.rowH * (i + 0.5) + 2;
             return (
               <g key={s.id}>
-                <path d={markerPath(s.shape, scene.legend!.x + figure.markerSize / 2 + 2, cy, figure.markerSize)} fill={s.color} />
+                <path d={markerPath(s.shape, scene.legend!.x + legendGlyphSize(figure) / 2 + 2, cy, legendGlyphSize(figure))} fill={s.color} />
                 <RichSvgText
                   text={s.name}
-                  x={scene.legend!.x + figure.markerSize + 10}
+                  x={scene.legend!.x + legendGlyphSize(figure) + 10}
                   y={cy + figure.legendFontSize * 0.35}
                   fontSize={figure.legendFontSize}
                   fill={INK}

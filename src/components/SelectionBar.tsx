@@ -113,6 +113,20 @@ export function SelectionBar({ stageRef }: { stageRef: RefObject<HTMLElement | n
     body = (
       <>
         <span className="sel-label">{tr('凡例')}</span>
+        <label className="sel-field" title={tr('凡例の文字の大きさ (右下の角をドラッグしても変わります)')}>
+          {tr('大きさ')}
+          <NumberInput
+            value={doc.figure.legendFontSize}
+            min={6}
+            max={40}
+            width={48}
+            onCommit={(v) =>
+              edit((d) => {
+                d.figure.legendFontSize = v ?? 13;
+              })
+            }
+          />
+        </label>
         <button
           type="button"
           className="btn ghost sm"

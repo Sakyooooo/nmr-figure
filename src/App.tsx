@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import { CommandPalette } from './components/CommandPalette';
 import { ReferenceDialog, SettingsDialog } from './components/Dialogs';
 import { DialogHost } from './components/DialogHost';
-import { Dock, TOOLS, ToolHint } from './components/Dock';
+import { Dock, TOOLS, ToolHint, toolUsable } from './components/Dock';
 import { FigureView } from './components/FigureView';
 import { Home } from './components/Home';
 import { Icon } from './components/Icon';
@@ -21,6 +21,7 @@ import { Onboarding } from './components/Onboarding';
 import { TrendChart } from './components/TrendChart';
 import { IconButton, Kbd } from './components/ui';
 import { computeLayout } from './lib/layout';
+import { layout2d } from './lib/scene2d';
 import { PROJECT_EXT } from './lib/projectFile';
 import { copyFigure, openDialog, openFiles, saveProject } from './state/fileOps';
 import type { FileHandle } from './state/store';
@@ -158,7 +159,7 @@ export default function App() {
         <aside className="float-panel right" aria-label={tr('右のパネル')} hidden={!rightShown}>
           <Inspector />
         </aside>
-        {hasData && !is2d && <SelectionBar stageRef={stageRef} />}
+        {hasData && <SelectionBar stageRef={stageRef} />}
         <Toast />
       </main>
       <StructureEditorHost />
@@ -386,8 +387,7 @@ function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: numbe
         } else if (key === 'home' || key === '0') fullRange();
         else {
           const t = TOOLS.find((x) => x.key.toLowerCase() === key);
-          // 2D で使えるのは移動と範囲の拡大だけ
-          if (t && (!doc.plot2d || t.id === 'select' || t.id === 'zoom')) setTool(t.id);
+          if (t && toolUsable(t.id, !!doc.plot2d)) setTool(t.id);
         }
       }
     };
@@ -400,6 +400,15 @@ function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: numbe
 function nudge(id: string, key: string, px: number) {
   const { doc, data } = useEditor.getState();
   const a = doc.annotations.find((x) => x.id === id);
+  // 2D の図に置いたもの: x, y とも ppm
+  if (a?.space === '2d' && doc.plot2d) {
+    const l = layout2d(doc, doc.plot2d);
+    const v = doc.plot2d.view;
+    const dx = ((key === 'ArrowLeft' ? 1 : key === 'ArrowRight' ? -1 : 0) * px * (v.xMax - v.xMin)) / l.plot.w;
+    const dy = ((key === 'ArrowUp' ? 1 : key === 'ArrowDown' ? -1 : 0) * px * (v.yMax - v.yMin)) / l.plot.h;
+    updateAnnotation(id, { x1: a.x1 + dx, x2: a.x2 + dx, y1: a.y1 + dy, y2: a.y2 + dy });
+    return;
+  }
   const layout = computeLayout(doc, data);
   const g = a && layout.layers.find((l) => l.layer.id === a.layerId);
   if (!a || !g) return;

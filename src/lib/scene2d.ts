@@ -7,6 +7,7 @@ import { solventInfo } from './solvents';
 import type { NmrDocument, Plot2d, Spectrum2dMeta } from '../state/types';
 import { experimentLabel2d } from './jdf2d';
 import type { Rect } from './layout';
+import type { PlacedAnnotation } from './scene';
 
 export interface Layout2d {
   width: number;
@@ -39,6 +40,8 @@ export interface Scene2d {
   rightPath: string;
   caption: string;
   title: string;
+  /** 図形・文字・交点の線 (2D に置いたもの。x, y は F2・F1 の ppm) */
+  annotations: PlacedAnnotation[];
 }
 
 const TOP = 14;
@@ -148,6 +151,9 @@ export function buildScene2d(doc: NmrDocument, data: Spectrum2dData | undefined)
     rightPath,
     caption: `X : ${meta.x.axisName}   Y : ${meta.y.axisName}  (parts per Million)`,
     title: title2d(doc),
+    annotations: doc.annotations
+      .filter((a) => a.space === '2d' && a.layerId === meta.id)
+      .map((a) => ({ a, p1: { px: layout.xToPx(a.x1), py: layout.yToPx(a.y1) }, p2: { px: layout.xToPx(a.x2), py: layout.yToPx(a.y2) } })),
   };
 }
 

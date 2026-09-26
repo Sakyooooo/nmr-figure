@@ -152,7 +152,8 @@ export interface PeakLabel {
   ppm: number;
 }
 
-export type AnnotationKind = 'ellipse' | 'rect' | 'arrow' | 'line' | 'text';
+/** cross = 2D の交点の線 (点から上と右の投影まで。HSQC・HMBC のクロスピークがどの ¹H・¹³C か見せる) */
+export type AnnotationKind = 'ellipse' | 'rect' | 'arrow' | 'line' | 'text' | 'cross';
 export type Dash = 'solid' | 'dashed' | 'dotted';
 
 /**
@@ -178,6 +179,12 @@ export interface Annotation {
   fill: string | null;
   text: string;
   fontSize: number;
+  /** 2D の図に置いたもの: x = 横軸 (F2) の ppm、y = 縦軸 (F1) の ppm、layerId は 2D のスペクトルの id */
+  space?: '2d';
+  /** 交点の線: 線の端に ppm の値を書く */
+  showValues?: boolean;
+  /** 交点の線を自動で引いたもの (引き直すときに消す) */
+  auto?: boolean;
 }
 
 export interface FigureStyle {
@@ -307,6 +314,8 @@ export interface Plot2d {
   showDiagonal: boolean;
   /** 上と右の 1D 投影 */
   showProjections: boolean;
+  /** 交点の線を自動で引くときの、縦軸 (F1) の値の一覧 (¹³C の SI の文など。図と一緒に残す) */
+  crossValues?: string;
   view: { xMax: number; xMin: number; yMax: number; yMin: number };
 }
 
@@ -389,7 +398,8 @@ export type Tool =
   | 'integral'
   | 'marker'
   | 'reference'
-  | 'region';
+  | 'region'
+  | 'cross';
 
 export type Selection = { kind: 'annotation' | 'marker' | 'peakLabel' | 'integral' | 'legend' | 'image'; id: string } | null;
 
@@ -499,9 +509,9 @@ export function migrateDocument(doc: NmrDocument): NmrDocument {
 export function annotationDefaults(kind: AnnotationKind): Omit<Annotation, 'id' | 'layerId' | 'x1' | 'y1' | 'x2' | 'y2'> {
   return {
     kind,
-    stroke: kind === 'text' ? '#000000' : '#d12b2b',
-    strokeWidth: kind === 'text' ? 1 : 1.5,
-    dash: 'solid',
+    stroke: kind === 'text' ? '#000000' : kind === 'cross' ? '#5a5a5a' : '#d12b2b',
+    strokeWidth: kind === 'text' ? 1 : kind === 'cross' ? 0.8 : 1.5,
+    dash: kind === 'cross' ? 'dashed' : 'solid',
     fill: null,
     text: kind === 'text' ? tr('テキスト') : '',
     fontSize: 14,
