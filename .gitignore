@@ -12,3 +12,7 @@ samples/
 
 # 配布用の出力
 release/
+
+# 手元だけに置くデータ (公開しない)
+local-data/
+public/nmr-assign-data/
