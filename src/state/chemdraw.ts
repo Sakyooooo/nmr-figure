@@ -121,9 +121,11 @@ const LINK_MARKER = '.nmrfig-link.json';
 
 /**
  * 連携の版 (installer.ps1 が印に書く version と合わせる)。2 = 閉じた印を置く (アプリがファイルを片付けられる)、
- * 3 = NMR の保存先に日本語などがあっても書類を見失わない (2 までは開いた直後に閉じたとみなし、描いた内容が図に入らなかった)
+ * 3 = NMR の保存先に日本語などがあっても書類を見失わない (2 までは開いた直後に閉じたとみなし、描いた内容が図に入らなかった)、
+ * 4 = ChemDraw には写し (ChemDraw\editing) を開いてもらい、アプリが読むファイルは連携だけが書く (3 までは ChemDraw が開いたままの
+ *     ファイルに書こうとして 1 回目に止まり、ChemDraw で直した構造式が図に入らなかった。本人の報告 2026-09-30「形が違う」)
  */
-const LINK_VERSION = 3;
+const LINK_VERSION = 4;
 
 /**
  * 連携ができているか (NMR の保存先の ChemDraw フォルダに印があるか)。null = まだ調べていない。
@@ -295,7 +297,7 @@ export async function drawInChemDraw(imageId: string | null) {
   if (useChemDrawLink.getState().outdated) {
     const choice = await ask(
       tr('ChemDraw との連携を新しくしてください'),
-      tr('今の連携は前の版です。NMR の保存先の名前に日本語などがあると、ChemDraw で描いた内容が図に入らず、ChemDraw が「ファイルがもうありません」と出します。連携し直してください (1 回だけ)。'),
+      tr('今の連携は前の版です。ChemDraw で直した内容が図に入らず、図の構造式が ChemDraw と違ったままになることがあります。連携し直してください (1 回だけ)。'),
       [
         { label: tr('ChemDraw と連携し直す'), value: 'link', kind: 'primary' },
         { label: tr('このまま開く'), value: 'open' },

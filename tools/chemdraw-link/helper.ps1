@@ -1,7 +1,9 @@
 ﻿# NMR Figure Editor と ChemDraw をつなぐ (アプリの構造式ボタン → nmrfig-chemdraw: のリンク → これ)。
-#  1. リンクの構造式を NMR の保存先の ChemDraw フォルダに書き、ChemDraw で開く (開いている ChemDraw があればその中に)
+#  1. リンクの構造式を NMR の保存先の ChemDraw フォルダに書き、その写し (ChemDraw\editing) を ChemDraw で開く
+#     (開いている ChemDraw があればその中に)。ChemDraw は開いた書類のファイルを開いたままにして、ほかから書き換えられない
+#     (版 3 までは同じファイルを開いていたので、1 回目に書くところで止まり、直した構造式が図に入らなかった)
 #  2. 描いている間、1 秒ごとに ChemDraw の中身を読み、変わっていればファイルに書く (アプリがそれを読んで図を直す)。
-#     書いたら「変更あり」を消すので、閉じるときに保存を聞かれない
+#     書いたら「変更あり」を消すので、閉じるときに保存を聞かれない。書けなかったときは次の回に書き直す
 #  3. 書類を閉じたら「閉じた」の印 (structure-….closed) を置いて終わる (自分で起動した ChemDraw は閉じる)。
 #     アプリはこの印を見て、最後の中身を図に入れてからファイルを片付ける
 # リンク: nmrfig-chemdraw:open?name=structure-<16進>&data=<deflate して base64url にした CDXML>
@@ -24,7 +26,10 @@ try {
   if (-not ($name -match '^structure-[0-9a-f]{8,32}$')) { Log "bad name"; exit 1 }
   $dir = Join-Path $config.folder 'ChemDraw'
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  # アプリが読むファイル (これだけが書く) と、ChemDraw が開く写し
   $path = Join-Path $dir "$name.cdxml"
+  $work = Join-Path $dir 'editing'
+  $workPath = Join-Path $work "$name.cdxml"
   $utf8 = New-Object System.Text.UTF8Encoding($false)
 
   # 同じ構造式をもう見ているときは、その書類を前に出すだけ
@@ -40,7 +45,8 @@ try {
     $text = $reader.ReadToEnd()
     $reader.Close()
     if (-not ($text -match '<CDXML[\s>]')) { Log "data is not CDXML"; exit 1 }
-    [IO.File]::WriteAllText($path, $text, $utf8)
+    # 前の版で開いた書類がまだ ChemDraw にあると、このファイルは書けない (その書類を見張り直す)
+    try { [IO.File]::WriteAllText($path, $text, $utf8) } catch { if (-not (Test-Path -LiteralPath $path)) { throw } }
   }
   if (-not (Test-Path $path)) { Log "no file $path"; exit 1 }
 
@@ -72,7 +78,19 @@ try {
     }
   }
   $doc = Find-Doc
-  if (-not $doc) { $doc = $app.Documents.Open($path) }
+  $reopened = [bool]$doc
+  if (-not $doc) {
+    if (-not (Test-Path -LiteralPath $work)) {
+      $w = New-Item -ItemType Directory -Force -Path $work
+      try { $w.Attributes = $w.Attributes -bor [IO.FileAttributes]::Hidden } catch {}
+    }
+    # 前に開いた写しで、12 時間より古いものは片付ける (ChemDraw が開いたままのものは消せないので残る)
+    foreach ($f in @(Get-ChildItem -LiteralPath $work -File -Force)) {
+      if (((Get-Date) - $f.LastWriteTime).TotalHours -gt 12) { try { $f.Delete() } catch {} }
+    }
+    [IO.File]::Copy($path, $workPath, $true)
+    $doc = $app.Documents.Open($workPath)
+  }
   try { $doc.Activate() } catch {}
   try { (New-Object -ComObject WScript.Shell).AppActivate('ChemDraw') | Out-Null } catch {}
   if (-not $owner) { Log "already watching $name"; exit 0 }
@@ -81,8 +99,25 @@ try {
   $closed = Join-Path $dir "$name.closed"
   foreach ($old in @($closed, "$path.tmp")) { if (Test-Path $old) { Remove-Item -Force $old } }
 
+  # もう開いていた書類 (前の見張りが途中で止まった、など) は、ChemDraw に見えている中身を図に入れ直す
   $last = $null
-  try { $last = [string]$doc.Objects.Data('chemical/x-cdxml') } catch {}
+  if (-not $reopened) { try { $last = [string]$doc.Objects.Data('chemical/x-cdxml') } catch {} }
+  # アプリが読むファイルを書き換える。書けなければ false (アプリが読んでいる最中、前の版で開いた書類が ChemDraw にある、など)
+  function Write-AppFile([string]$text) {
+    $tmp = "$path.tmp"
+    try {
+      [IO.File]::WriteAllText($tmp, $text, $utf8)
+      Move-Item -Force -LiteralPath $tmp -Destination $path
+      return $true
+    } catch {
+      if (-not $script:writeFailed) { Log ("write retry: " + $_.Exception.Message.Trim()) }
+      $script:writeFailed = $true
+      return $false
+    }
+  }
+  $writeFailed = $false
+  # 書けていない最後の中身 (閉じたあとにもう一度書く)
+  $pending = $null
   $started = Get-Date
   $closedCount = 0
   $busySince = $null
@@ -109,16 +144,27 @@ try {
     $now = $null
     try { $now = [string]$doc.Objects.Data('chemical/x-cdxml') } catch { continue }
     if (-not $now -or $now -eq $last) { continue }
-    $tmp = "$path.tmp"
-    [IO.File]::WriteAllText($tmp, $now, $utf8)
-    Move-Item -Force -Path $tmp -Destination $path
+    # 書けなかったら止まらずに次の回に書き直す (記録は続けて失敗した 1 回目だけ)
+    if (-not (Write-AppFile $now)) { $pending = $now; continue }
+    $writeFailed = $false
+    $pending = $null
     $last = $now
     try { $doc.Modified = $false } catch {}
+  }
+  if ($pending) {
+    # 閉じれば ChemDraw がファイルを放すので、最後の中身をもう一度書く
+    for ($i = 0; $i -lt 10 -and -not (Write-AppFile $pending); $i++) { Start-Sleep -Milliseconds 500 }
   }
   Log "done $name ($state)"
   # 閉じた印: アプリが最後の中身を図に入れてから、この構造式のファイルと一緒に消す
   [IO.File]::WriteAllText($closed, (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss'), $utf8)
   if ($own) { try { if ($app.Documents.Count -eq 0) { $app.Quit() } } catch {} }
+  # 閉じた・ChemDraw を終えたなら写しを消す (ChemDraw がファイルを放すまで少し待つ)
+  if ($state -eq 'closed' -or $state -eq 'gone') {
+    for ($i = 0; $i -lt 10 -and (Test-Path -LiteralPath $workPath); $i++) {
+      try { [IO.File]::Delete($workPath) } catch { Start-Sleep -Milliseconds 500 }
+    }
+  }
   $mutex.ReleaseMutex()
 } catch {
   Log ("error: " + $_.Exception.Message)
