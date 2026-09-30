@@ -167,6 +167,7 @@ async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: File
   const { doc, data, fids, fids2d, data2d, jdfBase } = project;
   const base = doc.spectra.find((s) => s.id === jdfBase);
   if (base) base.syncFile = fileName;
+  unlinkNonBase(doc.spectra, jdfBase, fileName);
   if (handle) registerJdfHandle(fileName, handle);
   loadDocument(doc, data, fileName, handle, fids, { data2d, fids2d });
   if (base) useEditor.setState((s) => ({ sources: { ...s.sources, [base.id]: buffer } }));
@@ -174,6 +175,15 @@ async function openFigureJdf(buffer: ArrayBuffer, fileName: string, handle: File
   // ふつうは Delta との同期 (state/deltaSync.ts) がファイルの中身と合わせる。ファイルに書けない開き方
   // (ファイルを選ぶ画面のない古いブラウザなど) のときだけ、Delta で変えたピーク値・積分を入れるかここで聞く
   if (base && !jdfHandle(fileName)) await offerDeltaChanges(buffer, fileName, base);
+}
+
+/**
+ * 図の .jdf と同期するのは土台だけ。前の版で保存した図には、土台でないスペクトルまで図の .jdf を指しているものがある
+ * (土台を変えて保存し直した)。そのままだと、図の .jdf の土台のデータでそのスペクトルが入れ替わるので、元の測定の .jdf に戻す
+ */
+function unlinkNonBase(spectra: SpectrumMeta[], jdfBase: string | null, fileName: string | null) {
+  if (!fileName) return;
+  for (const m of spectra) if (m.id !== jdfBase && m.syncFile === fileName) m.syncFile = null;
 }
 
 async function offerDeltaChanges(buffer: ArrayBuffer, fileName: string, base: SpectrumMeta) {
@@ -326,10 +336,11 @@ export async function openSavedFigure(id: string) {
   if (!figure) return;
   if (!(await confirmDiscard())) return;
   try {
-    const { doc, data, fids, fids2d, data2d } = parseProject(figure.json);
+    const { doc, data, fids, fids2d, data2d, jdfBase } = parseProject(figure.json);
     const handle = figure.handle ?? null;
     // 図入りの .jdf に保存した図は、そのファイルと同期できるように覚えておく
     if (handle && isJdfName(handle.name)) registerJdfHandle(handle.name, handle);
+    unlinkNonBase(doc.spectra, jdfBase, figure.fileName ?? handle?.name ?? null);
     loadDocument(doc, data, handle?.name ?? savedFileName(figure), handle, fids, { data2d, fids2d });
     useEditor.setState({ screen: 'editor' });
     notify(tr('{name} を開きました', { name: figure.name }));
