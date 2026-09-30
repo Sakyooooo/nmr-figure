@@ -43,6 +43,8 @@ export function IntegralPanel() {
 
   return (
     <Section
+      id="analysis-integral"
+      defaultOpen={false}
       title={tr('積分{v0} ({length})', { v0: layer.label ? ` — ${layer.label}` : '', length: mine.length })}
       help={tr('「自動で積分」で信号をまとめて積分します。積分ツール (I) で左右にドラッグすると手でも引けます。値を書き換えると、その積分を基準にほかがそろいます。')}
     >

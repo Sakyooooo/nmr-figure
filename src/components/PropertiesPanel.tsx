@@ -43,6 +43,25 @@ export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
             <RichHtml text={style.name} />
           </p>
         )}
+        {selection.kind === 'marker' && (
+          <>
+            <label className="field">
+              {tr('大きさ')}
+              <NumberInput
+                value={doc.figure.markerSize}
+                min={3}
+                max={30}
+                width={48}
+                onCommit={(v) =>
+                  edit((d) => {
+                    d.figure.markerSize = v ?? 8;
+                  })
+                }
+              />
+            </label>
+            <p className="hint">{tr('図のマーカー全部 (凡例の印も) がこの大きさになります。選んだマーカーの右下の四角をドラッグしても変えられます。')}</p>
+          </>
+        )}
         <button className="danger" onClick={deleteSelection}>
           {tr('削除 (Delete)')}
         </button>

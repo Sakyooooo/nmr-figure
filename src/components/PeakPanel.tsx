@@ -40,6 +40,8 @@ export function PeakPanel() {
 
   return (
     <Section
+      id="analysis-peak"
+      defaultOpen={false}
       title={tr('ピーク値{v0} ({length})', { v0: layer.label ? ` — ${layer.label}` : '', length: rows.length })}
       help={tr('「自動で拾う」で高いピークにまとめて付きます。ピーク値ツール (P) でクリックすると 1 本ずつ付け外しできます。')}
     >

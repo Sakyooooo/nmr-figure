@@ -19,6 +19,8 @@ export function ProcessingPanel() {
 
   return (
     <Section
+      id="analysis-processing"
+      defaultOpen={false}
       title={tr('FID の処理 (位相補正)')}
       help={tr('Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。')}
     >

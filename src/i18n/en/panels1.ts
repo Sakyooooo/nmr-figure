@@ -59,6 +59,8 @@ export const EN_PANELS1: Record<string, string> = {
     'Drag the squares at either end to change the range. Edit the value under "Integrals" below.',
   '削除 (Delete)': 'Delete (Delete key)',
   選択中のマーカー: 'Selected marker',
+  '図のマーカー全部 (凡例の印も) がこの大きさになります。選んだマーカーの右下の四角をドラッグしても変えられます。':
+    'All markers in the figure (including the legend symbols) use this size. You can also drag the small square at the lower right of the selected marker.',
   選択中のピーク値: 'Selected peak label',
   選択中の構造式: 'Selected structure',
   選択中の画像: 'Selected image',

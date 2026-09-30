@@ -399,9 +399,11 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
       handle = await fsWindow.showSaveFilePicker({ suggestedName: defaultJdfName(base), types: localized(JDF_TYPES), ...(near ? { startIn: near } : {}) });
     }
     const name = handle?.name ?? defaultJdfName(base);
-    // 土台のスペクトルは、保存したあとこのファイルと同期する (FID から処理したものも)。図の中身にもそう書いておく
+    // 土台のスペクトルは、保存したあとこのファイルと同期する (FID から処理したものも)。図の中身にもそう書いておく。
+    // このファイルと同期するのは土台だけ。前に土台だったスペクトル (あとから下に別のスペクトルを足した) は元の測定の .jdf に戻す
+    // (戻さないと、このファイルの新しい土台のデータを「Delta で処理し直した」と読み、そのスペクトルが入れ替わっていた)
     const s = useEditor.getState();
-    const doc = { ...s.doc, spectra: s.doc.spectra.map((m) => (m.id === base.meta.id ? { ...m, syncFile: name } : m)) };
+    const doc = { ...s.doc, spectra: s.doc.spectra.map((m) => (m.id === base.meta.id ? { ...m, syncFile: name } : m.syncFile === name ? { ...m, syncFile: null } : m)) };
     const json = serializeProject(doc, s.data, s.fids, s.fids2d, { jdfBase: base.meta.id });
     let bytes: ArrayBuffer;
     try {
@@ -423,12 +425,13 @@ async function saveFigureJdf(base: FigureBase, saveAs: boolean): Promise<'done' 
       // 書けてから、同期の相手をこのファイルにする (先に変えると、まだ空のファイルを読みに行ってしまう)
       registerJdfHandle(name, handle);
       useEditor.setState((st) => ({ sources: { ...st.sources, [base.meta.id]: bytes } }));
-      if (base.meta.syncFile !== name) {
-        edit((d) => {
-          const m = d.spectra.find((x) => x.id === base.meta.id);
-          if (m) m.syncFile = name;
-        }, false);
-      }
+      edit((d) => {
+        for (const m of d.spectra) {
+          if (m.id === base.meta.id) {
+            if (m.syncFile !== name) m.syncFile = name;
+          } else if (m.syncFile === name) m.syncFile = null;
+        }
+      }, false);
       markSaved(name, handle);
       notify(tr('{name} に保存しました (ダブルクリックすると Delta で開けます)', { name }));
       await rememberFigure(json, name, handle);

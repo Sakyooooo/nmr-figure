@@ -59,10 +59,13 @@ export function invalidateSavedData() {
   lastDataKey = null;
 }
 
-/** 変更のたびに少し待ってから書く */
+/**
+ * 変更のたびに少し待ってから書く。保存しただけ (同じファイルへの上書きで、図も名前も変わらない) のときも書き直す。
+ * 書き直さないと「保存していない変更あり」のまま残り、開き直すたびに別の図を開こうとすると「保存していない図があります」と聞いていた (2026-09-30 本人)
+ */
 export function startAutoSave() {
   useEditor.subscribe((s, prev) => {
-    if (s.doc === prev.doc && s.data === prev.data && s.projectName === prev.projectName && s.fileHandle === prev.fileHandle) return;
+    if (s.doc === prev.doc && s.data === prev.data && s.projectName === prev.projectName && s.fileHandle === prev.fileHandle && s.dirty === prev.dirty) return;
     clearTimeout(timer);
     timer = setTimeout(() => void flush(), DELAY);
   });

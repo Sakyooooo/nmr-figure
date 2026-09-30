@@ -47,7 +47,7 @@ export function ImpurityPanel() {
 
   if (!solvent || !result) {
     return (
-      <Section title={title}>
+      <Section id="analysis-impurity" defaultOpen={false} title={title}>
         <p className="hint">{tr('左の一覧で溶媒を選ぶと、不純物の候補を表示します。')}</p>
       </Section>
     );
@@ -56,7 +56,7 @@ export function ImpurityPanel() {
   const shown = showAll ? candidates : candidates.slice(0, SHOW_LIMIT);
 
   return (
-    <Section title={title}>
+    <Section id="analysis-impurity" defaultOpen={false} title={title}>
       <p className="hint">
         {trx('{solvent} · 基準 {ref} ppm · 許容幅 ±{tol} ppm · 表示範囲のピーク {n} 本', { solvent: <RichHtml text={solvent.label} />, ref: ref ?? '—', tol: toleranceFor(settings, meta.nucleus), n: result.peakCount })}
       </p>
@@ -130,6 +130,8 @@ export function MarkerPanel() {
 
   return (
     <Section
+      id="analysis-marker"
+      defaultOpen={false}
       title={tr('マーカー・凡例')}
       help={
         <>

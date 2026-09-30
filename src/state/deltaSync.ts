@@ -25,6 +25,7 @@ import {
   syncFileOf,
 } from '../lib/deltaSync';
 import { downloadBlob, baseName } from '../lib/exportFigure';
+import { figureBaseOf } from '../lib/figureJdf';
 import { readJdf } from '../lib/jdf';
 import { writeProcessedJdf } from '../lib/jdfProcessed';
 import { annotationBlock, withAnnotationBlock, writeAnnotations, type WritableAnnotations } from '../lib/jdfWrite';
@@ -119,7 +120,10 @@ function reconcile() {
   const wanted = new Map<string, { spectrumId: string; fileName: string }>();
   const byFile = new Set<string>();
   const duplicates: string[] = [];
-  for (const layer of doc.layers) {
+  // 図の土台を先に見る: 前の版で保存した図には、図の .jdf を 2 本のスペクトルが指しているものがある (土台を変えて保存し直した)。
+  // そのファイルの中身は土台のものなので、土台だけが同期する (ほかの 1 本が同期すると、土台のデータで入れ替わってしまう)
+  const baseLayer = figureBaseOf(doc)?.layerId;
+  for (const layer of [...doc.layers].sort((a, b) => Number(b.id === baseLayer) - Number(a.id === baseLayer))) {
     const meta = doc.spectra.find((s) => s.id === layer.spectrumId);
     if (!canSyncDelta(meta) || !data[meta.id]) continue;
     // 同じファイルを 2 本入れたときは、最初の 1 本だけ同期する
@@ -379,6 +383,8 @@ async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer, fileChanged =
   } catch {
     return;
   }
+  // 核種が違うファイルは、このスペクトルを処理し直したものではない (図の .jdf の土台がほかのスペクトルに変わっていた、など)。入れ替えない
+  if (loaded.meta.nucleus !== meta.nucleus) return;
   if (meta.processing) {
     const app = appState(link);
     if (!fileChanged || !app || fileDataMatches(bytes, app)) return;

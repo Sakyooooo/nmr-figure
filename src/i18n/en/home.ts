@@ -46,6 +46,9 @@ export const EN_HOME: Record<string, string> = {
   編集: 'Edited',
   '{n} 版': '{n} versions',
   '{name}\n{layers} 本を重ねた図 ({formatStamp})': '{name}\nFigure with {layers} {layers|spectrum|spectra} ({formatStamp})',
+  '{name}\n{samples} を重ねた比較の図 ({formatStamp})。重ねたどのサンプルのカードからも開けます':
+    '{name}\nComparison figure of {samples} ({formatStamp}). It can be opened from the card of any sample it contains',
+  比較: 'Compare',
   '保存した図 {name} を開く': 'Open saved figure {name}',
   図: 'Figure',
   '{n} 本': '{n} spectra',

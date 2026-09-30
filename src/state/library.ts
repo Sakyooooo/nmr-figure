@@ -476,6 +476,25 @@ export function unlistedFigures(s: Pick<LibraryState, 'experiments' | 'figures'>
   return s.figures.filter((f) => !listed.has(f.id) && !inFolder.has(savedFileName(f)));
 }
 
+/**
+ * 比較の図 (ほかのサンプルの測定を土台にして重ねた図) のうち、このサンプルの測定も入っているもの (本人の希望 2026-09-30「比較したら両方からアクセスできるように」)。
+ * 図は土台の測定の「編集した版」として出るので、重ねたほかのサンプルのカードにも図のチップとして出し、どちらからでも開けるようにする
+ */
+export function comparisonFigures(s: Pick<LibraryState, 'experiments' | 'figures'>, sampleKey: string): SavedFigure[] {
+  const unlisted = new Set(unlistedFigures(s).map((f) => f.id));
+  return s.figures.filter((f) => {
+    if (unlisted.has(f.id) || f.sampleKeys.length < 2 || !f.sampleKeys.includes(sampleKey)) return false;
+    // 版として出ている所 (フォルダの図入りの .jdf か、土台の測定) のサンプル
+    const own = s.experiments.find((e) => e.figure && e.fileName === savedFileName(f)) ?? (f.base ? s.experiments.find((e) => !e.figure && e.fileName === f.base!.fileName) : undefined);
+    return !!own && sampleKeyOf(own) !== sampleKey;
+  });
+}
+
+/** 保存した図がデータフォルダに図入りの .jdf として置いてあれば、その一覧の項目 */
+export function folderFigureOf(s: Pick<LibraryState, 'experiments'>, f: SavedFigure): ExperimentMeta | undefined {
+  return s.experiments.find((e) => e.figure && e.fileName === savedFileName(f));
+}
+
 /** 保存した図のファイル名 (拡張子つき) */
 export function savedFileName(f: SavedFigure) {
   return f.fileName ?? f.handle?.name ?? `${f.name}.nmrfig`;

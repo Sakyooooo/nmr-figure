@@ -8,7 +8,9 @@ import {
   NUCLEUS_FILTERS,
   canOpen,
   chosenFile,
+  comparisonFigures,
   deleteFigure,
+  folderFigureOf,
   fileVersion,
   filteredExperiments,
   grantPermission,
@@ -255,13 +257,19 @@ function SortControl() {
 function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: Measurement[]; showDay?: boolean }) {
   const note = useLibrary((s) => s.notes[sampleKey]);
   // セレクタで filter すると毎回別の配列になって再描画が止まらないので、取り出してから絞る
-  // 保存した図は、ふつうは元の測定の「編集した版」として札にまとまる。元の測定がフォルダにない図だけ、ここに図のまま出す
+  // 保存した図は、ふつうは元の測定の「編集した版」として札にまとまる。元の測定がフォルダにない図だけ、ここに図のまま出す。
+  // 比較の図 (ほかのサンプルを土台にして、このサンプルの測定も重ねた図) も、ここから開けるように図のまま出す
   const allFigures = useLibrary((s) => s.figures);
   const experiments = useLibrary((s) => s.experiments);
-  const figures = useMemo(
-    () => unlistedFigures({ experiments, figures: allFigures }).filter((f) => f.sampleKeys.includes(sampleKey)),
-    [experiments, allFigures, sampleKey],
-  );
+  const figures = useMemo(() => {
+    const lib = { experiments, figures: allFigures };
+    return [
+      ...unlistedFigures(lib)
+        .filter((f) => f.sampleKeys.includes(sampleKey))
+        .map((f) => ({ figure: f, compare: false })),
+      ...comparisonFigures(lib, sampleKey).map((f) => ({ figure: f, compare: true })),
+    ];
+  }, [experiments, allFigures, sampleKey]);
   const selected = useLibrary((s) => s.selected);
   const focus = useLibrary((s) => s.focus);
   const choice = useLibrary((s) => s.versionChoice);
@@ -301,8 +309,8 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
               focused={m.files.some((f) => f.key === focus)}
             />
           ))}
-          {figures.map((f) => (
-            <FigureChip key={f.id} figure={f} />
+          {figures.map(({ figure, compare }) => (
+            <FigureChip key={figure.id} figure={figure} compare={compare} />
           ))}
         </div>
       </div>
@@ -401,25 +409,43 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
   );
 }
 
-/** 保存した図 (比較) のチップ。クリックで開く */
-function FigureChip({ figure }: { figure: SavedFigure }) {
+/**
+ * 保存した図のチップ。クリックで開く。
+ * compare = 比較の図 (ほかのサンプルの測定の「編集した版」でもある)。ここで消すとその版も消えるので、消すボタンは出さない
+ */
+function FigureChip({ figure, compare }: { figure: SavedFigure; compare: boolean }) {
+  const open = () => {
+    // データフォルダに図入りの .jdf があれば、土台の測定の版と同じくそのファイルを開く
+    const inFolder = compare ? folderFigureOf(useLibrary.getState(), figure) : undefined;
+    void (inFolder ? openExperiments([inFolder.key], 'new') : openSavedFigure(figure.id));
+  };
   return (
     <div className="exp figure" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
       <button
         type="button"
         className="exp-open"
-        title={tr('{name}\n{layers} 本を重ねた図 ({formatStamp})', { name: figure.name, layers: figure.layers, formatStamp: formatStamp(figure.savedAt) })}
+        title={
+          compare
+            ? tr('{name}\n{samples} を重ねた比較の図 ({formatStamp})。重ねたどのサンプルのカードからも開けます', {
+                name: figure.name,
+                samples: figure.sampleKeys.join(' / '),
+                formatStamp: formatStamp(figure.savedAt),
+              })
+            : tr('{name}\n{layers} 本を重ねた図 ({formatStamp})', { name: figure.name, layers: figure.layers, formatStamp: formatStamp(figure.savedAt) })
+        }
         aria-label={tr('保存した図 {name} を開く', { name: figure.name })}
-        onClick={() => void openSavedFigure(figure.id)}
+        onClick={open}
       >
         <Icon name="file-text" size={16} />
         <span className="exp-nuc">
           {tr('図')}{' '}<RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
         </span>
         <span className="exp-time">{formatTime(figure.savedAt)}</span>
-        {figure.layers > 1 && <span className="badge">{tr('{n} 本', { n: figure.layers })}</span>}
+        {compare ? <span className="badge">{tr('比較')}</span> : figure.layers > 1 && <span className="badge">{tr('{n} 本', { n: figure.layers })}</span>}
       </button>
-      <IconButton icon="x" size="sm" label={tr('{name} をホーム画面から消す (測定データは消えません)', { name: figure.name })} onClick={() => void deleteFigure(figure.id)} />
+      {!compare && (
+        <IconButton icon="x" size="sm" label={tr('{name} をホーム画面から消す (測定データは消えません)', { name: figure.name })} onClick={() => void deleteFigure(figure.id)} />
+      )}
     </div>
   );
 }

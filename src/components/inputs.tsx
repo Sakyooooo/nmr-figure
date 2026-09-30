@@ -163,16 +163,22 @@ export function Check({ checked, onChange, children }: { checked: boolean; onCha
   );
 }
 
+/** 区画を開けたか閉じたか (id ごと)。タブを切り替えても保つが、アプリを開き直すと既定に戻る */
+const sectionOpen = new Map<string, boolean>();
+
 /**
- * 開け閉めできる区画。help (使い方の説明) は常には出さず、見出しの右の ⓘ で開く
+ * 開け閉めできる区画。help (使い方の説明) は常には出さず、見出しの右の ⓘ で開く。
+ * id を付けると、開け閉めをタブの切り替えのあとも覚えておく (解析タブは最初は閉じておき、開けたものだけ開いたままにする)
  */
 export function Section({
+  id,
   title,
   children,
   defaultOpen = true,
   extra,
   help,
 }: {
+  id?: string;
   title: string;
   children: ReactNode;
   defaultOpen?: boolean;
@@ -183,7 +189,12 @@ export function Section({
   const detailsRef = useRef<HTMLDetailsElement>(null);
   return (
     <div className={`section-wrap${help ? ' has-help' : ''}`}>
-      <details className="section" open={defaultOpen} ref={detailsRef}>
+      <details
+        className="section"
+        open={(id !== undefined ? sectionOpen.get(id) : undefined) ?? defaultOpen}
+        ref={detailsRef}
+        onToggle={id ? (e) => sectionOpen.set(id, e.currentTarget.open) : undefined}
+      >
         <summary>
           <span>{title}</span>
           {extra}

@@ -34,6 +34,7 @@ export function SiPanel() {
 
   return (
     <Section
+      id="analysis-si"
       title={tr('SI 用テキスト')}
       defaultOpen={false}
       help={tr('¹H は積分した範囲ごとに、多重度と J を自動で読みます (重なった信号は m)。¹³C などは積分がなければピーク値、それもなければ自動で拾ったピークを並べます。違うところは表で直せます。')}

@@ -60,6 +60,8 @@ type Gesture =
   | { type: 'legend'; x0: number; y0: number; lx: number; ly: number; token: number }
   /** 凡例の右下の角: 文字の大きさを変える (枠の高さが指の位置に合うように) */
   | { type: 'legendResize'; y0: number; h0: number; fs0: number; token: number }
+  /** 選んだマーカーの右下のつまみ: 図のマーカー全部 (凡例の印も) の大きさを変える。中心から離れたぶんだけ半径を大きく */
+  | { type: 'markerResize'; cx: number; cy: number; d0: number; s0: number; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
   | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
 
@@ -190,6 +192,14 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
           hitKind === 'handle'
             ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, at, token }
             : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa, at, token };
+        capture();
+        return;
+      }
+      if (hitKind === 'markerHandle') {
+        const m = scene.markers.find((k) => k.id === hitId);
+        if (!m) return;
+        select({ kind: 'marker', id: hitId });
+        gesture.current = { type: 'markerResize', cx: m.x, cy: m.y, d0: Math.max(4, Math.hypot(x - m.x, y - m.y)), s0: doc.figure.markerSize, token: beginGesture() };
         capture();
         return;
       }
@@ -427,6 +437,15 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
           }, false);
         break;
       }
+      case 'markerResize': {
+        // つまみは中心から半径の所にあるので、指が中心から離れたぶんだけ半径 (大きさの半分) を大きくする (つまみが指に付いてくる)
+        const size = Math.round(Math.min(30, Math.max(3, cur.s0 + 2 * (Math.hypot(x - cur.cx, y - cur.cy) - cur.d0))));
+        if (size !== doc.figure.markerSize)
+          edit((d) => {
+            d.figure.markerSize = size;
+          }, false);
+        break;
+      }
       case 'legend': {
         const { plot } = layout;
         const lx = cur.lx + x - cur.x0;
@@ -476,7 +495,14 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     } else if (cur.type === 'move') {
       reanchor(cur.id);
       endGesture(cur.token);
-    } else if (cur.type === 'resize' || cur.type === 'legend' || cur.type === 'legendResize' || cur.type === 'imageMove' || cur.type === 'imageResize') {
+    } else if (
+      cur.type === 'resize' ||
+      cur.type === 'legend' ||
+      cur.type === 'legendResize' ||
+      cur.type === 'markerResize' ||
+      cur.type === 'imageMove' ||
+      cur.type === 'imageResize'
+    ) {
       endGesture(cur.token);
     }
   };
@@ -728,7 +754,15 @@ function SelectionOverlay({ scene, selected, doc }: { scene: Scene; selected?: P
   }
   if (selection.kind === 'marker') {
     const m = scene.markers.find((x) => x.id === selection.id);
-    return m ? <circle data-ui="sel" cx={m.x} cy={m.y} r={doc.figure.markerSize / 2 + 4} className="sel-outline" /> : null;
+    if (!m) return null;
+    const r = doc.figure.markerSize / 2 + 4;
+    return (
+      <g data-ui="sel">
+        <circle cx={m.x} cy={m.y} r={r} className="sel-outline" />
+        {/* 右下のつまみで大きさ (図のマーカー全部・凡例の印も) を変える */}
+        {tool === 'select' && <rect data-hit={`markerHandle:${m.id}`} x={m.x + r * 0.71 - 4} y={m.y + r * 0.71 - 4} width={8} height={8} className="handle handle-se" />}
+      </g>
+    );
   }
   if (selection.kind === 'peakLabel') {
     const p = scene.peakLabels.find((x) => x.id === selection.id);
