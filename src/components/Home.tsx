@@ -38,6 +38,9 @@ import { Icon } from './Icon';
 import { openOnboarding } from './Onboarding';
 import { RichHtml } from './RichText';
 import { IconButton } from './ui';
+import { FigureContent } from './FigureContent';
+import { parseProject } from '../lib/projectFile';
+import { buildScene } from '../lib/scene';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const FILTER_LABEL: Record<NucleusFilter, string> = { '1H': '^{1}H', '13C': '^{13}C', '19F': '^{19}F', '31P': '^{31}P', '2D': '2D', other: trk('その他') };
@@ -51,6 +54,8 @@ export function Home() {
   const measurements = useMemo(() => groupMeasurements(listedFiles(lib)), [lib]);
   const focusedM = measurements.find((m) => m.files.some((f) => f.key === lib.focus)) ?? null;
   const focused = focusedM?.files.find((f) => f.key === lib.focus) ?? null;
+  // 比較の図の一覧で選んだ図 (focus = figure:<id>)
+  const focusedFigure = lib.focus?.startsWith(FIGURE_FOCUS) ? lib.figures.find((f) => FIGURE_FOCUS + f.id === lib.focus) : undefined;
 
   return (
     <div className="home">
@@ -107,7 +112,9 @@ export function Home() {
             </details>
           )}
         </main>
-        <aside className="home-detail">{focusedM && focused ? <Detail m={focusedM} e={focused} /> : <Welcome />}</aside>
+        <aside className="home-detail">
+          {focusedFigure ? <FigureDetail key={focusedFigure.id} figure={focusedFigure} /> : focusedM && focused ? <Detail m={focusedM} e={focused} /> : <Welcome />}
+        </aside>
       </div>
 
       {lib.selected.length > 0 && <SelectionBar />}
@@ -261,19 +268,19 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
   // 比較の図 (ほかのサンプルを土台にして、このサンプルの測定も重ねた図) も、ここから開けるように図のまま出す
   const allFigures = useLibrary((s) => s.figures);
   const experiments = useLibrary((s) => s.experiments);
-  const figures = useMemo(() => {
+  const { figures, compares } = useMemo(() => {
     const lib = { experiments, figures: allFigures };
-    return [
-      ...unlistedFigures(lib)
-        .filter((f) => f.sampleKeys.includes(sampleKey))
-        .map((f) => ({ figure: f, compare: false })),
-      ...comparisonFigures(lib, sampleKey).map((f) => ({ figure: f, compare: true })),
-    ];
+    return {
+      figures: unlistedFigures(lib).filter((f) => f.sampleKeys.includes(sampleKey)),
+      // 比較の図は数が多くなるので、「比較の図 N」1 つにまとめ、押すと相手・本数・日付の一覧を出す (本人の選択 2026-09-30)
+      compares: comparisonFigures(lib, sampleKey).sort((a, b) => b.savedAt - a.savedAt),
+    };
   }, [experiments, allFigures, sampleKey]);
+  const [showCompares, setShowCompares] = useState(false);
   const selected = useLibrary((s) => s.selected);
   const focus = useLibrary((s) => s.focus);
   const choice = useLibrary((s) => s.versionChoice);
-  const active = items.some((m) => m.files.some((f) => f.key === focus));
+  const active = items.some((m) => m.files.some((f) => f.key === focus)) || compares.some((f) => FIGURE_FOCUS + f.id === focus);
   const tap = useDoubleTap();
   // カードの空いている所をダブルタップしたら、選んでいる (なければ最初に開ける) 測定を開く
   const target = items.find((m) => m.files.some((f) => f.key === focus)) ?? items.find((m) => canOpen(m.main)) ?? items[0];
@@ -309,10 +316,27 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
               focused={m.files.some((f) => f.key === focus)}
             />
           ))}
-          {figures.map(({ figure, compare }) => (
-            <FigureChip key={figure.id} figure={figure} compare={compare} />
+          {figures.map((f) => (
+            <FigureChip key={f.id} figure={f} />
           ))}
+          {compares.length > 0 && (
+            <button
+              type="button"
+              className={`exp compare-toggle${showCompares ? ' on' : ''}`}
+              aria-expanded={showCompares}
+              title={tr('このサンプルの測定も重ねた比較の図 (ほかのサンプルを土台にして保存したもの)。押すと一覧を出します')}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                setShowCompares((v) => !v);
+              }}
+              onPointerUp={(ev) => ev.stopPropagation()}
+            >
+              <Icon name={showCompares ? 'chevron-down' : 'chevron-right'} size={14} />
+              {tr('比較の図 {n}', { n: compares.length })}
+            </button>
+          )}
         </div>
+        {showCompares && compares.length > 0 && <CompareList figures={compares} sampleKey={sampleKey} />}
       </div>
     </article>
   );
@@ -325,7 +349,7 @@ function SampleCard({ sampleKey, items, showDay }: { sampleKey: string; items: M
 let lastTap: { id: string; t: number; x: number; y: number } | null = null;
 function useDoubleTap() {
   return (ev: React.PointerEvent, id: string, action: () => void) => {
-    if (ev.button !== 0 || (ev.target as Element).closest('input, textarea, .exp.figure button')) return;
+    if (ev.button !== 0 || (ev.target as Element).closest('input, textarea, .exp.saved-fig button')) return;
     const now = performance.now();
     const prev = lastTap;
     if (prev && prev.id === id && now - prev.t < 500 && Math.hypot(ev.clientX - prev.x, ev.clientY - prev.y) < 24) {
@@ -409,43 +433,125 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
   );
 }
 
+/** 右の詳細に出す保存した図 (比較の図の一覧で選んだもの) の focus の頭 */
+const FIGURE_FOCUS = 'figure:';
+
+/** 保存した図を開く。データフォルダに図入りの .jdf があれば、土台の測定の版と同じくそのファイルを開く */
+function openFigure(figure: SavedFigure) {
+  const inFolder = folderFigureOf(useLibrary.getState(), figure);
+  void (inFolder ? openExperiments([inFolder.key], 'new') : openSavedFigure(figure.id));
+}
+
 /**
- * 保存した図のチップ。クリックで開く。
- * compare = 比較の図 (ほかのサンプルの測定の「編集した版」でもある)。ここで消すとその版も消えるので、消すボタンは出さない
+ * 保存した図のチップ (元の測定がフォルダにない図)。クリックで開く。
+ * クラス名に figure を使わない (編集画面の図の .figure の決まりで横幅いっぱいになっていた)
  */
-function FigureChip({ figure, compare }: { figure: SavedFigure; compare: boolean }) {
-  const open = () => {
-    // データフォルダに図入りの .jdf があれば、土台の測定の版と同じくそのファイルを開く
-    const inFolder = compare ? folderFigureOf(useLibrary.getState(), figure) : undefined;
-    void (inFolder ? openExperiments([inFolder.key], 'new') : openSavedFigure(figure.id));
-  };
+function FigureChip({ figure }: { figure: SavedFigure }) {
   return (
-    <div className="exp figure" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
+    <div className="exp saved-fig" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
       <button
         type="button"
         className="exp-open"
-        title={
-          compare
-            ? tr('{name}\n{samples} を重ねた比較の図 ({formatStamp})。重ねたどのサンプルのカードからも開けます', {
-                name: figure.name,
-                samples: figure.sampleKeys.join(' / '),
-                formatStamp: formatStamp(figure.savedAt),
-              })
-            : tr('{name}\n{layers} 本を重ねた図 ({formatStamp})', { name: figure.name, layers: figure.layers, formatStamp: formatStamp(figure.savedAt) })
-        }
+        title={tr('{name}\n{layers} 本を重ねた図 ({formatStamp})', { name: figure.name, layers: figure.layers, formatStamp: formatStamp(figure.savedAt) })}
         aria-label={tr('保存した図 {name} を開く', { name: figure.name })}
-        onClick={open}
+        onClick={() => openFigure(figure)}
       >
         <Icon name="file-text" size={16} />
         <span className="exp-nuc">
           {tr('図')}{' '}<RichHtml text={figure.nuclei.map(nucleusRich).join(' + ')} />
         </span>
         <span className="exp-time">{formatTime(figure.savedAt)}</span>
-        {compare ? <span className="badge">{tr('比較')}</span> : figure.layers > 1 && <span className="badge">{tr('{n} 本', { n: figure.layers })}</span>}
+        {figure.layers > 1 && <span className="badge">{tr('{n} 本', { n: figure.layers })}</span>}
       </button>
-      {!compare && (
-        <IconButton icon="x" size="sm" label={tr('{name} をホーム画面から消す (測定データは消えません)', { name: figure.name })} onClick={() => void deleteFigure(figure.id)} />
+      <IconButton icon="x" size="sm" label={tr('{name} をホーム画面から消す (測定データは消えません)', { name: figure.name })} onClick={() => void deleteFigure(figure.id)} />
+    </div>
+  );
+}
+
+/**
+ * 比較の図の一覧 (サンプルのカードの「比較の図 N」を押したとき)。相手のサンプル・核種・本数・保存した日時で見分ける。
+ * クリックで右に図の見た目、ダブルクリック (ダブルタップ) か Enter で開く (測定のチップと同じ)
+ */
+function CompareList({ figures, sampleKey }: { figures: SavedFigure[]; sampleKey: string }) {
+  const focus = useLibrary((s) => s.focus);
+  const tap = useDoubleTap();
+  return (
+    <ul className="compare-list" onClick={(ev) => ev.stopPropagation()} onPointerUp={(ev) => ev.stopPropagation()}>
+      {figures.map((f) => {
+        const key = FIGURE_FOCUS + f.id;
+        const partners = f.sampleKeys.filter((k) => k !== sampleKey);
+        return (
+          <li key={f.id}>
+            <button
+              type="button"
+              className={`compare-row${focus === key ? ' focused' : ''}`}
+              aria-pressed={focus === key}
+              title={tr('{name}\nクリックで右に図、ダブルクリック (ダブルタップ) か Enter で開く', { name: f.name })}
+              onClick={() => useLibrary.setState({ focus: key })}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter') {
+                  ev.preventDefault();
+                  openFigure(f);
+                }
+              }}
+              onPointerUp={(ev) => {
+                ev.stopPropagation();
+                tap(ev, `fig:${f.id}`, () => openFigure(f));
+              }}
+            >
+              <span className="exp-nuc">
+                <RichHtml text={f.nuclei.map(nucleusRich).join(' + ')} />
+              </span>
+              <span className="compare-with">{tr('{samples} と', { samples: partners.join(' · ') })}</span>
+              <span className="badge">{tr('{n} 本', { n: f.layers })}</span>
+              <span className="exp-time">{formatStamp(f.savedAt)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 比較の図の一覧で選んだ図の詳細 (図の見た目・重ねたスペクトル・開くボタン) */
+function FigureDetail({ figure }: { figure: SavedFigure }) {
+  const parsed = useMemo(() => {
+    try {
+      const p = parseProject(figure.json);
+      return { doc: p.doc, scene: p.doc.plot2d ? null : buildScene(p.doc, p.data) };
+    } catch {
+      return null;
+    }
+  }, [figure.json]);
+  return (
+    <div className="detail">
+      <h2 title={figure.name}>{figure.name}</h2>
+      <p className="hint">{tr('{samples} を重ねた比較の図です (保存 {time})。', { samples: figure.sampleKeys.join(' · '), time: formatStamp(figure.savedAt) })}</p>
+      {parsed?.scene ? (
+        <svg className="figure-preview" viewBox={`0 0 ${parsed.scene.layout.width} ${parsed.scene.layout.height}`} role="img" aria-label={tr('図のプレビュー')}>
+          <rect x={0} y={0} width={parsed.scene.layout.width} height={parsed.scene.layout.height} fill="#ffffff" />
+          <FigureContent scene={parsed.scene} figure={parsed.doc.figure} images={parsed.doc.figureImages ?? []} />
+        </svg>
+      ) : (
+        !parsed && <p className="hint warn">{tr('図を読めませんでした')}</p>
       )}
+      {parsed && (
+        <ul className="figure-layers">
+          {parsed.doc.layers.map((l) => {
+            const m = parsed.doc.spectra.find((s) => s.id === l.spectrumId);
+            return (
+              <li key={l.id}>
+                <RichHtml text={nucleusRich(m?.nucleus ?? '')} /> {l.label || m?.title} <span className="muted">{m?.fileName}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="row wrap">
+        <button className="btn primary" onClick={() => openFigure(figure)}>
+          {tr('この図を開く')}
+        </button>
+      </div>
     </div>
   );
 }

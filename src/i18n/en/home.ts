@@ -46,9 +46,14 @@ export const EN_HOME: Record<string, string> = {
   編集: 'Edited',
   '{n} 版': '{n} versions',
   '{name}\n{layers} 本を重ねた図 ({formatStamp})': '{name}\nFigure with {layers} {layers|spectrum|spectra} ({formatStamp})',
-  '{name}\n{samples} を重ねた比較の図 ({formatStamp})。重ねたどのサンプルのカードからも開けます':
-    '{name}\nComparison figure of {samples} ({formatStamp}). It can be opened from the card of any sample it contains',
-  比較: 'Compare',
+  'このサンプルの測定も重ねた比較の図 (ほかのサンプルを土台にして保存したもの)。押すと一覧を出します':
+    'Comparison figures that include a measurement of this sample (saved with another sample at the bottom). Press to list them',
+  '比較の図 {n}': 'Comparisons {n}',
+  '{name}\nクリックで右に図、ダブルクリック (ダブルタップ) か Enter で開く': '{name}\nClick to preview on the right; double-click (double-tap) or Enter to open',
+  '{samples} と': 'with {samples}',
+  '{samples} を重ねた比較の図です (保存 {time})。': 'Comparison figure of {samples} (saved {time}).',
+  図のプレビュー: 'Figure preview',
+  図を読めませんでした: 'Could not read the figure',
   '保存した図 {name} を開く': 'Open saved figure {name}',
   図: 'Figure',
   '{n} 本': '{n} spectra',

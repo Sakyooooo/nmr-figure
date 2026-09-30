@@ -851,12 +851,76 @@ details.sub[open] {
   font: var(--type-numeric);
   font-variant-numeric: tabular-nums;
 }
-.exp.figure {
+.exp.saved-fig {
   padding-left: 2px;
   background: var(--color-bg-subtle);
 }
-.exp.figure .exp-open .icon-svg {
+.exp.saved-fig .exp-open .icon-svg {
   color: var(--color-icon-default);
+}
+/* 比較の図: カードには「比較の図 N」だけ。押すと下に一覧 (相手・本数・日時) */
+.exp.compare-toggle {
+  gap: var(--spacing-4);
+  padding: 0 var(--spacing-8) 0 var(--spacing-4);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+}
+.exp.compare-toggle:hover,
+.exp.compare-toggle.on {
+  border-color: var(--color-accent-default);
+  color: var(--color-text-primary);
+}
+.compare-list {
+  margin: var(--spacing-8) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+}
+.compare-list li + li {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.compare-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  width: 100%;
+  min-height: 30px;
+  padding: 0 var(--spacing-8);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  user-select: none;
+}
+.compare-row:hover {
+  background: var(--color-bg-hover);
+}
+.compare-row.focused {
+  background: var(--color-bg-selected);
+}
+.compare-with {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.figure-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+.figure-layers {
+  margin: 0;
+  padding-left: var(--spacing-16);
+  font: var(--type-label);
 }
 .badge {
   display: inline-flex;
