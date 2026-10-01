@@ -8,6 +8,7 @@ import { figureSvgString, svgToPng } from './lib/exportFigure';
 import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
+import { startUsageCount } from './state/usage';
 import { openOnboarding } from './components/Onboarding';
 import { startFileLaunch } from './state/launch';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
@@ -40,6 +41,8 @@ startChemDrawHousekeeping();
 // 前回の作業を読み込んでから、変更を自動で保存し始める
 void restoreWork().finally(() => {
   startAutoSave();
+  // 使われた回数 (開いた・編集した) を数える。前回の作業を戻したことは編集に数えない
+  startUsageCount();
   // Delta との同期は、前回の図を読み込んでから始める (図の中の .jdf を見に行くため)
   startDeltaSync();
   // アプリとして入れたとき、ダブルクリックした .nmrfig を開く (前回の図を読み込んだあとに)

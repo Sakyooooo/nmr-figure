@@ -13,8 +13,13 @@ JEOL Delta で処理したスペクトルを、資料 (Word / PowerPoint) 用の
 ## 前提
 - 使うのは本人。将来は配布もありうる → サーバーを持たない静的Webアプリ。データはPCの外に出ない
   - 本番の画面には CSP (vite.config.ts) を入れ、外への通信 (fetch・画像・フォーム送信) をブラウザに止めさせる。
-    connect-src / img-src は自分のサイトと data: / blob: だけ。eval も禁止 ('wasm-unsafe-eval' のみ)。
+    connect-src / img-src は自分のサイトと data: / blob: だけ (connect-src だけ、使われた回数を数える GoatCounter を足している)。eval も禁止 ('wasm-unsafe-eval' のみ)。
     Ketcher が使う paper.js は full 版だと読み込み時に文字列からコードを作る (中の acorn) ので core 版に差し替えている
+  - 使われた回数 (本人の希望 2026-10-01「開発者としてどれだけ利用されたか分かるように」「開いた回数、編集した回数のみでいい」、state/usage.ts):
+    GoatCounter (nmr-figure.goatcounter.com) に「開いた」(アプリを読み込むたび、ページを見た回数) と「編集した」(図を開いて・新しく作って
+    最初に直したとき。保存後にまた直し始めたらもう 1 回。前回の作業を戻しただけは数えない) の名前だけを送る。
+    ファイル名・試料名・データ・画面の大きさ・どのページから来たか (r) は送らない、Cookie なし (credentials: omit)。公開版 (sakyooooo.github.io) だけで送り、
+    設定の「使われた回数」(settings.sendUsage、既定は送る) で止められる。README・説明の 1 枚目・空の画面の一文にも書いた
 - 入力は Delta の `.jdf` (処理済み、または未処理の FID)。別ファイルを複数読み込む
 - 対象核種: ¹H / ¹³C / ¹⁹F / ³¹P、2D (COSY, HSQC, HMBC, NOESY など全部)
 - 比較の用途: 反応の経時変化、原料と生成物。一度に2〜4本

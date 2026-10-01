@@ -15,6 +15,8 @@ export interface Settings {
   templates: StyleTemplate[];
   /** 新しい図を作ったときに自動で当てるテンプレート */
   defaultTemplateId: string | null;
+  /** 開いた回数・編集した回数を開発者に送る (state/usage.ts。回数だけで、データは送らない) */
+  sendUsage: boolean;
   /** 画面まわりの好み */
   ui: {
     leftOpen: boolean;
@@ -85,6 +87,7 @@ export function defaultSettings(): Settings {
     pngScale: 4,
     templates: [],
     defaultTemplateId: null,
+    sendUsage: true,
     ui: { leftOpen: true, rightOpen: true, homeSort: { key: 'date', desc: true }, lang: 'auto', onboardingDone: false, structureTool: null, theme: 'system' },
   };
 }

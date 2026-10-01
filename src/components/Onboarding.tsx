@@ -19,7 +19,7 @@ export function openOnboarding() {
 const STEPS: { title: string; text: string; art: () => ReactNode; chemdraw?: boolean }[] = [
   {
     title: trk('NMR Figure Editor へようこそ'),
-    text: trk('JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。'),
+    text: trk('JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。'),
     art: ArtWelcome,
   },
   {

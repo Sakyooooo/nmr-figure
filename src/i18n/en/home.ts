@@ -132,8 +132,8 @@ export const EN_HOME: Record<string, string> = {
 
   // Onboarding.tsx (使い方の説明)
   'NMR Figure Editor へようこそ': 'Welcome to NMR Figure Editor',
-  'JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。':
-    'Make clean figures for Word and PowerPoint from JEOL Delta spectra (.jdf). Your data never leaves this computer.',
+  'JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。':
+    'Make clean figures for Word and PowerPoint from JEOL Delta spectra (.jdf). Your data never leaves this computer. Only the number of opens and edits is sent to the developer (you can turn this off in Settings).',
   'ホーム画面で「データフォルダを選ぶ」を押し、.jdf の入ったフォルダを選びます。測定日・サンプルごとに並び、ダブルクリックで開きます。チェックを付けてまとめて開くと、重ね書きになります。':
     'On the home screen, click "Choose data folder" and pick the folder with your .jdf files. They are listed by date and sample; double-click to open. Check several and open them together to overlay them.',
   図を作る: 'Build the figure',

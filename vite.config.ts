@@ -28,7 +28,8 @@ function devOutput(): Plugin {
 
 /**
  * 本番の画面に CSP (Content-Security-Policy) を入れる。「データを外に送らない」を、コードの約束ではなく
- * ブラウザの決まりにする: 通信 (connect-src) は自分のサイトからの読み込みだけ、フォームの送信もさせない。
+ * ブラウザの決まりにする: 通信 (connect-src) は自分のサイトからの読み込みと、使われた回数を数える GoatCounter
+ * (src/state/usage.ts の USAGE_ORIGIN。開いた・編集したの回数だけ) だけ、フォームの送信もさせない。
  * 開発サーバーは HMR のためにインラインのスクリプトと WebSocket を使うので、build のときだけ入れる。
  *   wasm-unsafe-eval: 構造式エディタ (Ketcher) の Indigo (WebAssembly) を動かすため
  *   blob: / data:     貼った画像・書き出す画像・Ketcher の Web Worker のため
@@ -41,7 +42,7 @@ export const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' data: blob:",
+  "connect-src 'self' data: blob: https://nmr-figure.goatcounter.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",

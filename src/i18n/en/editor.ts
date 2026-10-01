@@ -14,7 +14,8 @@ export const EN_EDITOR: Record<string, string> = {
   ファイルを開く: 'Open file',
   ホームの一覧から選ぶ: 'Choose from the home list',
   '文献値から作図 (SI の文を貼る)': 'Plot from reported data (paste SI text)',
-  'データはこのパソコンの中だけで処理され、外部には送信されません。': 'Data is processed only on this computer and never sent anywhere.',
+  'データはこのパソコンの中だけで処理され、外部には送信されません。開発者に送るのは、開いた回数と編集した回数だけです (設定で止められます)。':
+    'Data is processed only on this computer and never sent anywhere. Only the number of times the app is opened and figures are edited is sent to the developer (you can turn this off in Settings).',
   '図はこのブラウザに自動で保存されます。ほかのパソコンでは見えないので、残したい図はファイルに保存してください':
     'The figure is saved automatically in this browser. Other computers cannot see it, so save figures you want to keep to a file',
   縮小: 'Zoom out',
@@ -204,6 +205,10 @@ export const EN_EDITOR: Record<string, string> = {
   'PNG の解像度': 'PNG resolution',
   倍: '×',
   '設定はこのブラウザに保存されます (図のファイルには含まれません)。': 'Settings are saved in this browser (not in figure files).',
+  使われた回数: 'Usage count',
+  '開いた回数・編集した回数を開発者に送る': 'Send the number of opens and edits to the developer',
+  '送るのは回数だけです。ファイル名・試料名・スペクトル・構造式は送りません。Cookie も使いません。集計には GoatCounter を使っています。':
+    'Only counts are sent. File names, sample names, spectra and structures are never sent, and no cookies are used. Counting uses GoatCounter.',
   '使っているもの (ライセンス)': 'Third-party software (licenses)',
   'アイコン:': 'Icons:',
   '構造式エディタ: Ketcher (EPAM Systems、Apache License 2.0)': 'Structure editor: Ketcher (EPAM Systems, Apache License 2.0)',

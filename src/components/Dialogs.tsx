@@ -6,7 +6,7 @@ import { labReference, type LangSetting, type StructureTool, type ThemeSetting }
 import { CHEMDRAW_DIR, refreshLinkStatus, setupChemDrawLink, useChemDrawLink } from '../state/chemdraw';
 import { SOLVENTS, tableResidual } from '../lib/solvents';
 import { setLanguage, setReferenceOffset, setStructureTool, setTheme, updateSettings, useEditor } from '../state/store';
-import { NumberInput } from './inputs';
+import { Check, NumberInput } from './inputs';
 import { RichHtml } from './RichText';
 import { ICON_LICENSE } from './iconPaths';
 import { IconButton } from './ui';
@@ -334,6 +334,22 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           />
           {tr('倍')}
         </label>
+      </section>
+      <section>
+        <h3>{tr('使われた回数')}</h3>
+        <Check
+          checked={settings.sendUsage !== false}
+          onChange={(v) =>
+            updateSettings((d) => {
+              d.sendUsage = v;
+            })
+          }
+        >
+          {tr('開いた回数・編集した回数を開発者に送る')}
+        </Check>
+        <p className="hint">
+          {tr('送るのは回数だけです。ファイル名・試料名・スペクトル・構造式は送りません。Cookie も使いません。集計には GoatCounter を使っています。')}
+        </p>
       </section>
       <p className="hint">{tr('設定はこのブラウザに保存されます (図のファイルには含まれません)。')}</p>
       <details className="sub">
