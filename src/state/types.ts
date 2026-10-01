@@ -383,6 +383,8 @@ export interface NmrDocument {
   figure: FigureStyle;
   view: ViewState;
   trend: TrendSettings;
+  /** Word に貼る図の写し (state/wordFigure.ts)。保存すると NMR の保存先の Word図 フォルダの name.nmrfig と name.svg を書き直す */
+  wordFigure?: { id: string; name: string };
 }
 
 export type Tool =

@@ -24,6 +24,7 @@ import {
 import { jdfHandle, registerJdfHandle } from './deltaSync';
 import { addSpectra, addSpectrum2d, edit, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
 import { emptyDocument, type SpectrumMeta } from './types';
+import { saveWordFigure } from './wordFigure';
 
 type PickerOptions = {
   suggestedName?: string;
@@ -349,7 +350,7 @@ export async function openSavedFigure(id: string) {
   }
 }
 
-function defaultProjectName() {
+export function defaultProjectName() {
   const { doc, projectName } = useEditor.getState();
   if (projectName) return baseName(projectName) + PROJECT_EXT;
   const first = doc.spectra[0]?.fileName ?? doc.spectra2d[0]?.fileName;
@@ -363,6 +364,8 @@ function defaultProjectName() {
 export async function saveProject(saveAs = false) {
   const { doc } = useEditor.getState();
   if (!doc.layers.length && !doc.plot2d) return;
+  // Word に貼った図の写し: いつも Word図 フォルダの写しと見た目を書き直す (Word で F9 を押すと新しくなる)
+  if (doc.wordFigure) return saveWordFigure();
   const base = figureBaseOf(doc);
   if (base && (await saveFigureJdf(base, saveAs)) !== 'fallback') return;
   await saveNmrfig(saveAs);

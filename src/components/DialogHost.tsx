@@ -15,7 +15,7 @@ export function DialogHost() {
         <h2>{current.title}</h2>
       </header>
       <div className="dialog-body">
-        <p>{current.message}</p>
+        <p style={{ whiteSpace: 'pre-line' }}>{current.message}</p>
         <div className="actions">
           {current.cancel && <button onClick={() => answer(null)}>{tr('キャンセル')}</button>}
           {current.actions.map((a) => (

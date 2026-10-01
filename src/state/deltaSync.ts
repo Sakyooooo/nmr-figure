@@ -123,7 +123,9 @@ function reconcile() {
   // 図の土台を先に見る: 前の版で保存した図には、図の .jdf を 2 本のスペクトルが指しているものがある (土台を変えて保存し直した)。
   // そのファイルの中身は土台のものなので、土台だけが同期する (ほかの 1 本が同期すると、土台のデータで入れ替わってしまう)
   const baseLayer = figureBaseOf(doc)?.layerId;
-  for (const layer of [...doc.layers].sort((a, b) => Number(b.id === baseLayer) - Number(a.id === baseLayer))) {
+  // Word に貼った図の写し (state/wordFigure.ts) は同期しない (元の .jdf に処理の記録を書くことがあるため。元のデータは変えない約束)
+  const layers = doc.wordFigure ? [] : doc.layers;
+  for (const layer of [...layers].sort((a, b) => Number(b.id === baseLayer) - Number(a.id === baseLayer))) {
     const meta = doc.spectra.find((s) => s.id === layer.spectrumId);
     if (!canSyncDelta(meta) || !data[meta.id]) continue;
     // 同じファイルを 2 本入れたときは、最初の 1 本だけ同期する

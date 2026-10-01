@@ -398,6 +398,21 @@ PowerPoint 365 で実際に変換して確かめた結果、次の書き方に�
 - `ClipboardItem.supports('image/svg+xml')` が false のブラウザでは PNG (既定 4 倍) だけを入れ、その旨を表示する
 - 確認用: `scripts/word-clip-check.ps1`
 
+## Word に貼る図 (直すと F9 で更新。state/wordFigure.ts, lib/wordFigureLink.ts)
+- 本人の希望 (2026-10-01): Word に貼った図からスペクトルを開いて拡大などしたい。別のファイルとして開き、直したら Word にも反映。
+  元のデータは変えない。自分の PC だけ。Ctrl+クリックでよい。反映は「F9 で新しくなる」を選んだ
+- 書き出し →「Word に貼る図」: 今の図の写し (`<図の名前>_<id 16 進 8 字>.nmrfig`、データごと、doc.wordFigure = { id, name }) と
+  見た目 (`.svg`) を NMR の保存先の「Word図」フォルダに置き、写しを開くリンク (アプリの URL `?word=<id>`) をコピーして手順を出す。
+  Word では「挿入 → 画像 → このデバイス」で .svg を「挿入とリンク」で入れ、Ctrl+K でリンクを付ける
+- リンクを開くと (main.tsx → openWordFigureFromUrl)、Word図 フォルダから写しを開く (フォルダの許可が要るときは「開く」を 1 回押す)。
+  URL から ?word を外す。初めての説明は出さない
+- 写しの保存 (saveProject → saveWordFigure) は、いつも Word図 の .nmrfig と .svg を書き直す (名前を付けて保存も同じ)。
+  Word で図を選んで F9 (全部なら Ctrl+A → F9) を押すと新しくなる。写しは Delta と同期しない (元の .jdf に処理の記録を書くことがあるため)
+- Word で確かめたこと (試験用の Word を COM で): ファイルにリンクした図 (AddPicture LinkToFile + SaveWithDocument = 挿入とリンク) と
+  INCLUDEPICTURE は、画像を書き換えて F9 で新しくなる。SVG でもよく、アプリの図の SVG も正しく描ける (InlineShape の種類 18)。
+  ブラウザからの貼り付けでは「ファイルにリンクした図」は作れない: HTML の data: PNG + <a> は「普通の絵 + 図のリンク」になるが、
+  Word が書く形のフィールド (<!--[if supportFields]> INCLUDEPICTURE …) は捨てられ、file:// の img や data: の SVG は入らない
+
 ## FID の処理 (Delta の処理結果と比べて検証済み)
 - 虚部の符号を反転する (しないと Delta と鏡像になる)
 - DC 補正 (後ろ 10% の平均) → 指数関数の窓 → ゼロ詰め 2 倍 → FFT → 中央 `x_sweep_clipped / x_sweep` だけ残す

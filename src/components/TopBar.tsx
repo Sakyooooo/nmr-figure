@@ -2,6 +2,7 @@ import { locale, tr } from '../i18n';
 import type { RefObject } from 'react';
 import { useSync } from '../state/deltaSync';
 import { openInChemDraw } from '../state/chemdrawExport';
+import { makeWordFigure } from '../state/wordFigure';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import { printFigure, setCanvasTab, togglePanel, useEditor } from '../state/store';
 import { Icon } from './Icon';
@@ -62,6 +63,12 @@ export function TopBar({
         items={[
           { label: tr('SVG で保存'), icon: 'download', hint: tr('PowerPoint で「図形に変換」すると線や文字を直せます'), onSelect: withSvg(exportSvg) },
           { label: tr('PNG で保存'), icon: 'image', onSelect: withSvg(exportPng) },
+          {
+            label: tr('Word に貼る図 (直すと F9 で更新)'),
+            icon: 'file-text',
+            hint: tr('図の写しを作ります。Word で Ctrl+クリックすると写しが開き、直して保存すると F9 で新しくなります (元のデータは変わりません)'),
+            onSelect: withSvg(makeWordFigure),
+          },
           {
             label: tr('ChemDraw で開く'),
             icon: 'hexagon',

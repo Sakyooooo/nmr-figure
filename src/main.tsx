@@ -9,6 +9,7 @@ import { openFiles } from './state/fileOps';
 import { restoreWork, startAutoSave } from './state/autosave';
 import { startDeltaSync } from './state/deltaSync';
 import { startUsageCount } from './state/usage';
+import { openWordFigureFromUrl } from './state/wordFigure';
 import { openOnboarding } from './components/Onboarding';
 import { startFileLaunch } from './state/launch';
 import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
@@ -47,9 +48,12 @@ void restoreWork().finally(() => {
   startDeltaSync();
   // アプリとして入れたとき、ダブルクリックした .nmrfig を開く (前回の図を読み込んだあとに)
   startFileLaunch();
+  // Word に貼った図を Ctrl+クリックしたとき (?word=<id>): その写しを開く
+  const fromWord = new URLSearchParams(location.search).has('word');
+  void openWordFigureFromUrl();
   // 初めて開いたときは使い方の説明を出す (開発の画面の見本 ?demo=… では、demo=onboarding のときだけ)
   const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get('demo') : null;
-  if ((demo === null && !useEditor.getState().settings.ui.onboardingDone) || demo === 'onboarding') openOnboarding();
+  if ((demo === null && !fromWord && !useEditor.getState().settings.ui.onboardingDone) || demo === 'onboarding') openOnboarding();
   if (import.meta.env.DEV) void openDemo();
 });
 

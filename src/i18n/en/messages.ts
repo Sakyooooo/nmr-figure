@@ -210,4 +210,36 @@ export const EN_MESSAGES: Record<string, string> = {
   "フォルダが開かれていません": "No folder is open",
   "原子の近くをクリックしてください": "Click near an atom",
   "構造式から原子がなくなったので、帰属のマーカーを {n} 個外しました": "Removed {n} assignment {n|marker|markers} because the atoms are gone from the structure",
+  "Word に貼る図は、NMR の保存先の中の「Word図」フォルダに置きます。NMR の保存先 (ホーム画面で開くフォルダ) を選んでください。":
+    "Figures for Word are placed in the \"Word図\" folder inside your NMR folder. Choose your NMR folder (the one you open on the home screen).",
+  "これは Word に貼った図の写しです。直して保存すると、Word で F9 を押せば新しくなります (もう一度作る必要はありません)":
+    "This is a copy of a figure pasted in Word. Edit and save it, then press F9 in Word to update it (no need to create it again).",
+  "Word に貼る図を作れませんでした: {message}":
+    "Could not create the figure for Word: {message}",
+  "NMR の保存先「{folder}」の「{dir}」フォルダに、この図の写し「{name}」を作りました。元の図とデータは変わりません。\n\nWord では:\n1. 「挿入」→「画像」→「このデバイス」で「{dir}」の「{name}.svg」を選ぶ\n2. 「挿入」ボタンの横の ▼ から「挿入とリンク」を選ぶ\n3. 入った図を選んで Ctrl+K を押し、「アドレス」に Ctrl+V で貼って OK (リンクはコピーしてあります)\n\nこの図を Ctrl+クリックすると、写しがこのアプリで開きます。直して保存したら、Word で図を選んで F9 を押すと新しくなります。\n\nリンク: {url}":
+    "Created a copy of this figure, \"{name}\", in the \"{dir}\" folder of your NMR folder \"{folder}\". The original figure and data are not changed.\n\nIn Word:\n1. Insert > Pictures > This Device, and choose \"{name}.svg\" in \"{dir}\"\n2. From the ▼ next to the Insert button, choose \"Insert and Link\"\n3. Select the picture, press Ctrl+K, paste with Ctrl+V into \"Address\" and press OK (the link has been copied)\n\nCtrl+click the picture to open the copy in this app. After you edit and save it, select the picture in Word and press F9 to update it.\n\nLink: {url}",
+  "Word に貼る図を作りました":
+    "Created a figure for Word",
+  "リンクをコピーできなかったので、下のボタンでコピーしてください。":
+    "The link could not be copied. Use the button below to copy it.",
+  "リンクをもう一度コピー":
+    "Copy the link again",
+  "リンクをコピーしました: {url}":
+    "Copied the link: {url}",
+  "Word に貼った図の写しを保存しました。Word で図を選んで F9 を押すと新しくなります":
+    "Saved the copy of the figure pasted in Word. Select the picture in Word and press F9 to update it",
+  "写しは保存しましたが、図の見た目は書き直せませんでした。「スペクトル」の表示に戻してから、もう一度保存してください":
+    "Saved the copy, but could not update its picture. Switch back to the \"Spectra\" view and save again",
+  "Word に貼った図を開きます":
+    "Open a figure pasted in Word",
+  "Word に貼った図の写しを、NMR の保存先の「{dir}」フォルダから開きます。":
+    "Opens the copy of the figure pasted in Word from the \"{dir}\" folder of your NMR folder.",
+  "Word に貼った図の写しが見つかりません (NMR の保存先の「{dir}」フォルダを確かめてください)":
+    "The copy of the figure pasted in Word was not found (check the \"{dir}\" folder in your NMR folder)",
+  "Word に貼った図の写しを開きました。直して保存すると、Word で F9 を押せば新しくなります (元のデータは変わりません)":
+    "Opened the copy of the figure pasted in Word. Edit and save it, then press F9 in Word to update it (the original data is not changed)",
+  "Word に貼る図 (直すと F9 で更新)":
+    "Figure for Word (updates with F9 after editing)",
+  "図の写しを作ります。Word で Ctrl+クリックすると写しが開き、直して保存すると F9 で新しくなります (元のデータは変わりません)":
+    "Creates a copy of the figure. Ctrl+click it in Word to open the copy; after you edit and save it, press F9 to update (the original data is not changed)",
 };

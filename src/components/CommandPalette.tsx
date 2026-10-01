@@ -2,6 +2,7 @@ import { currentLang, tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { drawInChemDraw, drawStructure } from '../state/chemdraw';
 import { openInChemDraw } from '../state/chemdrawExport';
+import { makeWordFigure } from '../state/wordFigure';
 import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
 import {
   autoDetectSignals,
@@ -222,6 +223,14 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
     { group: tr('書き出し'), label: tr('図をコピー (Word / PowerPoint に貼る)'), icon: 'copy', shortcut: 'Ctrl+Shift+C', run: withSvg(copyFigure), enabled: hasData },
     { group: tr('書き出し'), label: tr('SVG で保存'), icon: 'download', keywords: 'svg ベクター 図形に変換', run: withSvg(exportSvg), enabled: hasData },
     { group: tr('書き出し'), label: tr('PNG で保存'), icon: 'image', keywords: 'png 画像', run: withSvg(exportPng), enabled: hasData },
+    {
+      group: tr('書き出し'),
+      label: tr('Word に貼る図 (直すと F9 で更新)'),
+      icon: 'file-text',
+      keywords: 'word リンク 写し f9 更新 ctrl クリック',
+      run: withSvg(makeWordFigure),
+      enabled: hasData,
+    },
     {
       group: tr('書き出し'),
       label: tr('ChemDraw で開く'),
