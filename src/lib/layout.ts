@@ -64,15 +64,17 @@ export function integralsOnAxis(f: FigureStyle, layerIds: string[], layerId: str
 
 /**
  * 図に出すもの。ピーク値・積分は Delta と同期しているので、図から外したいときも消さずに隠す
- * (消すと Delta のファイルからも消えるため)
+ * (消すと Delta のファイルからも消えるため)。図全体の設定と、スペクトルごとの設定 (Layer.showPeaks / showIntegrals)
  */
 export function shownOnFigure(doc: NmrDocument): NmrDocument {
   const f = doc.figure;
-  if (f.showPeakLabels !== false && f.showIntegrals !== false) return doc;
+  const hidePeaks = new Set(doc.layers.filter((l) => l.showPeaks === false).map((l) => l.id));
+  const hideIntegrals = new Set(doc.layers.filter((l) => l.showIntegrals === false).map((l) => l.id));
+  if (f.showPeakLabels !== false && f.showIntegrals !== false && !hidePeaks.size && !hideIntegrals.size) return doc;
   return {
     ...doc,
-    peakLabels: f.showPeakLabels === false ? [] : doc.peakLabels,
-    integrals: f.showIntegrals === false ? [] : doc.integrals,
+    peakLabels: f.showPeakLabels === false ? [] : doc.peakLabels.filter((p) => !hidePeaks.has(p.layerId)),
+    integrals: f.showIntegrals === false ? [] : doc.integrals.filter((x) => !hideIntegrals.has(x.layerId)),
   };
 }
 

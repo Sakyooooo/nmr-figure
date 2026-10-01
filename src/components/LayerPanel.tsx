@@ -47,7 +47,18 @@ export function LayerPanel() {
         {doc.layers.map((layer, i) => {
           const meta = doc.spectra.find((s) => s.id === layer.spectrumId);
           if (!meta) return null;
-          return <LayerRow key={layer.id} layer={layer} meta={meta} index={i} count={doc.layers.length} active={layer.id === activeLayerId} />;
+          return (
+            <LayerRow
+              key={layer.id}
+              layer={layer}
+              meta={meta}
+              index={i}
+              count={doc.layers.length}
+              active={layer.id === activeLayerId}
+              peaks={doc.peakLabels.filter((p) => p.layerId === layer.id).length}
+              integrals={doc.integrals.filter((x) => x.layerId === layer.id).length}
+            />
+          );
         })}
       </ol>
       {active && activeMeta && <LayerDetails layer={active} meta={activeMeta} index={doc.layers.indexOf(active)} />}
@@ -55,7 +66,24 @@ export function LayerPanel() {
   );
 }
 
-function LayerRow({ layer, meta, index, count, active }: { layer: Layer; meta: SpectrumMeta; index: number; count: number; active: boolean }) {
+function LayerRow({
+  layer,
+  meta,
+  index,
+  count,
+  active,
+  peaks,
+  integrals,
+}: {
+  layer: Layer;
+  meta: SpectrumMeta;
+  index: number;
+  count: number;
+  active: boolean;
+  /** このスペクトルのピーク値・積分の数 (あれば、図に出すかの切り替えを出す) */
+  peaks: number;
+  integrals: number;
+}) {
   const setLayer = (patch: Partial<Layer>) =>
     edit((d) => {
       Object.assign(d.layers.find((l) => l.id === layer.id)!, patch);
@@ -102,7 +130,37 @@ function LayerRow({ layer, meta, index, count, active }: { layer: Layer; meta: S
       >
         <Icon name="more" size={16} />
       </MenuButton>
+      {(peaks > 0 || integrals > 0) && (
+        <div className="layer-marks">
+          {peaks > 0 && (
+            <MarkToggle
+              shown={layer.showPeaks !== false}
+              text={tr('ピーク値 {n}', { n: peaks })}
+              label={layer.showPeaks !== false ? tr('{name} のピーク値を図から隠す (スペクトルとピーク値のデータは残す)', { name }) : tr('{name} のピーク値を図に出す', { name })}
+              onToggle={() => setLayer({ showPeaks: layer.showPeaks === false })}
+            />
+          )}
+          {integrals > 0 && (
+            <MarkToggle
+              shown={layer.showIntegrals !== false}
+              text={tr('積分 {n}', { n: integrals })}
+              label={layer.showIntegrals !== false ? tr('{name} の積分を図から隠す (スペクトルと積分のデータは残す)', { name }) : tr('{name} の積分を図に出す', { name })}
+              onToggle={() => setLayer({ showIntegrals: layer.showIntegrals === false })}
+            />
+          )}
+        </div>
+      )}
     </li>
+  );
+}
+
+/** スペクトルの行の下の「ピーク値」「積分」を図に出すかの切り替え (目のアイコン) */
+function MarkToggle({ shown, text, label, onToggle }: { shown: boolean; text: string; label: string; onToggle: () => void }) {
+  return (
+    <button type="button" className={`mark-toggle${shown ? '' : ' off'}`} aria-pressed={shown} aria-label={label} title={label} onClick={onToggle}>
+      <Icon name={shown ? 'eye' : 'eye-off'} size={14} />
+      <span>{text}</span>
+    </button>
   );
 }
 

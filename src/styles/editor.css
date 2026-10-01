@@ -862,6 +862,39 @@
 .layer-row.hidden-layer .layer-name {
   opacity: 0.55;
 }
+/* スペクトルの行の下: ピーク値・積分を図に出すかの切り替え (目のアイコン) */
+.layer-row {
+  flex-wrap: wrap;
+}
+.layer-marks {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  padding-left: 28px;
+}
+.mark-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  min-height: 0;
+  padding: 1px var(--spacing-8) 1px var(--spacing-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--type-label);
+}
+.mark-toggle:hover:not(:disabled) {
+  background: var(--color-bg-subtle);
+}
+.mark-toggle.off {
+  border-style: dashed;
+  color: var(--color-text-tertiary);
+}
+.mark-toggle.off span {
+  text-decoration: line-through;
+}
 .layer-details,
 .view-panel {
   display: flex;

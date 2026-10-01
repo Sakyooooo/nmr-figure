@@ -76,6 +76,12 @@ export interface Layer {
   time?: number | null;
   /** 積分値の基準。この積分をこの値にして、ほかの積分をそろえる */
   integralRef?: { id: string; value: number } | null;
+  /**
+   * このスペクトルのピーク値・積分を図に出すか (false で隠す。未設定は出す)。スペクトルは出したまま、比較の図で
+   * 出したいものだけ出す (本人の希望 2026-10-01)。消さずに隠すので、Delta との同期・SI 用テキストには影響しない
+   */
+  showPeaks?: boolean;
+  showIntegrals?: boolean;
 }
 
 /** 積分範囲。ppm は基準合わせ前の値 (from > to) */
