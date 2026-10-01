@@ -44,6 +44,40 @@ describe('CDXML の描画', () => {
     expect(elements(text, 'tspan').map((s) => s.children.join('')).join('')).toBe('HO');
   });
 
+  it('右側に置く 1 文字のラベル (W=O の O: LabelAlignment=Right・LabelJustification=Left) は、p が左端なので原子の中心に描く', () => {
+    // ChemDraw 25 が書いた W=O: 原子 (282.43, 120.68)、文字の p は左端 (278.55, 124.58)
+    const { all } = draw(label(1, 282.43, 120.68, 'O', 'LabelJustification="Left" LabelAlignment="Right"') + n(2, 273.79, 109.17) + b(3, 2, 1, 'Order="2"'));
+    const text = all.find((x) => x.name === 'text')!;
+    expect(text.attrs['text-anchor']).toBeUndefined();
+    expect(Number(text.attrs.x)).toBeCloseTo(278.54, 1);
+    expect(Number(text.attrs.y)).toBeCloseTo(124.58, 1);
+  });
+
+  it('丸い 1 文字 (O) には、斜めの結合が枠の角ではなく丸い輪郭まで伸びる', () => {
+    // O (8.64, 11.51) へ斜め (53°) に入る単結合。枠の角で止めると O の中心から 6.7 手前、丸い輪郭なら 5.4 手前
+    const endGap = (letter: string) => {
+      const { all } = draw(n(1, 0, 0) + label(2, 8.64, 11.51, letter) + b(3, 1, 2));
+      const nums = all.find((x) => x.name === 'path')!.attrs.d.match(/-?[\d.]+/g)!.map(Number);
+      return Math.hypot(8.64 - nums[nums.length - 2], 11.51 - nums[nums.length - 1]);
+    };
+    expect(endGap('O')).toBeGreaterThan(4.8);
+    expect(endGap('O')).toBeLessThan(5.8);
+    // N は角ばっているので、枠のまま
+    expect(endGap('N')).toBeGreaterThan(6.2);
+  });
+
+  it('斜めの W=O の 2 本の線は、同じ長さにそろえて止める', () => {
+    // ChemDraw 25 が書いた構造: W (273.79, 109.17) と O (282.43, 120.68) の二重結合 (W は結合が多いので中央に 2 本)
+    const w = `<n id="1" p="273.79 109.17" Element="74"><t p="269.07 113.07"><s font="3" size="10" color="0" face="96">W</s></t></n>`;
+    const { lines } = draw(w + label(2, 282.43, 120.68, 'O', 'LabelJustification="Left" LabelAlignment="Right"') + b(3, 1, 2, 'Order="2"'));
+    expect(lines).toHaveLength(2);
+    const [a, c] = lines.map(([x1, y1, x2, y2]) => Math.hypot(x2 - x1, y2 - y1));
+    expect(Math.abs(a - c)).toBeLessThan(0.05);
+    // ChemDraw の画面では 2 pt 前後の短い線 (枠の角で 1 本ずつ止めると 1.5 pt と 3.2 pt になっていた)
+    expect(a).toBeGreaterThan(1.8);
+    expect(a).toBeLessThan(3);
+  });
+
   it('化学式の数字は下付き (NH2 の 2)', () => {
     const { all } = draw(label(1, 0, 0, 'NH2') + n(2, -12.47, 7.2) + b(3, 1, 2));
     const two = all.find((x) => x.name === 'tspan' && x.children.join('') === '2')!;

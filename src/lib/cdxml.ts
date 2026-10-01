@@ -281,6 +281,8 @@ interface Label {
   lines: { segs: Seg[]; x: number; y: number; anchor: 'start' | 'middle' | 'end' }[];
   /** 結合を止める枠 (字の形の範囲) */
   clip: Rect;
+  /** 丸い 1 文字 (O など): 枠の角ではなく、枠に内接する楕円で止める */
+  round?: boolean;
 }
 
 interface Atom {
@@ -314,7 +316,8 @@ function atomLabel(ctx: Ctx, n: XNode, x: number, y: number): Label | null {
   const size = def.size;
   const tokens = labelTokens(segs);
   const align = t.attrs.LabelAlignment ?? 'Auto';
-  const just = t.attrs.LabelJustification ?? t.attrs.Justification ?? 'Left';
+  const justification = t.attrs.LabelJustification ?? t.attrs.Justification;
+  const just = justification ?? 'Left';
   const p = nums(t.attrs.p);
   const lines: Label['lines'] = [];
   if (align === 'Above' || align === 'Below') {
@@ -327,7 +330,10 @@ function atomLabel(ctx: Ctx, n: XNode, x: number, y: number): Label | null {
     const right = just === 'Right' || align === 'Right';
     const ordered = right ? [...tokens].reverse() : tokens;
     const segsOut = mergeSegs(ordered.flat());
-    const anchor = right ? 'end' : just === 'Center' ? 'middle' : 'start';
+    // 文字の位置 p が文字のどこかは LabelJustification が決める (LabelAlignment ではない)。W=O の O のように、
+    // 原子の右側に置く (LabelAlignment="Right") 1 文字のラベルでも LabelJustification="Left" で、p は文字の左端
+    const explicit = justification === 'Left' || justification === 'Right' || justification === 'Center';
+    const anchor = p.length >= 2 && explicit ? (just === 'Right' ? 'end' : just === 'Center' ? 'middle' : 'start') : right ? 'end' : just === 'Center' ? 'middle' : 'start';
     let px: number;
     if (p.length >= 2) px = p[0];
     else {
@@ -362,15 +368,36 @@ function atomLabel(ctx: Ctx, n: XNode, x: number, y: number): Label | null {
     top = Math.min(...lines.map((line) => line.y - size * 0.73));
     bottom = Math.max(...lines.map((line) => line.y));
   }
-  if (!Number.isFinite(l)) return { lines, clip: { l: x - size * 0.4, t: top, r: x + size * 0.4, b: bottom } };
-  return { lines, clip: { l, t: top, r, b: bottom } };
+  // 丸い 1 文字 (O・S): ChemDraw は字の輪郭で結合を止めるので、斜めの結合は枠の角より手前まで伸びる
+  // (ChemDraw が描いた画像と重ねて確かめた: 環の O・C=O・S で一致が増え、減る図はなかった。N・C は角ばるので枠のまま)
+  const round = tokens.length === 1 && tokens[0].length === 1 && (tokens[0][0].text === 'O' || tokens[0][0].text === 'S');
+  if (!Number.isFinite(l)) return { lines, clip: { l: x - size * 0.4, t: top, r: x + size * 0.4, b: bottom }, round };
+  return { lines, clip: { l, t: top, r, b: bottom }, round };
 }
 
 /** 線分 p→q が、p を囲む枠から出る位置 (p が枠の外なら p のまま) */
-function exitPoint(p: P, q: P, box: Rect): P {
+function exitPoint(p: P, q: P, box: Rect, round = false): P {
   if (p.x < box.l || p.x > box.r || p.y < box.t || p.y > box.b) return p;
   const dx = q.x - p.x;
   const dy = q.y - p.y;
+  if (round) {
+    // 枠に内接する楕円から出る位置 (p が楕円の外なら p のまま)
+    const cx = (box.l + box.r) / 2;
+    const cy = (box.t + box.b) / 2;
+    const a = (box.r - box.l) / 2;
+    const b = (box.b - box.t) / 2;
+    const ux = (p.x - cx) / a;
+    const uy = (p.y - cy) / b;
+    if (ux * ux + uy * uy >= 1) return p;
+    const vx = dx / a;
+    const vy = dy / b;
+    const qa = vx * vx + vy * vy;
+    if (qa === 0) return p;
+    const qb = 2 * (ux * vx + uy * vy);
+    const qc = ux * ux + uy * uy - 1;
+    const te = (-qb + Math.sqrt(qb * qb - 4 * qa * qc)) / (2 * qa);
+    return te >= 1 ? q : { x: p.x + dx * te, y: p.y + dy * te };
+  }
   let t = Infinity;
   if (dx > 0) t = Math.min(t, (box.r - p.x) / dx);
   if (dx < 0) t = Math.min(t, (box.l - p.x) / dx);
@@ -388,8 +415,8 @@ function expand(r: Rect, m: number): Rect {
 function clipSegment(p: P, q: P, a: Atom, b: Atom): [P, P] | null {
   let p2 = p;
   let q2 = q;
-  if (a.label) p2 = exitPoint(p, q, expand(a.label.clip, a.margin));
-  if (b.label) q2 = exitPoint(q, p2, expand(b.label.clip, b.margin));
+  if (a.label) p2 = exitPoint(p, q, expand(a.label.clip, a.margin), a.label.round);
+  if (b.label) q2 = exitPoint(q, p2, expand(b.label.clip, b.margin), b.label.round);
   if ((q2.x - p2.x) * (q.x - p.x) + (q2.y - p2.y) * (q.y - p.y) <= 0) return null;
   return [p2, q2];
 }
@@ -696,9 +723,14 @@ function renderFragment(ctx: Ctx, frag: XNode) {
     if (order === '2' || (order === '1.5' && !inCircleRing(bond))) {
       const side = doubleSide(bond, node.attrs.DoublePosition);
       if (side === 0) {
-        for (const k of [-0.5, 0.5]) {
-          const s = drawLine(ctx, bond, add(p, n, gap * k), add(q, n, gap * k), k < 0 ? display : display2, color, true, true);
-          if (s) lineSvg(ctx, s);
+        // 中央に 2 本: 結合の中心の線を文字で止め、2 本は同じ長さにそろえる (ChemDraw も 2 本をそろえて止める。
+        // 1 本ずつ文字の枠で止めると、斜めの W=O のように 2 本の長さが 2 pt ほど違ってしまう)
+        const axis = clipSegment(p, q, bond.a, bond.b);
+        if (axis) {
+          for (const k of [-0.5, 0.5]) {
+            const s = drawLine(ctx, bond, add(axis[0], n, gap * k), add(axis[1], n, gap * k), k < 0 ? display : display2, color, false, false);
+            if (s) lineSvg(ctx, s);
+          }
         }
       } else {
         main(p, q, display);

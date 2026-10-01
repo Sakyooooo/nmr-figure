@@ -81,8 +81,14 @@ x(i) = axisStart + (i - offsetStart) * (axisStop - axisStart) / (offsetStop - of
   ChemDraw に描かせた画像と重ねて確かめた (scripts/cdxml-compare.mjs)
   - 拡大縮小しても線の太さ・くさびの幅・二重線の間隔は ChemDraw の書式のまま (ChemDraw で大きさを変えたときと同じ)。字は倍率に合わせる
   - 原子の文字: ChemDraw が書いた位置 (t の p) と揃え方。右揃え (LabelJustification Right) は並びを逆にする (OH → HO、NH2 → H2N)。
+    **p が文字のどこか (左端・右端・中央) は LabelJustification が決める** (LabelAlignment ではない)。W=O の O は LabelAlignment=Right でも
+    LabelJustification=Left で p は文字の左端 (CF3・CH3 は Right で p が右端)。LabelAlignment だけ見て右端と決めると、O が文字の幅だけ左にずれ、
+    隣の結合に重なる (本人の報告 2026-10-01「ChemDraw の構造と表示される構造がずれる」の原因の 1 つ)
     Above / Below は縦に並べる。face 96 (化学式) は数字を下付き、+ - を上付き
   - 結合は文字の形の枠 (電荷の上付きは除く) + MarginWidth で止める。文字のない 2 本の結合は折れ線にして角をとがらせる
+    丸い 1 文字 (O・S) は枠の角ではなく、枠に内接する楕円で止める (ChemDraw は字の輪郭で止めるので、斜めの結合は枠の角より手前まで伸びる。
+    ChemDraw が描いた画像 (corpus k1〜k11) と重ねた一致が、環の O・C=O・S で増え、減る図はなかった。N・C は角ばるので枠のまま)。
+    中央に 2 本の二重結合は、結合の中心の線を止めてから 2 本を同じ長さにそろえる (1 本ずつ止めると、斜めの W=O で 2 pt ほど違う長さになる)
   - 二重結合の 2 本目 (DoublePosition がないとき): 環の内側 → 末端の文字の原子 (C=O) は中央 → 置換基の多い側 → 同じなら B→E の左
   - くさび: 細い側は線の太さ、太い側は BoldWidth の 1.5 倍。破線のくさびは細い側の原子から HashSpacing + 0.7×線の太さ ごと、
     長さは原子からの距離に比例 (太い側 1.8×BoldWidth)、両端の原子の上には引かない
