@@ -3,10 +3,11 @@
 #          (HKCU\Software\Classes)。NMR の保存先の ChemDraw フォルダに .nmrfig-link.json を置く (アプリはこれで連携できたと知る)
 #  外す:   上を消す
 # 呼び方:
-#  - アプリの「ChemDraw と連携する」が作る ChemDraw連携を入れる.cmd (NMR の保存先の ChemDraw フォルダに置く。中にこのスクリプトと
-#    helper.ps1・launch.vbs が入っている)。置かれた場所から NMR の保存先がわかるので、フォルダは聞かない
+#  - アプリの「ChemDraw と連携する」が NMR の保存先の ChemDraw フォルダに置く ChemDraw連携を入れる.cmd (このスクリプトと
+#    helper.ps1・launch.vbs を隣に置き、このスクリプトを -File で動かす)。置かれた場所から NMR の保存先がわかるので、フォルダは聞かない。
+#    以前は cmd の中に base64 で入れて iex で動かしていたが、ウイルス対策ソフト (ESET) に削除されたので、読める文章のまま置く形にした
 #  - このフォルダの ChemDraw連携を入れる.bat / 外す.bat (NMR の保存先を聞く)
-# 変数 (呼ぶ側が決める): $NmrfigSelf = 呼んだファイル、$NmrfigHelper / $NmrfigVbs = 中身 (base64。なければ隣のファイル)、
+# 変数 (呼ぶ側が決める): $NmrfigSelf = 呼んだファイル (なければこのスクリプト。helper.ps1・launch.vbs はその隣から写す)、
 #   $NmrfigUninstall = 外す。環境変数 NMRFIG_DRYRUN があれば、レジストリに触らず %TEMP% に書く (試験用)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -69,13 +70,9 @@ if ($current -eq $folder -and (Test-Path (Join-Path $folder 'ChemDraw\.nmrfig-li
 }
 
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-function Put([string]$name, $b64) {
-  $target = Join-Path $dest $name
-  if ($b64) { [IO.File]::WriteAllBytes($target, [Convert]::FromBase64String($b64)) }
-  else { Copy-Item -Force (Join-Path $srcDir $name) $target }
+foreach ($name in @('helper.ps1', 'launch.vbs')) {
+  Copy-Item -Force -LiteralPath (Join-Path $srcDir $name) -Destination (Join-Path $dest $name)
 }
-Put 'helper.ps1' $(if (Get-Variable NmrfigHelper -ErrorAction SilentlyContinue) { $NmrfigHelper } else { $null })
-Put 'launch.vbs' $(if (Get-Variable NmrfigVbs -ErrorAction SilentlyContinue) { $NmrfigVbs } else { $null })
 [IO.File]::WriteAllText($configPath, (@{ folder = $folder } | ConvertTo-Json), $utf8)
 
 if (-not $dry) {

@@ -13,7 +13,7 @@ import { create } from 'zustand';
 import { tr } from '../i18n';
 import { cdxmlAtomSites, cdxmlToSvg, drawCdxml, looksLikeCdxml } from '../lib/cdxml';
 import { downloadBlob } from '../lib/exportFigure';
-import { buildLinkInstaller, LINK_INSTALLER_NAME } from '../lib/linkInstaller';
+import { buildLinkFiles, LINK_FILE_NAMES, LINK_INSTALLER_NAME, zipFiles } from '../lib/linkInstaller';
 import { imageRect, PX_PER_PT } from '../lib/scene';
 import { ask } from './dialog';
 import {
@@ -134,12 +134,17 @@ const LINK_VERSION = 4;
 export const useChemDrawLink = create<{ ready: boolean | null; outdated: boolean }>(() => ({ ready: null, outdated: false }));
 
 async function markerVersion(): Promise<number | null> {
+  return (await markerInfo())?.version ?? null;
+}
+
+/** 連携の印の版と、入れた時刻 (印のファイルの更新時刻) */
+async function markerInfo(): Promise<{ version: number; at: number } | null> {
   const file = dataFolderName() ? await folderChildFile(CHEMDRAW_DIR, LINK_MARKER) : null;
   if (!file) return null;
   try {
-    return Number(JSON.parse(await file.text()).version) || 1;
+    return { version: Number(JSON.parse(await file.text()).version) || 1, at: file.lastModified };
   } catch {
-    return 1;
+    return { version: 1, at: file.lastModified };
   }
 }
 
@@ -223,9 +228,9 @@ async function readyFolder(write = false): Promise<boolean> {
 let linkTimer: number | null = null;
 
 /**
- * ChemDraw と連携する: NMR の保存先に ChemDraw フォルダを作り、ChemDraw連携を入れる.cmd を置く。
+ * ChemDraw と連携する: NMR の保存先に ChemDraw フォルダを作り、ChemDraw連携を入れる.cmd と隣の台本 (読める文章のまま) を置く。
  * 本人がダブルクリックすると連携が入る (置かれた場所から NMR の保存先がわかるので、フォルダは聞かれない)。
- * ブラウザがこの種類のファイルを書かせてくれなければ、ダウンロードにする (そのときは開いたときに保存先を選ぶ)
+ * ブラウザがこの種類のファイルを書かせてくれなければ、zip でダウンロードにする (そのときは開いたときに保存先を選ぶ)
  */
 export async function setupChemDrawLink() {
   if (!(await readyFolder(true))) return;
@@ -235,22 +240,24 @@ export async function setupChemDrawLink() {
     import('../../tools/chemdraw-link/helper.ps1?raw'),
     import('../../tools/chemdraw-link/launch.vbs?raw'),
   ]);
-  const text = buildLinkInstaller({ installer: installer.default, helper: helper.default, vbs: vbs.default });
+  const files = buildLinkFiles({ installer: installer.default, helper: helper.default, vbs: vbs.default });
+  const zipName = 'ChemDraw連携.zip';
   // ChemDraw で描くと決めたことにする (まだ決めていなければ)
   if (!useEditor.getState().settings.ui.structureTool) setStructureTool('chemdraw');
   let placed = true;
   try {
-    await folderWriteChildFile(CHEMDRAW_DIR, LINK_INSTALLER_NAME, text);
+    // cmd は最後に置く (台本がそろってから、ダブルクリックできるように)
+    for (const f of [...files.slice(1), files[0]]) await folderWriteChildFile(CHEMDRAW_DIR, f.name, f.text);
   } catch {
     placed = false;
   }
-  if (!placed) downloadBlob(new Blob([text], { type: 'application/octet-stream' }), LINK_INSTALLER_NAME);
+  if (!placed) downloadBlob(new Blob([zipFiles(files)], { type: 'application/zip' }), zipName);
   waitForLink();
   await ask(
     tr('ChemDraw と連携する'),
     placed
-      ? tr('NMR の保存先「{folder}」の中の「ChemDraw」フォルダに「{name}」を置きました。エクスプローラーでこのファイルをダブルクリックしてください (1 回だけ)。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。', { folder, name: LINK_INSTALLER_NAME })
-      : tr('「{name}」をダウンロードしました。開いてください (1 回だけ)。NMR の保存先を聞かれたら「{folder}」を選んでください。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。', { folder, name: LINK_INSTALLER_NAME }),
+      ? tr('NMR の保存先「{folder}」の中の「ChemDraw」フォルダに「{name}」を置きました。エクスプローラーでこのファイルをダブルクリックしてください (1 回だけ)。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。隣に置いた台本 (installer.ps1 など) は中身を読める普通の文章で、連携が入ると自動で消えます。', { folder, name: LINK_INSTALLER_NAME })
+      : tr('「{zip}」をダウンロードしました。右クリック →「すべて展開」で展開し、中の「{name}」をダブルクリックしてください (1 回だけ)。NMR の保存先を聞かれたら「{folder}」を選んでください。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。', { folder, name: LINK_INSTALLER_NAME, zip: zipName }),
     [{ label: tr('閉じる'), value: 'ok', kind: 'primary' }],
     { cancel: false },
   );
@@ -444,12 +451,14 @@ export async function sweepChemDrawFolder() {
     if (!names.length) return;
     const canDelete = (await folderWritePermission(false)) === 'granted';
     const remove = (name: string) => (canDelete ? folderRemoveChildFile(CHEMDRAW_DIR, name) : Promise.resolve(false));
-    const version = await markerVersion();
+    const marker = await markerInfo();
     const { doc } = useEditor.getState();
     const now = Date.now();
     for (const name of names) {
-      if (name === LINK_INSTALLER_NAME) {
-        if (version !== null && version >= LINK_VERSION) await remove(name);
+      if (LINK_FILE_NAMES.includes(name)) {
+        // 連携を入れるファイル: 今の版の連携が、置いたあとに入ったら要らない (入れ直すために置いた直後には消さない)
+        const file = marker && marker.version >= LINK_VERSION ? await folderChildFile(CHEMDRAW_DIR, name) : null;
+        if (file && marker && marker.at >= file.lastModified) await remove(name);
         continue;
       }
       if (name.endsWith('.tmp')) {

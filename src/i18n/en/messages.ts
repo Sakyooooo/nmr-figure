@@ -199,8 +199,10 @@ export const EN_MESSAGES: Record<string, string> = {
   "ChemDraw が開きませんでしたか": "Did ChemDraw not open?",
   "ChemDraw で描いた構造式を図に置きました。ChemDraw で直すと、図も変わります": "Placed the structure drawn in ChemDraw. Editing it in ChemDraw updates the figure",
   "NMR の保存先への書き込みが許可されませんでした": "Writing to the NMR folder was not allowed",
-  "NMR の保存先「{folder}」の中の「ChemDraw」フォルダに「{name}」を置きました。エクスプローラーでこのファイルをダブルクリックしてください (1 回だけ)。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。": "Placed \"{name}\" in the \"ChemDraw\" folder inside your NMR folder \"{folder}\". Double-click it in File Explorer (only once). If Windows asks, choose \"Run\". You will see \"Linked\" when it is done.",
-  "「{name}」をダウンロードしました。開いてください (1 回だけ)。NMR の保存先を聞かれたら「{folder}」を選んでください。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。": "Downloaded \"{name}\". Open it (only once). When asked for the NMR folder, choose \"{folder}\". If Windows asks, choose \"Run\". You will see \"Linked\" when it is done.",
+  "NMR の保存先「{folder}」の中の「ChemDraw」フォルダに「{name}」を置きました。エクスプローラーでこのファイルをダブルクリックしてください (1 回だけ)。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。隣に置いた台本 (installer.ps1 など) は中身を読める普通の文章で、連携が入ると自動で消えます。":
+    "Placed \"{name}\" in the \"ChemDraw\" folder inside your NMR folder \"{folder}\". Double-click it in File Explorer (only once). If Windows asks, choose \"Run\". You will see \"Linked\" when it is done. The scripts placed next to it (installer.ps1 etc.) are plain, readable text and are removed automatically once the link is installed.",
+  "「{zip}」をダウンロードしました。右クリック →「すべて展開」で展開し、中の「{name}」をダブルクリックしてください (1 回だけ)。NMR の保存先を聞かれたら「{folder}」を選んでください。Windows が確認を出したら「実行」を選んでください。終わると「連携できました」と出ます。":
+    "Downloaded \"{zip}\". Right-click it, choose \"Extract All\", then double-click \"{name}\" inside (only once). When asked for the NMR folder, choose \"{folder}\". If Windows asks, choose \"Run\". You will see \"Linked\" when it is done.",
   "ChemDraw と連携できました。構造式ボタンを押すと ChemDraw が開きます": "ChemDraw is linked. Press the structure button to open ChemDraw",
   "ChemDraw との連携がまだです": "ChemDraw is not linked yet",
   "ChemDraw で描くには、この PC で ChemDraw との連携を 1 回だけ準備します。": "To draw in ChemDraw, set up the ChemDraw link once on this PC.",

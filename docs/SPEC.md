@@ -116,11 +116,14 @@ x(i) = axisStart + (i - offsetStart) * (axisStop - axisStart) / (offsetStop - of
     そこで、この PC に連携を 1 回だけ入れてもらう (管理者の権限は要らない)。
   - 連携の準備 (本人の希望 2026-09-24「初回と設定に ChemDraw リンクボタン、フォルダは勝手に用意してよい」):
     初めて開いたときの説明の 5 枚目・設定・構造式ボタン (連携がまだのとき) の「ChemDraw と連携する」→
-    NMR の保存先 (書き込みの許可を取る) に「ChemDraw」フォルダを作り、ChemDraw連携を入れる.cmd を置く (lib/linkInstaller.ts)。
-    本人がダブルクリックすると、置かれた場所から NMR の保存先がわかるので、フォルダは聞かない (保存先の食い違いが起きない)。
-    ブラウザが書かせてくれないときはダウンロードにし、開いたときに保存先を選んでもらう
-  - ChemDraw連携を入れる.cmd: ASCII だけの cmd。起動の行が自分を読み、最後の ::NMRFIG:: のあとの base64 (installer.ps1 と、
-    helper.ps1・launch.vbs の base64) を PowerShell で実行する。改行は CRLF にそろえる (公開版は Linux でビルドするため)
+    NMR の保存先 (書き込みの許可を取る) に「ChemDraw」フォルダを作り、ChemDraw連携を入れる.cmd と installer.ps1・helper.ps1・launch.vbs を
+    読める文章のまま置く (lib/linkInstaller.ts。cmd は最後に置く)。本人が cmd をダブルクリックすると、置かれた場所から NMR の保存先がわかるので、
+    フォルダは聞かない (保存先の食い違いが起きない)。ブラウザが書かせてくれないときは 4 つを zip (圧縮なし、名前は UTF-8) でダウンロードにし、
+    展開して cmd を開いたときに保存先を選んでもらう
+  - ChemDraw連携を入れる.cmd: ASCII だけの cmd で、`powershell -ExecutionPolicy Bypass -STA -File "%~dp0installer.ps1"` を動かすだけ。
+    installer.ps1 は隣の helper.ps1・launch.vbs を写す。改行は CRLF にそろえる (公開版は Linux でビルドするため)。
+    **本体を隠して動かさない**: 以前は cmd の中に base64 で入れて iex で動かしていたが、友人の PC で ESET (LiveGuard) が
+    「Windows コマンド プロセッサがアクセスしようとしているファイルで脅威」として削除した (2026-10-01)。隠して動かす形はマルウェアの運び屋と同じ
   - 連携 (tools/chemdraw-link/installer.ps1): %LOCALAPPDATA%\NMRFigure\chemdraw-link に helper.ps1 と launch.vbs と config.json
     (NMR の保存先) を置き、nmrfig-chemdraw: を HKCU\Software\Classes に登録し、NMR の保存先\ChemDraw\.nmrfig-link.json を置く。
     アプリはこの印で「連携できた」と知る (2 秒ごとに見て知らせる。設定にも出す)。同じフォルダに入っていれば、入れ直すか外すかを聞く。
@@ -146,7 +149,8 @@ x(i) = axisStart + (i - offsetStart) * (axisStop - axisStart) / (offsetStop - of
   - 12 秒たってもファイルができなければ、連携が入っていないか、連携の NMR の保存先がアプリのフォルダと違うと案内する
   - ChemDraw フォルダの片付け (本人の希望 2026-09-24「要らなくなったファイルは随時消す」、sweepChemDrawFolder):
     連携 (版 2) は書類を閉じると structure-….closed を置く。アプリは最後の中身を図に入れてから .cdxml と .closed を消す。
-    ほかに、連携が入ったあとの ChemDraw連携を入れる.cmd、1 分より古い .tmp、ファイルのない .closed を消す。
+    ほかに、連携を入れるファイル (cmd と隣の 3 つ。今の版の連携の印がファイルより新しいときだけ = 入れ直すために置いた直後は消さない)、
+    1 分より古い .tmp、ファイルのない .closed を消す。
     開いている図の構造式のファイルが残っていれば (アプリを開き直した・別の図にしていた)、中身を図に入れて見張り直す。
     ほかの図の構造式のファイルは、その図を開き直したときに拾えるよう 12 時間残してから消す。連携の印は残す。
     起動して 3 秒後・30 秒ごと (画面を出しているとき)・アプリに戻ったとき・描いている間は 10 秒ごとに行う。
