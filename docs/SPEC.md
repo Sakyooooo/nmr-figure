@@ -18,7 +18,7 @@ JEOL Delta で処理したスペクトルを、資料 (Word / PowerPoint) 用の
   - 使われた回数 (本人の希望 2026-10-01「開発者としてどれだけ利用されたか分かるように」「開いた回数、編集した回数のみでいい」、state/usage.ts):
     GoatCounter (nmr-figure.goatcounter.com) に「開いた」(アプリを読み込むたび、ページを見た回数) と「編集した」(図を開いて・新しく作って
     最初に直したとき。保存後にまた直し始めたらもう 1 回。前回の作業を戻しただけは数えない) の名前だけを送る。
-    ファイル名・試料名・データ・画面の大きさ・どのページから来たか (r) は送らない、Cookie なし (credentials: omit)。公開版 (sakyooooo.github.io) だけで送り、
+    ファイル名・試料名・データ・画面の大きさ・どのページから来たか (r) は送らない、Cookie なし (credentials: omit)。公開版 (sakyooooo.github.io と、Vercel の本番 nmr-figure.vercel.app。名前を完全に指定、デプロイごとの URL は除く) だけで送り、
     設定の「使われた回数」(settings.sendUsage、既定は送る) で止められる。README・説明の 1 枚目・空の画面の一文にも書いた
 - 入力は Delta の `.jdf` (処理済み、または未処理の FID)。別ファイルを複数読み込む
 - 対象核種: ¹H / ¹³C / ¹⁹F / ³¹P、2D (COSY, HSQC, HMBC, NOESY など全部)

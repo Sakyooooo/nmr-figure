@@ -7,11 +7,13 @@ import { useEditor } from './store';
  *  - 開いた: アプリを開く (読み込む) たびに 1 回
  *  - 編集した: 図を開いて (新しく作って) 最初に直したときに 1 回。保存してからまた直し始めたら、もう 1 回。
  *    直すたびに送ると 1 枚の図で何百回にもなるので、「変更なし → 変更あり」になったときだけ数える。前回の作業を戻しただけ (doc は変わらない) は数えない
- * 公開版 (sakyooooo.github.io) だけで数える (開発サーバー・手元の試験では送らない)。設定の「使われた回数を送る」を外すと送らない。
+ * 公開版 (PUBLIC_HOSTS の 2 つ: GitHub Pages と Vercel の本番) だけで数える (開発サーバー・手元の試験・Vercel のデプロイごとの URL では送らない)。
+ * 設定の「使われた回数を送る」を外すと送らない。
  * 通信先は CSP (vite.config.ts) でこの 1 つだけ許す
  */
 export const USAGE_ORIGIN = 'https://nmr-figure.goatcounter.com';
-const PUBLIC_HOST = 'sakyooooo.github.io';
+/** 数える場所 (名前を完全に指定する。ほかの *.vercel.app やデプロイごとの URL は数えない) */
+const PUBLIC_HOSTS = ['sakyooooo.github.io', 'nmr-figure.vercel.app'];
 
 export type UsageEvent = 'open' | 'edit';
 
@@ -25,7 +27,7 @@ export function usageUrl(event: UsageEvent, rnd = Math.random().toString(36).sli
 
 /** 送ってよいか: 公開版で、設定で止めていないとき */
 export function usageAllowed(host = location.hostname, prod = import.meta.env.PROD): boolean {
-  return prod && host === PUBLIC_HOST && useEditor.getState().settings.sendUsage !== false;
+  return prod && PUBLIC_HOSTS.includes(host) && useEditor.getState().settings.sendUsage !== false;
 }
 
 function send(event: UsageEvent) {

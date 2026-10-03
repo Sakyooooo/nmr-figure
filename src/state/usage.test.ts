@@ -16,6 +16,10 @@ describe('使われた回数', () => {
 
   it('公開版だけで送り、設定で止められる', () => {
     expect(usageAllowed('sakyooooo.github.io', true)).toBe(true);
+    expect(usageAllowed('nmr-figure.vercel.app', true)).toBe(true);
+    // Vercel のデプロイごとの URL や、ほかの人の *.vercel.app は数えない
+    expect(usageAllowed('nmr-figure-kfkzm3qbp-sakyooooos-projects.vercel.app', true)).toBe(false);
+    expect(usageAllowed('someone-else.vercel.app', true)).toBe(false);
     expect(usageAllowed('localhost', true)).toBe(false);
     expect(usageAllowed('sakyooooo.github.io', false)).toBe(false);
     updateSettings((s) => {
