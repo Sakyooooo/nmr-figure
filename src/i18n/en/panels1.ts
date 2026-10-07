@@ -222,7 +222,12 @@ export const EN_PANELS1: Record<string, string> = {
   '{name}: 2D の軸と核種 ({nucleus}) が違います': '{name}: the nucleus ({nucleus}) does not match the axes of the 2D',
   '{fileName}: 2D の軸と核種 ({nucleus}) が違うので、上・右には使えません':
     '{fileName}: the nucleus ({nucleus}) does not match the axes of the 2D, so it cannot be used on the top/right',
-  '{from} を 2D の{side}に使いました (帰属のマーカー {n} 個も)': 'Using {from} on the {side} of the 2D (with {n} assignment markers)',
+  '{from} を 2D の{side}に使いました ({list})': 'Using {from} on the {side} of the 2D ({list})',
+  '構造式 {n} 個': '{n} structures',
+  '。構造式も左下に置きました': '. The structure was placed at the lower left too',
+  '原子のマーカー {n} 個': '{n} atom markers',
+  '、': ', ',
+  '。別のマーカーが付いていた原子 {n} 個には足していません': '. {n} atoms already had a different marker and were left as they were',
   '{from} を 2D の{side}に使いました': 'Using {from} on the {side} of the 2D',
   スペクトルが見つかりません: 'Spectrum not found',
   '同じサンプルの帰属した 1D を上・右に使いました ({list})。右の「上と右のスペクトル」で 2D の投影に戻せます':

@@ -1,9 +1,23 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultProcessing2d, type Spectrum2dData } from '../lib/fid2d';
+import { annotationBox } from '../lib/scene';
 import { buildScene2d } from '../lib/scene2d';
-import { clearSide1d, markCrossPeaksFromSides, setSide1d, sideFromProject, sidesFor, type SideSource } from './side2d';
+import { DEMO_CDXML } from '../demoCdxml';
+import { cdxmlAtomSites } from '../lib/cdxml';
+import { clearSide1d, markCrossPeaksFromSides, sameStructure, setSide1d, sideFromProject, sidesFor, type SideSource } from './side2d';
 import { loadDocument, toggleMarker2d, toggleSideMarker, useEditor } from './store';
-import { DEFAULT_MARKER_COLORS, defaultPlot2d, emptyDocument, type MarkerStyle, type NmrDocument, type Spectrum2dMeta, type SpectrumMeta } from './types';
+import {
+  annotationDefaults,
+  DEFAULT_MARKER_COLORS,
+  defaultPlot2d,
+  emptyDocument,
+  type Annotation,
+  type FigureImage,
+  type MarkerStyle,
+  type NmrDocument,
+  type Spectrum2dMeta,
+  type SpectrumMeta,
+} from './types';
 
 const doc = () => useEditor.getState().doc;
 
@@ -235,5 +249,108 @@ describe('同じマーカーのクロスピークにも付ける', () => {
     expect(cross[0].ppm).toBeCloseTo(7.0, 0);
     expect(cross[0].ppm1).toBeCloseTo(128, -1);
     expect(markCrossPeaksFromSides()).toBe(0);
+  });
+});
+
+describe('構造式と原子のマーカーも持ってくる', () => {
+  const shift = (text: string, dx: number, dy: number, only?: string) =>
+    text.replace(/<n id="(\d+)" p="([\d.-]+) ([\d.-]+)"/g, (all, id, x, y) => (only && id !== only ? all : `<n id="${id}" p="${+x + dx} ${+y + dy}"`));
+  const image = (id: string, cdxml = DEMO_CDXML): FigureImage => ({ id, svg: null, href: null, source: null, cdxml, x: 0.7, y: 0.1, w: 0.2, ratio: 0.5 });
+  const atoms = cdxmlAtomSites(DEMO_CDXML).map((s) => s.id);
+  const green: MarkerStyle = { id: 'g1', name: '', color: '#00aa00', shape: 'diamond' };
+  const note: Annotation = { ...annotationDefaults('text'), id: 'n1', layerId: '', imageId: 'imgH', x1: 0.1, y1: 0.2, x2: 0.1, y2: 0.2, text: 'a' };
+
+  beforeEach(() => open2d());
+
+  it('同じ構造式か: 構造式ごと動かしたものは同じ、原子の並びが違えば別', () => {
+    expect(sameStructure(image('a'), image('b', shift(DEMO_CDXML, 40, -15)))).toBe(true);
+    expect(sameStructure(image('a'), image('b', shift(DEMO_CDXML, 6, 0, atoms[2])))).toBe(false);
+    expect(sameStructure(image('a'), { ...image('b'), cdxml: null, svg: '<svg/>' })).toBe(false);
+  });
+
+  it('¹H の図の構造式を元の大きさでプロットの左下に置き、原子のマーカーと構造式の上の文字も持ってくる', () => {
+    const src = {
+      ...source('1H', [{ ppm: 7.0, style: red }]),
+      images: [image('imgH')],
+      atomMarks: [
+        { imageId: 'imgH', atomId: atoms[0], style: red },
+        { imageId: 'imgH', atomId: atoms[1], style: blue },
+      ],
+      imageNotes: [note],
+      figureSize: { width: 940, height: 400 },
+    };
+    expect(setSide1d(['top'], src)).toEqual({ images: 1, atoms: 2, skipped: 0 });
+    const d = doc();
+    expect(d.figureImages).toHaveLength(1);
+    const im = d.figureImages[0];
+    const s = buildScene2d(d, useEditor.getState().data2d.S2)!;
+    const r = { x: im.x * s.layout.width, y: im.y * s.layout.height, w: im.w * s.layout.width };
+    // 元の図と同じ 188 px、プロットの左下。枠の外に出る原子のマーカー・文字も含めてプロットの内側
+    const { plot } = s.layout;
+    const size = d.figure.markerSize;
+    expect(r.w).toBeCloseTo(188, 0);
+    expect(r.x).toBeGreaterThanOrEqual(plot.x + 8 - 0.01);
+    expect(r.y + r.w * im.ratio).toBeLessThanOrEqual(plot.y + plot.h - 8 + 0.01);
+    const left = Math.min(r.x, ...s.markers.filter((m) => m.imageId).map((m) => m.x - size / 2));
+    const box = annotationBox(s.annotations[0]);
+    const bottom = Math.max(r.y + r.w * im.ratio, box.y + box.h, ...s.markers.filter((m) => m.imageId).map((m) => m.y + size / 2));
+    // (マーカーのまわりは 1 px の余白を見ている)
+    expect(Math.abs(left - (plot.x + 8))).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(bottom - (plot.y + plot.h - 8))).toBeLessThanOrEqual(1.5);
+    const atomMarks = d.markers.filter((m) => m.imageId === im.id);
+    expect(atomMarks.map((m) => m.atomId)).toEqual([atoms[0], atoms[1]]);
+    // 原子のマーカーと、ピークのマーカーは同じ種類 (凡例 1 行)
+    expect(atomMarks[0].styleId).toBe(d.markers.find((m) => m.side === 'top')!.styleId);
+    // 2D の図に描かれる (原子のマーカー 2 つ + 上のマーカー 1 つ)
+    expect(s.markers).toHaveLength(3);
+    expect(d.annotations).toHaveLength(1);
+    expect(d.annotations[0]).toMatchObject({ imageId: im.id, space: '2d', layerId: 'S2', text: 'a' });
+  });
+
+  it('¹³C の図に同じ構造式があれば 1 つにして、原子のマーカーを足す (1 つの原子に 1 つ)', () => {
+    setSide1d(['top'], { ...source('1H', []), images: [image('imgH')], atomMarks: [{ imageId: 'imgH', atomId: atoms[0], style: red }, { imageId: 'imgH', atomId: atoms[1], style: blue }], imageNotes: [note] });
+    const placed = setSide1d(['right'], {
+      ...source('13C', [], 'C_図.jdf'),
+      images: [image('imgC', shift(DEMO_CDXML, 100, 30))],
+      atomMarks: [
+        // 同じ原子・同じ種類 (¹H と ¹³C で同じ色・名前): そのまま
+        { imageId: 'imgC', atomId: atoms[0], style: { ...red, id: 'other' } },
+        // 新しい原子: 足す
+        { imageId: 'imgC', atomId: atoms[2], style: red },
+        // ¹H で別の種類が付いている原子: 足さない
+        { imageId: 'imgC', atomId: atoms[1], style: green },
+      ],
+      imageNotes: [{ ...note, id: 'n2', imageId: 'imgC' }],
+    });
+    expect(placed).toEqual({ images: 0, atoms: 1, skipped: 1 });
+    const d = doc();
+    expect(d.figureImages).toHaveLength(1);
+    expect(d.markers.filter((m) => m.imageId).map((m) => m.atomId)).toEqual([atoms[0], atoms[1], atoms[2]]);
+    // 構造式の上の文字は、もうある構造式には足さない
+    expect(d.annotations).toHaveLength(1);
+    // ¹H を投影に戻すと、¹H から持ってきた原子のマーカーだけ外れる (構造式と ¹³C のものは残る)
+    clearSide1d(['top']);
+    expect(doc().figureImages).toHaveLength(1);
+    expect(doc().markers.filter((m) => m.imageId).map((m) => m.atomId)).toEqual([atoms[2]]);
+  });
+
+  it('1D の図から読むと、構造式・原子のマーカー・構造式の上の文字・図の大きさも入る', () => {
+    const d: NmrDocument = emptyDocument();
+    const base = meta1d('1H', 10);
+    d.spectra = [base];
+    d.layers = [{ id: 'L1', spectrumId: base.id, visible: true, color: '#000', label: '', scale: 1, lineWidth: 1 }];
+    d.figureImages = [image('imgH')];
+    d.markerStyles = [red];
+    d.markers = [
+      { id: 'a', layerId: 'L1', styleId: 'r1', ppm: 7.0 },
+      { id: 'b', layerId: '', styleId: 'r1', ppm: 0, imageId: 'imgH', atomId: atoms[0] },
+      { id: 'c', layerId: '', styleId: 'r1', ppm: 0, imageId: 'gone', atomId: atoms[1] },
+    ];
+    d.annotations = [note, { ...note, id: 'n3', imageId: undefined }];
+    const src = sideFromProject({ doc: d, data: { [base.id]: new Float32Array(1001) } }, '図')!;
+    expect(src.images!.map((x) => x.id)).toEqual(['imgH']);
+    expect(src.atomMarks!.map((x) => x.atomId)).toEqual([atoms[0]]);
+    expect(src.imageNotes!.map((x) => x.id)).toEqual(['n1']);
+    expect(src.figureSize).toEqual({ width: 940, height: 400 });
   });
 });
