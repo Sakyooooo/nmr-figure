@@ -1,5 +1,5 @@
 import { tr } from './i18n';
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { CommandPalette } from './components/CommandPalette';
 import { ReferenceDialog, SettingsDialog } from './components/Dialogs';
 import { DialogHost } from './components/DialogHost';
@@ -26,9 +26,12 @@ import { PROJECT_EXT } from './lib/projectFile';
 import { copyFigure, openDialog, openFiles, saveProject } from './state/fileOps';
 import type { FileHandle } from './state/store';
 import {
+  beginGesture,
   closeSiImport,
   copySelection,
   deleteSelection,
+  edit,
+  endGesture,
   fitY,
   fullRange,
   nudgeMarker,
@@ -65,7 +68,8 @@ export default function App() {
   const screen = useEditor((s) => s.screen);
   const [w, h] = tab === 'trend' ? [trend.width, trend.height] : [figure.width, figure.height];
   const [touchHelp, setTouchHelp] = useFirstTouchHelp(hasData && screen === 'editor');
-  const paperWidth = usePaperWidth(scrollRef, w, h, `${ui.leftOpen}${ui.rightOpen}${hasData}${screen}`);
+  // 縦に伸ばした 1D の図は、幅に合わせて縦にスクロールする (2D・推移グラフは全体が入る大きさ)
+  const { paperWidth, fitWidth } = usePaperWidth(scrollRef, w, h, `${ui.leftOpen}${ui.rightOpen}${hasData}${screen}`, tab !== 'trend' && !is2d);
 
   useKeyboard(svgRef, w, paperWidth, () => setPaletteOpen(true));
 
@@ -131,6 +135,7 @@ export default function App() {
           {hasData ? (
             <div className="paper" style={{ width: paperWidth }}>
               {is2d ? <Figure2dView svgRef={svgRef} /> : tab === 'trend' ? <TrendChart svgRef={svgRef} /> : <FigureView svgRef={svgRef} />}
+              {tab !== 'trend' && <HeightHandle scale={paperWidth / w} paperWidth={paperWidth} fitWidth={fitWidth} scrollRef={scrollRef} />}
             </div>
           ) : (
             <EmptyState />
@@ -179,8 +184,13 @@ export default function App() {
   );
 }
 
-/** 図の表示幅 (px)。「合わせる」のときは、スクロールせずに全体が見える最大の大きさにする */
-function usePaperWidth(ref: RefObject<HTMLDivElement | null>, w: number, h: number, layoutKey: string) {
+/**
+ * 図の表示幅 (px)。「合わせる」のときは、スクロールせずに全体が見える最大の大きさにする。
+ * widthFirst (1D の図) は、縦長で全体を入れると幅が枠の 8 割より狭くなるとき、幅に合わせて縦にスクロールする
+ * (本人の希望 2026-10-07「何個も重ねたときなど、縦方向に伸ばせるように」。縮めると字やピークが小さくなる)。
+ * fitWidth は、その高さの図を「合わせる」で出したときの幅
+ */
+function usePaperWidth(ref: RefObject<HTMLDivElement | null>, w: number, h: number, layoutKey: string, widthFirst: boolean) {
   const zoom = useEditor((s) => s.viewZoom);
   const [box, setBox] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
@@ -202,8 +212,78 @@ function usePaperWidth(ref: RefObject<HTMLDivElement | null>, w: number, h: numb
     };
     // パネルの開閉で枠の大きさが変わるので測り直す
   }, [ref, layoutKey]);
-  if (zoom !== 'fit') return Math.round(w * zoom);
-  return Math.max(240, Math.floor(Math.min(box.w, (box.h * w) / h)));
+  const fitWidth = (height: number) => {
+    const whole = Math.min(box.w, (box.h * w) / height);
+    return Math.max(240, Math.floor(widthFirst && whole < box.w * 0.8 ? box.w : whole));
+  };
+  return { paperWidth: zoom !== 'fit' ? Math.round(w * zoom) : fitWidth(h), fitWidth };
+}
+
+/**
+ * 図の下の辺: 上下にドラッグして図の高さを変える (本人の希望 2026-10-07)。重ねたスペクトルの間隔も広がる。
+ * ドラッグ中は表示の倍率を変えない (図が縮んで、つかんだ辺が手から離れないように)。離したとき、「合わせる」で同じ大きさに
+ * なるなら「合わせる」に戻し、ならなければその倍率のまま (急に縮まない)。画面の下の端まで来たら下へ送る
+ */
+function HeightHandle({
+  scale,
+  paperWidth,
+  fitWidth,
+  scrollRef,
+}: {
+  scale: number;
+  paperWidth: number;
+  fitWidth: (height: number) => number;
+  scrollRef: RefObject<HTMLDivElement | null>;
+}) {
+  const height = useEditor((s) => s.doc.figure.height);
+  const drag = useRef<{ y0: number; top0: number; h0: number; token: number; fit: boolean } | null>(null);
+  const [active, setActive] = useState(false);
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const fit = useEditor.getState().viewZoom === 'fit';
+    setViewZoom(scale);
+    drag.current = { y0: e.clientY, top0: scrollRef.current?.scrollTop ?? 0, h0: height, token: beginGesture(), fit };
+    setActive(true);
+  };
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const el = scrollRef.current;
+    // 下の道具の帯 (80 px) の近くまで来たら、画面を下へ送る
+    if (el && e.clientY > el.getBoundingClientRect().bottom - 96) el.scrollTop += 12;
+    const dy = e.clientY - d.y0 + ((el?.scrollTop ?? 0) - d.top0);
+    const next = Math.round(Math.min(4000, Math.max(150, d.h0 + dy / scale)));
+    if (next !== useEditor.getState().doc.figure.height)
+      edit((doc) => {
+        doc.figure.height = next;
+      }, false);
+  };
+  const onUp = () => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    setActive(false);
+    endGesture(d.token);
+    if (d.fit && Math.abs(fitWidth(useEditor.getState().doc.figure.height) - paperWidth) < 2) setViewZoom('fit');
+  };
+  return (
+    <div
+      className={`height-handle${active ? ' active' : ''}`}
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={tr('図の高さ')}
+      title={tr('上下にドラッグで図の高さを変えます')}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      <span className="grip" />
+      {active && <span className="height-readout num">{tr('高さ {h} px', { h: height })}</span>}
+    </div>
+  );
 }
 
 /** 何もないとき: 何がないか → 次にやること (よく使うものにはキー) → 保存の場所 */

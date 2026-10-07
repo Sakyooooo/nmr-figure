@@ -377,6 +377,8 @@
   inset: 0;
   display: flex;
   overflow: auto;
+  /* 縦に伸ばした図でスクロールの帯が出ても、幅が変わらないように (横にもスクロールの帯が出ていた) */
+  scrollbar-gutter: stable;
   /* 上: 使い方の一行、下: 道具の帯の分を空ける */
   padding: 56px var(--spacing-12) 80px;
 }
@@ -387,11 +389,48 @@
   padding-right: calc(var(--size-panel-right) + var(--spacing-24));
 }
 .stage .paper {
+  position: relative;
   flex: none;
   margin: auto;
   /* 図の紙はダークモードでも白 (Word / PowerPoint に貼る図と同じ見た目) */
   background: var(--data-paper);
   outline: 1px solid var(--color-border-default);
+}
+
+/* 図の下の辺: 上下にドラッグして図の高さを変える */
+.height-handle {
+  position: absolute;
+  right: 0;
+  bottom: -7px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.height-handle .grip {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border-default);
+  transition: background-color 120ms;
+}
+.height-handle:hover .grip,
+.height-handle.active .grip {
+  background: var(--color-accent-default);
+}
+.height-handle .height-readout {
+  position: absolute;
+  top: 16px;
+  padding: 2px var(--spacing-8);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font: var(--type-numeric);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .stage-top,

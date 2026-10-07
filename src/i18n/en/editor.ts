@@ -1,5 +1,8 @@
 /** 編集画面の枠 (上の帯・下の道具・操作を探す・選択の帯・ダイアログ) */
 export const EN_EDITOR: Record<string, string> = {
+  図の高さ: 'Figure height',
+  上下にドラッグで図の高さを変えます: 'Drag up or down to change the figure height',
+  '高さ {h} px': 'Height {h} px',
   // App.tsx
   無題: 'Untitled',
   'ここにドロップ (.jdf は新しい図で開く、図入りの .jdf と {ext} は図を開く)':
