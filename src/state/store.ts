@@ -10,6 +10,7 @@ import { nucleusDefaults } from '../lib/nuclei';
 import { labReference, loadSettings, saveSettings, templateFigure, type HomeSort, type LangSetting, type Settings, type StructureTool, type StyleTemplate, type ThemeSetting } from '../lib/settings';
 import { applyTheme } from '../lib/theme';
 import { detectSignals, exclusions } from '../lib/siText';
+import { integralArea } from '../lib/integrals';
 import { findPeaks, maxInRange, noiseLevel } from '../lib/spectrum';
 import { autoPhase, finish, referenceShift, tallestPpm, transform, type FidData, type Processing, type Spectrum } from '../lib/fid';
 import { transform2d, type Fid2dData, type Processing2d, type Spectrum2dData } from '../lib/fid2d';
@@ -1063,8 +1064,12 @@ export function autoDetectSignals(layerId: string, fraction = 0.03, visibleOnly 
   const off = meta.refOffset;
   const existing = doc.integrals.filter((x) => x.layerId === layerId).map((x) => [x.from + off, x.to + off]);
   const range: [number, number] | undefined = visibleOnly ? [doc.view.xMin, doc.view.xMax] : undefined;
+  // 溶媒などの大きなピークの裾に乗った山は、範囲の両端を結ぶ直線を引くと値が 0 以下になる (裾の坂の分を引きすぎる)。
+  // 値がマイナスの積分が最初にできると基準 (= 1) になり、ほかの積分まで全部マイナスで出ていた (C6D6 の 7.15 の横の 7.12・7.04。
+  // 2026-10-08 マニュアルの画面を撮っていて見つけた)。値の出ない範囲は自動では作らない (手で引くことはできる)
+  const withBaseline = doc.figure.integralBaseline !== false;
   const regions = detectSignals(arr, meta, exclusions(doc, meta, layerId, settings), { range, minFraction: fraction }).filter(
-    ([hi, lo]) => !existing.some(([a, b]) => hi >= b && lo <= a),
+    ([hi, lo]) => !existing.some(([a, b]) => hi >= b && lo <= a) && integralArea(arr, meta, hi - off, lo - off, withBaseline) > 0,
   );
   if (!regions.length) return 0;
   edit((d) => {
