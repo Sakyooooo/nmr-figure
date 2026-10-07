@@ -1,11 +1,17 @@
 import { tr } from '../i18n';
+import { useState } from 'react';
+import type { ExperimentMeta } from '../lib/jdfMeta';
 import { experimentLabel2d } from '../lib/jdf2d';
 import { autoTitle2d, fullView2d, squareHeight } from '../lib/scene2d';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
 import { autoCrossLines, clearCrossLines, parseValues, valuesFromLibrary } from '../state/cross2d';
+import { pickSide1d } from '../state/fileOps';
+import { useLibrary } from '../state/library';
+import { attachSideFromLibrary, clearSide1d, markCrossPeaksFromSides, sideCandidates } from '../state/side2d';
 import { edit, notify, setPlot2d, setProcessing2d, setView2d, useEditor } from '../state/store';
 import type { Processing2d } from '../lib/fid2d';
+import type { Side2d, Spectrum2dMeta } from '../state/types';
 import { Check, ColorInput, NumberInput, Section, TextInput } from './inputs';
 import { RichHtml } from './RichText';
 
@@ -133,17 +139,16 @@ export function Plot2dPanel() {
             <NumberInput value={plot.lineWidth} min={0.2} max={3} step={0.1} width={52} onCommit={(v) => setPlot2d({ lineWidth: v ?? 0.6 })} />
           </label>
         </div>
-        <div className="row wrap">
-          <Check checked={plot.showProjections} onChange={(v) => setPlot2d({ showProjections: v })}>
-            {tr('上と右に投影')}
-          </Check>
-          {meta.x.nucleus === meta.y.nucleus && (
+        {meta.x.nucleus === meta.y.nucleus && (
+          <div className="row wrap">
             <Check checked={plot.showDiagonal} onChange={(v) => setPlot2d({ showDiagonal: v })}>
               {tr('対角線')}
             </Check>
-          )}
-        </div>
+          </div>
+        )}
       </Section>
+
+      <SidePanel meta={meta} />
 
       <Section
         title={tr('交点の線')}
@@ -205,6 +210,103 @@ export function Plot2dPanel() {
       </Section>
     </>
   );
+}
+
+/**
+ * 上と右のスペクトル: 2D の投影か、読み込んだ 1D (本人の希望 2026-10-07)。
+ * 同じサンプルの、マーカーを付けて保存した版 (帰属した図) を選ぶと、付けたマーカーも上・右に出る
+ */
+function SidePanel({ meta }: { meta: Spectrum2dMeta }) {
+  const show = useEditor((s) => s.doc.plot2d?.showProjections ?? false);
+  // 上と右に同じ種類のマーカーがある (¹H と ¹³C の帰属の組がある)
+  const paired = useEditor((s) => {
+    const styles = (side: Side2d) => new Set(s.doc.markers.filter((m) => m.space === '2d' && m.side === side).map((m) => m.styleId));
+    const right = styles('right');
+    return [...styles('top')].some((id) => right.has(id));
+  });
+  const rows: { sides: Side2d[]; nucleus: string; label: string }[] =
+    meta.x.nucleus === meta.y.nucleus
+      ? [{ sides: ['top', 'right'], nucleus: meta.x.nucleus, label: tr('上と右') }]
+      : [
+          { sides: ['top'], nucleus: meta.x.nucleus, label: tr('上 (横軸)') },
+          { sides: ['right'], nucleus: meta.y.nucleus, label: tr('右 (縦軸)') },
+        ];
+  return (
+    <Section
+      title={tr('上と右のスペクトル')}
+      help={tr(
+        'ふつうは 2D から作った投影を出します。同じサンプルの 1D (¹H・¹³C など) を選ぶと、その 1D を出します。マーカーを付けて保存した版 (帰属した図) を選ぶと、付けたマーカーも上・右に出ます。2D を開いたとき、帰属した版があれば自動で使います。ホーム画面で 2D と一緒に 1D を選んで開いても、上・右に使います。',
+      )}
+    >
+      <Check checked={show} onChange={(v) => setPlot2d({ showProjections: v })}>
+        {tr('上と右にスペクトルを出す')}
+      </Check>
+      {show && rows.map((r) => <SideRow key={r.label} {...r} />)}
+      {show && <p className="hint">{tr('マーカーの道具で上・右のスペクトルの山をクリックすると、そこにもマーカーを付けられます (もう一度押すと外れます)。')}</p>}
+      {show && paired && (
+        <div className="row">
+          <button
+            onClick={() => {
+              const n = markCrossPeaksFromSides();
+              notify(
+                n ? tr('クロスピーク {n} か所にマーカーを付けました', { n }) : tr('上と右の同じマーカーの組に当たるクロスピークがありませんでした (もう付いている所は飛ばします)'),
+                n ? 'info' : 'error',
+              );
+            }}
+            title={tr('上 (横軸) と右 (縦軸) に同じ種類のマーカーが付いている組で、そこにクロスピークがあれば、同じマーカーを付けます')}
+          >
+            {tr('同じマーカーのクロスピークにも付ける')}
+          </button>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function SideRow({ sides, nucleus, label }: { sides: Side2d[]; nucleus: string; label: string }) {
+  const doc = useEditor((s) => s.doc);
+  // ホーム画面の一覧が変わったら選べるものも変わる
+  useLibrary((s) => s.experiments);
+  useLibrary((s) => s.figures);
+  const [busy, setBusy] = useState(false);
+  const current = doc.plot2d?.[sides[0]] ?? null;
+  const candidates = sideCandidates(doc, nucleus);
+  const marks = current ? doc.markers.filter((m) => m.side === sides[0] && m.from1d === current.spectrumId).length : 0;
+  const choose = async (value: string) => {
+    if (value === '__current') return;
+    if (value === '') return clearSide1d(sides);
+    if (value === '__file') return pickSide1d(sides);
+    const e = candidates.find((c) => c.key === value);
+    if (!e) return;
+    setBusy(true);
+    try {
+      await attachSideFromLibrary(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <label className="field block">
+      <span>
+        {label}: <RichHtml text={nucleusRich(nucleus)} />
+      </span>
+      <select value={current ? '__current' : ''} disabled={busy} onChange={(e) => void choose(e.target.value)}>
+        <option value="">{tr('2D の投影')}</option>
+        {current && <option value="__current">{current.from}</option>}
+        {candidates.map((c) => (
+          <option key={c.key} value={c.key}>
+            {candidateLabel(c)}
+          </option>
+        ))}
+        <option value="__file">{tr('ファイルから選ぶ…')}</option>
+      </select>
+      {current && marks > 0 && <span className="hint">{tr('帰属のマーカー {n} 個', { n: marks })}</span>}
+    </label>
+  );
+}
+
+function candidateLabel(e: ExperimentMeta) {
+  return `${e.figure ? tr('編集した版') : tr('測定')} — ${e.fileName}`;
 }
 
 /** 図の高さを、プロットが正方形になるように直す */

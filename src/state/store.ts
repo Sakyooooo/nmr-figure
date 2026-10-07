@@ -23,6 +23,7 @@ import {
   emptyDocument,
   type Annotation,
   type Plot2d,
+  type Side2d,
   type MarkerShape,
   type NmrDocument,
   type Selection,
@@ -287,11 +288,12 @@ export function fullRange() {
 export function addSpectra(items: LoadedSpectrum[]) {
   if (!items.length) return;
   const { doc } = get();
-  // 2D と 1D は同じ図に混ぜない
+  // 2D と 1D は同じ図に混ぜない (2D の上・右に読み込んだ 1D も外す)
   if (doc.plot2d) {
     edit((d) => {
       d.plot2d = null;
       d.spectra2d = [];
+      d.spectra = d.spectra.filter((s) => d.layers.some((l) => l.spectrumId === s.id));
     });
   }
   const firstLoad = doc.layers.length === 0;
@@ -577,10 +579,20 @@ export function toggleMarker(layerId: string, styleId: string, ppm: number, tol:
 export function toggleMarker2d(spectrumId: string, styleId: string, x: number, y: number, tolX: number, tolY: number) {
   edit((d) => {
     const i = d.markers.findIndex(
-      (m) => m.space === '2d' && m.layerId === spectrumId && m.styleId === styleId && Math.abs(m.ppm - x) <= tolX && Math.abs((m.ppm1 ?? 0) - y) <= tolY,
+      (m) => m.space === '2d' && !m.side && m.layerId === spectrumId && m.styleId === styleId && Math.abs(m.ppm - x) <= tolX && Math.abs((m.ppm1 ?? 0) - y) <= tolY,
     );
     if (i >= 0) d.markers.splice(i, 1);
     else d.markers.push({ id: crypto.randomUUID(), layerId: spectrumId, styleId, ppm: x, ppm1: y, space: '2d' });
+    pruneStyles(d);
+  });
+}
+
+/** 2D の図の上・右のスペクトルにマーカーを付ける (同じ種類が近くにあれば外す)。ppm はその軸の表示の ppm */
+export function toggleSideMarker(spectrumId: string, side: Side2d, styleId: string, ppm: number, tol: number) {
+  edit((d) => {
+    const i = d.markers.findIndex((m) => m.space === '2d' && m.side === side && m.layerId === spectrumId && m.styleId === styleId && Math.abs(m.ppm - ppm) <= tol);
+    if (i >= 0) d.markers.splice(i, 1);
+    else d.markers.push({ id: crypto.randomUUID(), layerId: spectrumId, styleId, ppm, space: '2d', side });
     pruneStyles(d);
   });
 }

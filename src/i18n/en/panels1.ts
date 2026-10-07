@@ -191,7 +191,42 @@ export const EN_PANELS1: Record<string, string> = {
   '↑ 上げる': '↑ Raise',
   本数: 'Count',
   '1本ごとに何倍ずつ高くするか': 'Ratio between successive contours',
-  上と右に投影: 'Projections on top and right',
+  上と右のスペクトル: 'Top and right spectra',
+  'ふつうは 2D から作った投影を出します。同じサンプルの 1D (¹H・¹³C など) を選ぶと、その 1D を出します。マーカーを付けて保存した版 (帰属した図) を選ぶと、付けたマーカーも上・右に出ます。2D を開いたとき、帰属した版があれば自動で使います。ホーム画面で 2D と一緒に 1D を選んで開いても、上・右に使います。':
+    'Normally the projections of the 2D are shown. Choose a 1D of the same sample (¹H, ¹³C, etc.) to show that 1D instead. If you choose a version saved with markers (an assigned figure), its markers appear on the top/right too. When a 2D is opened, an assigned version is used automatically if there is one. Selecting 1D spectra together with the 2D on the home screen also puts them on the top/right.',
+  上と右にスペクトルを出す: 'Show spectra on top and right',
+  上と右: 'Top and right',
+  '上 (横軸)': 'Top (horizontal axis)',
+  '右 (縦軸)': 'Right (vertical axis)',
+  '2D の投影': 'Projection of the 2D',
+  'ファイルから選ぶ…': 'Choose a file…',
+  '帰属のマーカー {n} 個': '{n} assignment markers',
+  編集した版: 'Edited version',
+  'マーカーの道具で上・右のスペクトルの山をクリックすると、そこにもマーカーを付けられます (もう一度押すと外れます)。':
+    'With the marker tool, click a peak of the top/right spectrum to put a marker there too (click again to remove it).',
+  '同じマーカーのクロスピークにも付ける': 'Mark the matching cross peaks too',
+  '上 (横軸) と右 (縦軸) に同じ種類のマーカーが付いている組で、そこにクロスピークがあれば、同じマーカーを付けます':
+    'Where the same kind of marker is on the top (horizontal) and right (vertical) spectra and a cross peak is there, put the same marker on the cross peak',
+  'クロスピーク {n} か所にマーカーを付けました': 'Marked {n} cross peaks',
+  '上と右の同じマーカーの組に当たるクロスピークがありませんでした (もう付いている所は飛ばします)':
+    'No cross peaks match the same markers on the top and right (ones already marked are skipped)',
+  '編集中の 2D の上・右に使う': 'Use on the top/right of the 2D being edited',
+  上: 'top',
+  右: 'right',
+  と: ' and ',
+  '1D の図です': 'This is a 1D figure',
+  '{name} は 1D の図です。編集中の 2D の{side}に使いますか？ (付けたマーカーも出ます)':
+    '{name} is a 1D figure. Use it on the {side} of the 2D being edited? (Its markers are shown too.)',
+  '2D の{side}に使う': 'Use on the {side} of the 2D',
+  '{name}: 1D のスペクトルを選んでください': '{name}: choose a 1D spectrum',
+  '{name}: 2D の軸と核種 ({nucleus}) が違います': '{name}: the nucleus ({nucleus}) does not match the axes of the 2D',
+  '{fileName}: 2D の軸と核種 ({nucleus}) が違うので、上・右には使えません':
+    '{fileName}: the nucleus ({nucleus}) does not match the axes of the 2D, so it cannot be used on the top/right',
+  '{from} を 2D の{side}に使いました (帰属のマーカー {n} 個も)': 'Using {from} on the {side} of the 2D (with {n} assignment markers)',
+  '{from} を 2D の{side}に使いました': 'Using {from} on the {side} of the 2D',
+  スペクトルが見つかりません: 'Spectrum not found',
+  '同じサンプルの帰属した 1D を上・右に使いました ({list})。右の「上と右のスペクトル」で 2D の投影に戻せます':
+    'Using the assigned 1D spectra of the same sample on the top/right ({list}). Switch back to the projections under "Top and right spectra" on the right',
   対角線: 'Diagonal',
   '2D の処理': '2D processing',
   'COSY・HMBC などは絶対値で表示します (位相補正は要りません)。変えると計算し直します。':

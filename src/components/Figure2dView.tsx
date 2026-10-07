@@ -3,6 +3,7 @@ import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent
 import type { Spectrum2dData } from '../lib/fid2d';
 import { annotationBox, dashArray, imageRect, markerBounds, nearestAtomAt, pxToImageAnchor, type PlacedAnnotation } from '../lib/scene';
 import { buildScene2d, fullView2d, type Layout2d, type Scene2d } from '../lib/scene2d';
+import { snapToPeak } from '../lib/spectrum';
 import { drawInChemDraw } from '../state/chemdraw';
 import {
   addAnnotation,
@@ -17,11 +18,12 @@ import {
   setView2d,
   toggleAtomMarker,
   toggleMarker2d,
+  toggleSideMarker,
   updateAnnotation,
   updateFigureImage,
   useEditor,
 } from '../state/store';
-import { annotationDefaults, type Annotation, type AnnotationKind, type FigureImage, type FigureStyle } from '../state/types';
+import { annotationDefaults, type Annotation, type AnnotationKind, type FigureImage, type FigureStyle, type Side2d } from '../state/types';
 import { AnnotationShape, LegendBox, MarkerGlyphs } from './FigureContent';
 import { constrain, ImageHits, MarkerHits, MarkerSelection, resizePoints, type Handle } from './FigureView';
 import { FigureImages } from './FigureImages';
@@ -190,9 +192,11 @@ function snapPeak2d(s: Spectrum2dData, x: number, y: number, winC: number, winR:
 export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement | null> }) {
   const doc = useEditor((s) => s.doc);
   const data2d = useEditor((s) => s.data2d);
+  /** 上・右に読み込んだ 1D のデータ */
+  const data1d = useEditor((s) => s.data);
   const tool = useEditor((s) => s.tool);
   const selection = useEditor((s) => s.selection);
-  const scene = useMemo(() => buildScene2d(doc, doc.plot2d ? data2d[doc.plot2d.spectrumId] : undefined), [doc, data2d]);
+  const scene = useMemo(() => buildScene2d(doc, doc.plot2d ? data2d[doc.plot2d.spectrumId] : undefined, data1d), [doc, data2d, data1d]);
   const gesture = useRef<Gesture | null>(null);
   const [draft, setDraft] = useState<Gesture | null>(null);
   if (!scene) return null;
@@ -238,6 +242,35 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       span(14, layout.plot.w, view.xMax - view.xMin, Math.abs(data.first2 - data.last2), data.n2),
       span(14, layout.plot.h, view.yMax - view.yMin, Math.abs(data.first1 - data.last1), data.n1),
     );
+  };
+  /** その場所が上・右の帯 (スペクトル) なら、どちらか */
+  const sideAt = (x: number, y: number): Side2d | null => {
+    const { plot, topBand, rightBand } = layout;
+    if (topBand && x >= plot.x && x <= plot.x + plot.w && y < plot.y - 2) return 'top';
+    if (rightBand && y >= plot.y && y <= plot.y + plot.h && x > plot.x + plot.w + 2) return 'right';
+    return null;
+  };
+  /** 帯のクリックした所のまわり (±8 px。1D の図と同じ) で、いちばん高い山の ppm。読み込んだ 1D なら、点の細かさで頂上に合わせる */
+  const sidePeak = (side: Side2d, pos: number) => {
+    const band = side === 'top' ? layout.topBand! : layout.rightBand!;
+    const trace = side === 'top' ? scene.top : scene.right;
+    const start = side === 'top' ? band.x : band.y;
+    const toPpm = side === 'top' ? layout.pxToX : layout.pxToY;
+    const c0 = Math.round(pos - start);
+    let best = c0;
+    if (trace) {
+      const lo = Math.max(0, c0 - 8);
+      const hi = Math.min(trace.levels.length - 1, c0 + 8);
+      best = Math.min(hi, Math.max(lo, c0));
+      for (let c = lo; c <= hi; c++) if (trace.levels[c] > trace.levels[best]) best = c;
+    }
+    let ppm = toPpm(start + best + 0.5);
+    const s1 = doc.plot2d?.[side];
+    const meta = s1 && doc.spectra.find((s) => s.id === s1.spectrumId);
+    const values = meta && data1d[meta.id];
+    const peak = meta && values ? snapToPeak(values, meta, ppm, Math.abs(toPpm(start) - toPpm(start + 2))) : null;
+    if (peak) ppm = peak.ppm;
+    return ppm;
   };
   const add = (kind: AnnotationKind, p: { x: number; y: number }, q: { x: number; y: number }, extra: Partial<Annotation> = {}) =>
     addAnnotation({ ...annotationDefaults(kind), layerId: scene.meta.id, space: '2d', x1: p.x, y1: p.y, x2: q.x, y2: q.y, ...extra });
@@ -314,6 +347,13 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
         const atom = nearestAtomAt(image, x, y, layout);
         if (atom) toggleAtomMarker(image.id, atom, styleId);
         else notify(tr('原子の近くをクリックしてください'), 'info');
+        return;
+      }
+      // 上・右のスペクトル: いちばん近い山の上に付ける (同じ種類がもう付いていれば外す)
+      const side = sideAt(x, y);
+      if (side) {
+        const tol = side === 'top' ? (Math.abs(view.xMax - view.xMin) * 8) / layout.plot.w : (Math.abs(view.yMax - view.yMin) * 8) / layout.plot.h;
+        toggleSideMarker(scene.meta.id, side, styleId, sidePeak(side, side === 'top' ? x : y), tol);
         return;
       }
       // 等高線の上: いちばん近いクロスピークに付ける (同じ種類がもう付いていれば外す)
@@ -443,7 +483,7 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
   /** 文字・丸・四角を構造式の上へ動かしたら構造式に、外へ出したら等高線に固定し直す (見た目の位置は変えない。1D の図と同じ) */
   const reanchor = (id: string) => {
     const state = useEditor.getState();
-    const now = buildScene2d(state.doc, state.doc.plot2d ? state.data2d[state.doc.plot2d.spectrumId] : undefined)?.annotations.find((p) => p.a.id === id);
+    const now = buildScene2d(state.doc, state.doc.plot2d ? state.data2d[state.doc.plot2d.spectrumId] : undefined, state.data)?.annotations.find((p) => p.a.id === id);
     if (!now || now.a.kind === 'line' || now.a.kind === 'arrow' || now.a.kind === 'cross') return;
     const box = annotationBox(now);
     const an = anchorAt(box.x + box.w / 2, box.y + box.h / 2);

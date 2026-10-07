@@ -22,8 +22,9 @@ import {
   useLibrary,
 } from './library';
 import { jdfHandle, registerJdfHandle } from './deltaSync';
+import { applySide, attachSideFromLibrary, autoSides, sideFromFile, sideLabel, sidesFor } from './side2d';
 import { addSpectra, addSpectrum2d, edit, loadDocument, markSaved, notify, useEditor, type FileHandle } from './store';
-import { emptyDocument, type SpectrumMeta } from './types';
+import { emptyDocument, type Side2d, type SpectrumMeta } from './types';
 import { saveWordFigure } from './wordFigure';
 
 type PickerOptions = {
@@ -79,9 +80,17 @@ async function confirmDiscard(): Promise<boolean> {
 export async function openFiles(files: { file: File; handle?: FileHandle }[], mode: 'add' | 'new' = 'add') {
   const spectra: LoadedSpectrum[] = [];
   let cleared = false;
+  /** 2D を開いた / 1D を 2D の上・右に使った */
+  let opened2d = false;
+  let attached = false;
   for (const { file, handle } of files) {
     const name = file.name.toLowerCase();
     try {
+      // 2D の図 (編集中のもの・一緒に開いたもの) に 1D (測定・図) を足したとき: 核種が合えば上・右に使う (帰属のマーカーも)
+      if ((mode === 'add' || opened2d) && useEditor.getState().doc.plot2d && (await attachSideFile(file))) {
+        attached = true;
+        continue;
+      }
       if (name.endsWith(PROJECT_EXT)) {
         if (!(await confirmDiscard())) continue;
         const { doc, data, fids, fids2d, data2d } = parseProject(await file.text());
@@ -110,6 +119,17 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         if (is2d(buffer)) {
           addSpectrum2d(readJdf2d(buffer, file.name));
           notify(tr('{name} (2D) を開きました', { name: file.name }));
+          opened2d = true;
+          // 先に読んだ 1D は、核種が合えば上・右に使う (2D と 1D は重ねない)
+          for (const s of spectra.splice(0)) {
+            const sides = sidesFor(useEditor.getState().doc, s.meta.nucleus);
+            if (!sides.length) {
+              notify(tr('{fileName}: 2D の軸と核種 ({nucleus}) が違うので、上・右には使えません', { fileName: s.meta.fileName, nucleus: s.meta.nucleus }), 'error');
+              continue;
+            }
+            applySide(sides, { meta: s.meta, data: s.data, from: s.meta.fileName, marks: [], figure: false });
+            attached = true;
+          }
           continue;
         }
         spectra.push(readJdf(buffer, file.name, readOptions()));
@@ -132,6 +152,63 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
     notify(tr('{join} を読み込みました', { join: spectra.map((s) => s.meta.fileName).join(', ') }));
     useEditor.setState({ screen: 'editor' });
   }
+  // 2D だけを開いたとき: 同じサンプルの帰属した 1D があれば上・右に使う
+  if (opened2d && !attached && useEditor.getState().doc.plot2d) await autoSides();
+}
+
+/**
+ * 2D の図を編集中に開いた 1D を、核種の合う側 (上・右) に使う。使った (やめた) ら true。
+ * 2D・核種の違うもの・「図として開く」を選んだものは false (今まで通りに開く)
+ */
+async function attachSideFile(file: File): Promise<boolean> {
+  let src;
+  try {
+    src = await sideFromFile(file);
+  } catch {
+    return false;
+  }
+  const sides = src ? sidesFor(useEditor.getState().doc, src.meta.nucleus) : [];
+  if (!src || !sides.length) return false;
+  if (src.figure) {
+    const side = sides.map(sideLabel).join(tr('と'));
+    const choice = await ask(tr('1D の図です'), tr('{name} は 1D の図です。編集中の 2D の{side}に使いますか？ (付けたマーカーも出ます)', { name: file.name, side }), [
+      { label: tr('図として開く'), value: 'open' },
+      { label: tr('2D の{side}に使う', { side }), value: 'side', kind: 'primary' },
+    ]);
+    if (choice === 'open') return false;
+    if (choice !== 'side') return true;
+  }
+  applySide(sides, src);
+  return true;
+}
+
+/** 2D の上・右に使う 1D をファイルから選ぶ (.jdf・図入りの .jdf・.nmrfig) */
+export async function pickSide1d(sides: Side2d[]) {
+  const use = async (file: File) => {
+    try {
+      const src = await sideFromFile(file);
+      if (!src) return notify(tr('{name}: 1D のスペクトルを選んでください', { name: file.name }), 'error');
+      const ok = sidesFor(useEditor.getState().doc, src.meta.nucleus);
+      if (!sides.every((s) => ok.includes(s))) return notify(tr('{name}: 2D の軸と核種 ({nucleus}) が違います', { name: file.name, nucleus: src.meta.nucleus }), 'error');
+      applySide(sides, src);
+    } catch (e) {
+      notify(e instanceof JdfError ? e.message : `${file.name}: ${(e as Error).message}`, 'error');
+    }
+  };
+  if (fsWindow.showOpenFilePicker) {
+    try {
+      const [h] = await fsWindow.showOpenFilePicker({ multiple: false, types: localized(OPEN_TYPES) });
+      if (h) await use(await h.getFile());
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') notify((e as Error).message, 'error');
+    }
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = `.jdf,${PROJECT_EXT}`;
+  input.onchange = () => input.files?.[0] && void use(input.files[0]);
+  input.click();
 }
 
 /** .jdf のヘッダーだけ見て 2D かどうか調べる (13 バイト目が次元の数) */
@@ -217,6 +294,31 @@ export async function openExperiments(keys: string[], mode: 'new' | 'add') {
     notify(tr('選んだ実験は開けません'), 'error');
     return;
   }
+  // 編集中の 2D に 1D を足す: 核種の合う側 (上・右) に使う。編集した版なら、付けたマーカー (帰属) も
+  if (mode === 'add' && useEditor.getState().doc.plot2d && metas.every((m) => m.dimension === 1)) {
+    useLibrary.setState({ selected: [] });
+    for (const m of metas) await attachSideFromLibrary(m);
+    useEditor.setState({ screen: 'editor' });
+    return;
+  }
+  // 2D は 1つの図に 1本。一緒に選んだ 1D (編集した版も) は、核種の合う側 (上・右) に使う
+  const two = metas.find((m) => m.dimension >= 2 && !m.figure);
+  if (two && !metas.some((m) => m.figure && m.dimension >= 2)) {
+    const ones = metas.filter((m) => m.dimension === 1);
+    if (metas.length > ones.length + 1) notify(tr('{fileName} (2D) だけを開きます。2D はほかのスペクトルと重ねられません', { fileName: two.fileName }));
+    if (!(await confirmDiscard())) return;
+    try {
+      addSpectrum2d(await load2dExperiment(two.key));
+      useLibrary.setState({ selected: [] });
+    } catch (e) {
+      notify(e instanceof JdfError ? e.message : `${two.fileName}: ${(e as Error).message}`, 'error');
+      return;
+    }
+    // 1D を選んでいなければ、同じサンプルの帰属した 1D を探して使う
+    if (ones.length) for (const m of ones) await attachSideFromLibrary(m);
+    else await autoSides();
+    return;
+  }
   // このソフトで編集して保存した版 (図) は、図ごと開く (ほかの測定とは重ねない)
   const figure = metas.find((m) => m.figure);
   if (figure) {
@@ -227,19 +329,6 @@ export async function openExperiments(keys: string[], mode: 'new' | 'add') {
       else await openFiles([await figureFileOf(figure.key)], mode);
     } catch (e) {
       notify(`${figure.fileName}: ${(e as Error).message}`, 'error');
-    }
-    return;
-  }
-  // 2D は 1つの図に 1本 (1D と混ぜない)
-  const two = metas.find((m) => m.dimension >= 2);
-  if (two) {
-    if (metas.length > 1) notify(tr('{fileName} (2D) だけを開きます。2D はほかのスペクトルと重ねられません', { fileName: two.fileName }));
-    if (!(await confirmDiscard())) return;
-    try {
-      addSpectrum2d(await load2dExperiment(two.key));
-      useLibrary.setState({ selected: [] });
-    } catch (e) {
-      notify(e instanceof JdfError ? e.message : `${two.fileName}: ${(e as Error).message}`, 'error');
     }
     return;
   }
@@ -353,7 +442,8 @@ export async function openSavedFigure(id: string) {
 export function defaultProjectName() {
   const { doc, projectName } = useEditor.getState();
   if (projectName) return baseName(projectName) + PROJECT_EXT;
-  const first = doc.spectra[0]?.fileName ?? doc.spectra2d[0]?.fileName;
+  // 2D の図は 2D の名前 (上・右に読み込んだ 1D の名前にしない)
+  const first = doc.plot2d ? doc.spectra2d[0]?.fileName : doc.spectra[0]?.fileName;
   return (first ? baseName(first) : 'figure') + PROJECT_EXT;
 }
 

@@ -4,6 +4,7 @@ import type { ExperimentMeta } from '../lib/jdfMeta';
 import { nucleusRich } from '../lib/nuclei';
 import { solventInfo } from '../lib/solvents';
 import { openDialog, openExperiments, openSavedFigure, readOptions } from '../state/fileOps';
+import { sidesFor } from '../state/side2d';
 import {
   NUCLEUS_FILTERS,
   canOpen,
@@ -566,6 +567,8 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
   const sampleKey = sampleKeyOf(e);
   const note = useLibrary((s) => s.notes[sampleKey]);
   const hasDoc = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
+  /** 編集中の 2D の上・右に使える 1D (核種が軸と合う。編集した版なら付けたマーカーも出る) */
+  const side2d = useEditor((s) => (e.dimension === 1 ? sidesFor(s.doc, e.nuclei[0] ?? '').join(',') : ''));
   const selecting = useLibrary((s) => s.selected.length > 0);
   const openable = canOpen(e);
   const choose = (key: string) =>
@@ -622,9 +625,9 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
         <button className={`btn${selecting ? '' : ' primary'}`} disabled={!openable} onClick={() => void openExperiments([e.key], 'new')}>
           {e.figure ? tr('この図を開く') : tr('この実験を開く')}
         </button>
-        {hasDoc && !e.savedFigureId && (
+        {hasDoc && (!e.savedFigureId || side2d) && (
           <button className="btn" disabled={!openable} onClick={() => void openExperiments([e.key], 'add')}>
-            {tr('編集中の図に追加')}
+            {side2d ? tr('編集中の 2D の上・右に使う') : tr('編集中の図に追加')}
           </button>
         )}
         {e.savedFigureId && (

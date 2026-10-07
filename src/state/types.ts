@@ -141,7 +141,8 @@ export interface MarkerStyle {
 /** ppm はすべて基準合わせ前の値。表示位置は ppm + refOffset */
 /**
  * マーカー。ピークに付けるもの (layerId と ppm) と、構造式の原子に付けるもの (帰属。imageId と atomId、layerId は空) と、
- * 2D の図のクロスピークに付けるもの (space = '2d'、layerId は 2D のスペクトル、ppm は横軸 F2・ppm1 は縦軸 F1) がある
+ * 2D の図のクロスピークに付けるもの (space = '2d'、layerId は 2D のスペクトル、ppm は横軸 F2・ppm1 は縦軸 F1) と、
+ * 2D の図の上・右のスペクトルに付けるもの (space = '2d' と side、ppm はその軸の表示の ppm) がある
  */
 export interface Marker {
   id: string;
@@ -154,6 +155,10 @@ export interface Marker {
   /** 2D の図のクロスピークに付けたとき */
   space?: '2d';
   ppm1?: number;
+  /** 2D の図の上・右のスペクトルに付けたとき (本人の希望 2026-10-07) */
+  side?: Side2d;
+  /** 上・右に読み込んだ 1D の帰属から持ってきたもの: その 1D (doc.spectra) の id。1D を替える・外すと一緒に外す */
+  from1d?: string;
   /** 置いた位置からのずれ (図の座標)。ドラッグ・矢印キーで少しずらしたとき (本人の希望 2026-10-07) */
   dx?: number;
   dy?: number;
@@ -312,6 +317,16 @@ export interface Spectrum2dMeta {
   processing: Processing2d;
 }
 
+export type Side2d = 'top' | 'right';
+
+/** 2D の図の上・右に出す 1D (2D の投影の代わり) */
+export interface Side1d {
+  /** doc.spectra の 1D (図には重ねない。上・右に描くだけ) */
+  spectrumId: string;
+  /** 読み込んだもの (編集した版ならその図の名前、測定ならファイル名) */
+  from: string;
+}
+
 /** 2D の等高線の描き方と表示範囲 */
 export interface Plot2d {
   spectrumId: string;
@@ -327,6 +342,12 @@ export interface Plot2d {
   showDiagonal: boolean;
   /** 上と右の 1D 投影 */
   showProjections: boolean;
+  /**
+   * 上・右に 1D のスペクトルを使う (無ければ 2D の投影)。同じサンプルの帰属した ¹H・¹³C を読み込むと、
+   * そのマーカーも上・右に出る (本人の希望 2026-10-07)
+   */
+  top?: Side1d | null;
+  right?: Side1d | null;
   /** 交点の線を自動で引くときの、縦軸 (F1) の値の一覧 (¹³C の SI の文など。図と一緒に残す) */
   crossValues?: string;
   view: { xMax: number; xMin: number; yMax: number; yMin: number };
