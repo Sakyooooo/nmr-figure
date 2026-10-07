@@ -572,6 +572,45 @@ export function toggleMarker(layerId: string, styleId: string, ppm: number, tol:
 }
 
 /**
+ * 2D の図のクロスピークにマーカーを付ける (同じ種類が近くにあれば外す)。x = 横軸 (F2)・y = 縦軸 (F1) の ppm、tol はそれぞれの許容幅
+ */
+export function toggleMarker2d(spectrumId: string, styleId: string, x: number, y: number, tolX: number, tolY: number) {
+  edit((d) => {
+    const i = d.markers.findIndex(
+      (m) => m.space === '2d' && m.layerId === spectrumId && m.styleId === styleId && Math.abs(m.ppm - x) <= tolX && Math.abs((m.ppm1 ?? 0) - y) <= tolY,
+    );
+    if (i >= 0) d.markers.splice(i, 1);
+    else d.markers.push({ id: crypto.randomUUID(), layerId: spectrumId, styleId, ppm: x, ppm1: y, space: '2d' });
+    pruneStyles(d);
+  });
+}
+
+/** マーカーを置いた位置からずらす (図の座標)。record = false はドラッグの途中 */
+export function setMarkerOffset(id: string, dx: number, dy: number, record = true) {
+  edit((d) => {
+    const m = d.markers.find((x) => x.id === id);
+    if (!m) return;
+    const r = (v: number) => Math.round(v * 10) / 10;
+    if (r(dx) || r(dy)) {
+      m.dx = r(dx);
+      m.dy = r(dy);
+    } else {
+      delete m.dx;
+      delete m.dy;
+    }
+  }, record);
+}
+
+/** 矢印キーでマーカーを px ずつずらす */
+export function nudgeMarker(id: string, key: string, px: number) {
+  const m = get().doc.markers.find((x) => x.id === id);
+  if (!m) return;
+  const dx = (key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0) * px;
+  const dy = (key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0) * px;
+  setMarkerOffset(id, (m.dx ?? 0) + dx, (m.dy ?? 0) + dy);
+}
+
+/**
  * 構造式の原子にマーカーを付ける (帰属)。1 つの原子に 1 つだけ: 同じ種類なら外し、違う種類なら付け替える
  */
 export function toggleAtomMarker(imageId: string, atomId: string, styleId: string) {

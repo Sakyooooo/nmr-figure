@@ -1,9 +1,8 @@
 import { tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { cdxmlAtomSites, drawCdxml } from '../lib/cdxml';
 import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
-import { annotationBox, buildScene, pxToImageAnchor, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { annotationBox, buildScene, markerBounds, nearestAtomAt, pxToImageAnchor, type PlacedAnnotation, type PlacedMarker, type Scene } from '../lib/scene';
 import { snapToPeak } from '../lib/spectrum';
 import {
   editAnnotationText,
@@ -19,6 +18,7 @@ import {
   pointSpacing,
   select,
   setLayerScale,
+  setMarkerOffset,
   setTool,
   setView,
   toggleMarker,
@@ -62,6 +62,8 @@ type Gesture =
   | { type: 'legendResize'; y0: number; h0: number; fs0: number; token: number }
   /** 選んだマーカーの右下のつまみ: 図のマーカー全部 (凡例の印も) の大きさを変える。中心から離れたぶんだけ半径を大きく */
   | { type: 'markerResize'; cx: number; cy: number; d0: number; s0: number; token: number }
+  /** マーカーをつかんで、置いた位置から少しずらす */
+  | { type: 'markerMove'; id: string; x0: number; y0: number; dx0: number; dy0: number; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
   | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
 
@@ -114,18 +116,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
   };
 
   /** 構造式のクリックした所にいちばん近い原子 (結合の長さの半分より遠ければ null) */
-  const nearestAtom = (image: NmrDocument['figureImages'][number], x: number, y: number) => {
-    const box = image.cdxml ? drawCdxml(image.cdxml, 1)?.box : null;
-    if (!image.cdxml || !box) return null;
-    const r = imageRect(image, layout);
-    const k = r.w / (box.r - box.l);
-    let best: { id: string; d: number } | null = null;
-    for (const s of cdxmlAtomSites(image.cdxml)) {
-      const d = Math.hypot(r.x + (s.x - box.l) * k - x, r.y + (s.y - box.t) * k - y);
-      if (!best || d < best.d) best = { id: s.id, d };
-    }
-    return best && best.d <= Math.max(8, 7.5 * k) ? best.id : null;
-  };
+  const nearestAtom = (image: NmrDocument['figureImages'][number], x: number, y: number) => nearestAtomAt(image, x, y, layout);
 
   /** その場所にある構造式・画像 (後から置いたものが上) */
   const imageAt = (x: number, y: number) => {
@@ -199,11 +190,21 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
         const m = scene.markers.find((k) => k.id === hitId);
         if (!m) return;
         select({ kind: 'marker', id: hitId });
-        gesture.current = { type: 'markerResize', cx: m.x, cy: m.y, d0: Math.max(4, Math.hypot(x - m.x, y - m.y)), s0: doc.figure.markerSize, token: beginGesture() };
+        const c = markerBounds(m.style.shape, m.x, m.y, doc.figure.markerSize);
+        gesture.current = { type: 'markerResize', cx: c.cx, cy: c.cy, d0: Math.max(4, Math.hypot(x - c.cx, y - c.cy)), s0: doc.figure.markerSize, token: beginGesture() };
         capture();
         return;
       }
-      if (hitKind === 'marker' || hitKind === 'peakLabel' || hitKind === 'integral') {
+      if (hitKind === 'marker') {
+        // つかんで動かすと、置いた位置から少しずらせる
+        const m = doc.markers.find((k) => k.id === hitId);
+        if (!m) return;
+        select({ kind: 'marker', id: hitId });
+        gesture.current = { type: 'markerMove', id: hitId, x0: x, y0: y, dx0: m.dx ?? 0, dy0: m.dy ?? 0, token: beginGesture() };
+        capture();
+        return;
+      }
+      if (hitKind === 'peakLabel' || hitKind === 'integral') {
         select({ kind: hitKind, id: hitId });
         return;
       }
@@ -437,6 +438,10 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
           }, false);
         break;
       }
+      case 'markerMove': {
+        setMarkerOffset(cur.id, cur.dx0 + x - cur.x0, cur.dy0 + y - cur.y0, false);
+        break;
+      }
       case 'markerResize': {
         // つまみは中心から半径の所にあるので、指が中心から離れたぶんだけ半径 (大きさの半分) を大きくする (つまみが指に付いてくる)
         const size = Math.round(Math.min(30, Math.max(3, cur.s0 + 2 * (Math.hypot(x - cur.cx, y - cur.cy) - cur.d0))));
@@ -500,6 +505,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       cur.type === 'legend' ||
       cur.type === 'legendResize' ||
       cur.type === 'markerResize' ||
+      cur.type === 'markerMove' ||
       cur.type === 'imageMove' ||
       cur.type === 'imageResize'
     ) {
@@ -561,7 +567,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       {(doc.trend.showOnSpectrum || tool === 'region') && <RegionBands scene={scene} doc={doc} />}
       <FigureContent scene={scene} figure={doc.figure} images={doc.figureImages ?? []} />
       {tool === 'select' && <ImageHits images={doc.figureImages ?? []} figure={layout} />}
-      {tool === 'select' && <HitLayer scene={scene} />}
+      {tool === 'select' && <HitLayer scene={scene} markerSize={doc.figure.markerSize} />}
       {(tool === 'select' || tool === 'integral') && <IntegralHits scene={scene} />}
       {(tool === 'peak' || tool === 'select') && <PeakLabelHits scene={scene} />}
       <SelectionOverlay scene={scene} selected={selected} doc={doc} />
@@ -626,6 +632,31 @@ export function resizePoints(orig: PlacedAnnotation, handle: Handle, x: number, 
   return { p1: { px: left, py: top }, p2: { px: right, py: bottom } };
 }
 
+/** マーカーをつかむ所 (形の真ん中に、形より少し大きく。小さいマーカーでも 7 px)。2D の図でも使う */
+export function MarkerHits({ markers, size }: { markers: PlacedMarker[]; size: number }) {
+  return (
+    <>
+      {markers.map((m) => {
+        const c = markerBounds(m.style.shape, m.x, m.y, size);
+        return <circle key={m.id} data-hit={`marker:${m.id}`} cx={c.cx} cy={c.cy} r={Math.max(7, c.r + 3)} fill="transparent" className="hit move" />;
+      })}
+    </>
+  );
+}
+
+/** 選んだマーカーの枠 (形の真ん中に合わせる) と、右下の大きさのつまみ。2D の図でも使う */
+export function MarkerSelection({ m, size, tool }: { m: PlacedMarker; size: number; tool: string }) {
+  const c = markerBounds(m.style.shape, m.x, m.y, size);
+  const r = c.r + 4;
+  return (
+    <g data-ui="sel">
+      <circle cx={c.cx} cy={c.cy} r={r} className="sel-outline" />
+      {/* 右下のつまみで大きさ (図のマーカー全部・凡例の印も) を変える */}
+      {tool === 'select' && <rect data-hit={`markerHandle:${m.id}`} x={c.cx + r * 0.71 - 4} y={c.cy + r * 0.71 - 4} width={8} height={8} className="handle handle-se" />}
+    </g>
+  );
+}
+
 /** 選択ツールのときだけ出す、クリック判定用の透明な図形 */
 /** 構造式・画像をつかむ場所 (本体と、右下の角)。2D の図でも使う */
 export function ImageHits({ images, figure }: { images: NmrDocument['figureImages']; figure: { width: number; height: number } }) {
@@ -651,7 +682,7 @@ export function ImageHits({ images, figure }: { images: NmrDocument['figureImage
   );
 }
 
-function HitLayer({ scene }: { scene: Scene }) {
+function HitLayer({ scene, markerSize }: { scene: Scene; markerSize: number }) {
   return (
     <g data-ui="hit">
       {scene.annotations.map((pa) => {
@@ -681,9 +712,7 @@ function HitLayer({ scene }: { scene: Scene }) {
           <rect key={a.id} data-hit={hit} x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" stroke="transparent" strokeWidth={10} className="hit" />
         );
       })}
-      {scene.markers.map((m) => (
-        <circle key={m.id} data-hit={`marker:${m.id}`} cx={m.x} cy={m.y} r={7} fill="transparent" className="hit" />
-      ))}
+      <MarkerHits markers={scene.markers} size={markerSize} />
       {scene.legend && (
         <rect
           data-hit="legend:legend"
@@ -754,15 +783,7 @@ function SelectionOverlay({ scene, selected, doc }: { scene: Scene; selected?: P
   }
   if (selection.kind === 'marker') {
     const m = scene.markers.find((x) => x.id === selection.id);
-    if (!m) return null;
-    const r = doc.figure.markerSize / 2 + 4;
-    return (
-      <g data-ui="sel">
-        <circle cx={m.x} cy={m.y} r={r} className="sel-outline" />
-        {/* 右下のつまみで大きさ (図のマーカー全部・凡例の印も) を変える */}
-        {tool === 'select' && <rect data-hit={`markerHandle:${m.id}`} x={m.x + r * 0.71 - 4} y={m.y + r * 0.71 - 4} width={8} height={8} className="handle handle-se" />}
-      </g>
-    );
+    return m ? <MarkerSelection m={m} size={doc.figure.markerSize} tool={tool} /> : null;
   }
   if (selection.kind === 'peakLabel') {
     const p = scene.peakLabels.find((x) => x.id === selection.id);

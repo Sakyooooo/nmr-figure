@@ -5,6 +5,7 @@ import {
   openStructureEditor,
   pasteAnnotation,
   reorderAnnotation,
+  setMarkerOffset,
   updateAnnotation,
   updateFigureImage,
   useEditor,
@@ -60,6 +61,10 @@ export function PropertiesPanel({ only }: { only?: 'analysis' | 'figure' }) {
               />
             </label>
             <p className="hint">{tr('図のマーカー全部 (凡例の印も) がこの大きさになります。選んだマーカーの右下の四角をドラッグしても変えられます。')}</p>
+            <p className="hint">{tr('マーカーをドラッグするか、矢印キー (Shift で大きく) で、置いた位置から少しずらせます。')}</p>
+            {marker && (marker.dx || marker.dy) ? (
+              <button onClick={() => setMarkerOffset(marker.id, 0, 0)}>{tr('位置を戻す')}</button>
+            ) : null}
           </>
         )}
         <button className="danger" onClick={deleteSelection}>

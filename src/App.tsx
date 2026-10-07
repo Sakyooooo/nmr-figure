@@ -31,6 +31,7 @@ import {
   deleteSelection,
   fitY,
   fullRange,
+  nudgeMarker,
   openSiImport,
   pasteAnnotation,
   redo,
@@ -346,7 +347,8 @@ function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: numbe
         return;
       }
       const { doc, selection, canvasTab } = useEditor.getState();
-      if (!doc.layers.length) return;
+      // 2D の図はスペクトルの一覧 (layers) が空なので、plot2d も見る (見ていなかったので、2D では元に戻す・削除・矢印キーなどが効かなかった)
+      if (!doc.layers.length && !doc.plot2d) return;
 
       if (ctrl && key === 'z') {
         e.preventDefault();
@@ -381,6 +383,10 @@ function useKeyboard(svgRef: RefObject<SVGSVGElement | null>, figureWidth: numbe
       } else if (e.key.startsWith('Arrow') && selection?.kind === 'annotation') {
         e.preventDefault();
         nudge(selection.id, e.key, e.shiftKey ? 10 : 1);
+      } else if (e.key.startsWith('Arrow') && selection?.kind === 'marker') {
+        // マーカーは置いた位置から少しずらす (1 px、Shift で 5 px)
+        e.preventDefault();
+        nudgeMarker(selection.id, e.key, e.shiftKey ? 5 : 1);
       } else if (!ctrl && !e.altKey) {
         if (key === 'f') {
           if (!doc.plot2d) fitY();

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { arrowHead, dashArray, legendGlyphSize, markerPath, type PlacedAnnotation, type Scene } from '../lib/scene';
+import { arrowHead, dashArray, legendGlyphSize, markerPath, type PlacedAnnotation, type PlacedLegend, type PlacedMarker, type Scene } from '../lib/scene';
 import { simulatedWord } from '../lib/simulate';
 import { tracePath } from '../lib/tracePath';
 import type { FigureImage, FigureStyle } from '../state/types';
@@ -7,6 +7,41 @@ import { FigureImages } from './FigureImages';
 import { RichSvgText } from './RichText';
 
 const INK = '#000000';
+
+/** マーカー (1D・2D の図で共通) */
+export function MarkerGlyphs({ markers, figure }: { markers: PlacedMarker[]; figure: FigureStyle }) {
+  return (
+    <>
+      {markers.map((m) => (
+        <path
+          key={m.id}
+          d={markerPath(m.style.shape, m.x, m.y, figure.markerSize)}
+          fill={m.style.color}
+          // 構造式の原子に付けたもの (「ChemDraw で開く」では ChemDraw の図形にする)
+          data-atom-marker={m.imageId}
+        />
+      ))}
+    </>
+  );
+}
+
+/** 凡例 (1D・2D の図で共通) */
+export function LegendBox({ legend, figure }: { legend: PlacedLegend; figure: FigureStyle }) {
+  const glyph = legendGlyphSize(figure);
+  return (
+    <g>
+      {legend.rows.map((s, i) => {
+        const cy = legend.y + legend.rowH * (i + 0.5) + 2;
+        return (
+          <g key={s.id}>
+            <path d={markerPath(s.shape, legend.x + glyph / 2 + 2, cy, glyph)} fill={s.color} />
+            <RichSvgText text={s.name} x={legend.x + glyph + 10} y={cy + figure.legendFontSize * 0.35} fontSize={figure.legendFontSize} fill={INK} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 
 /** 書き出しにもそのまま使う図の本体。操作用の要素はここに入れない */
 export const FigureContent = memo(function FigureContent({
@@ -122,34 +157,8 @@ export const FigureContent = memo(function FigureContent({
       ))}
 
       {/* マーカーと凡例 */}
-      {scene.markers.map((m) => (
-        <path
-          key={m.id}
-          d={markerPath(m.style.shape, m.x, m.y, figure.markerSize)}
-          fill={m.style.color}
-          // 構造式の原子に付けたもの (「ChemDraw で開く」では ChemDraw の図形にする)
-          data-atom-marker={m.imageId}
-        />
-      ))}
-      {scene.legend && (
-        <g>
-          {scene.legend.rows.map((s, i) => {
-            const cy = scene.legend!.y + scene.legend!.rowH * (i + 0.5) + 2;
-            return (
-              <g key={s.id}>
-                <path d={markerPath(s.shape, scene.legend!.x + legendGlyphSize(figure) / 2 + 2, cy, legendGlyphSize(figure))} fill={s.color} />
-                <RichSvgText
-                  text={s.name}
-                  x={scene.legend!.x + legendGlyphSize(figure) + 10}
-                  y={cy + figure.legendFontSize * 0.35}
-                  fontSize={figure.legendFontSize}
-                  fill={INK}
-                />
-              </g>
-            );
-          })}
-        </g>
-      )}
+      <MarkerGlyphs markers={scene.markers} figure={figure} />
+      {scene.legend && <LegendBox legend={scene.legend} figure={figure} />}
 
       {scene.annotations.map((pa) =>
         // 構造式に固定した印は data-mark-of を付ける (「ChemDraw で開く」では ChemDraw の文字にする)

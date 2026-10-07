@@ -1,24 +1,29 @@
 import { tr } from '../i18n';
 import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Spectrum2dData } from '../lib/fid2d';
-import { annotationBox, dashArray, imageRect, pxToImageAnchor, type PlacedAnnotation } from '../lib/scene';
+import { annotationBox, dashArray, imageRect, markerBounds, nearestAtomAt, pxToImageAnchor, type PlacedAnnotation } from '../lib/scene';
 import { buildScene2d, fullView2d, type Layout2d, type Scene2d } from '../lib/scene2d';
 import { drawInChemDraw } from '../state/chemdraw';
 import {
   addAnnotation,
   beginGesture,
+  edit,
   editAnnotationText,
   endGesture,
+  notify,
   openStructureEditor,
   select,
+  setMarkerOffset,
   setView2d,
+  toggleAtomMarker,
+  toggleMarker2d,
   updateAnnotation,
   updateFigureImage,
   useEditor,
 } from '../state/store';
 import { annotationDefaults, type Annotation, type AnnotationKind, type FigureImage, type FigureStyle } from '../state/types';
-import { AnnotationShape } from './FigureContent';
-import { constrain, ImageHits, resizePoints, type Handle } from './FigureView';
+import { AnnotationShape, LegendBox, MarkerGlyphs } from './FigureContent';
+import { constrain, ImageHits, MarkerHits, MarkerSelection, resizePoints, type Handle } from './FigureView';
 import { FigureImages } from './FigureImages';
 import { RichSvgText } from './RichText';
 
@@ -86,6 +91,10 @@ export const Figure2dContent = memo(function Figure2dContent({
       {/* 図形・文字と、交点の線 (点から上と右の投影まで) */}
       {scene.annotations.map((pa) => (pa.a.kind === 'cross' ? <CrossLines key={pa.a.id} pa={pa} layout={layout} /> : <AnnotationShape key={pa.a.id} pa={pa} />))}
 
+      {/* マーカー (クロスピーク・構造式の原子) と凡例 */}
+      <MarkerGlyphs markers={scene.markers} figure={figure} />
+      {scene.legend && <LegendBox legend={scene.legend} figure={figure} />}
+
       {figure.showXCaption && (
         <text x={plot.x} y={layout.captionY} fontSize={9} fill={INK}>
           {scene.caption}
@@ -143,7 +152,11 @@ type Gesture =
   | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; at: Anchor2d; token: number }
   | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; at: Anchor2d; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
-  | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
+  | { type: 'imageResize'; id: string; x0: number; w0: number; token: number }
+  | { type: 'markerMove'; id: string; x0: number; y0: number; dx0: number; dy0: number; token: number }
+  | { type: 'markerResize'; cx: number; cy: number; d0: number; s0: number; token: number }
+  | { type: 'legend'; x0: number; y0: number; lx: number; ly: number; token: number }
+  | { type: 'legendResize'; y0: number; h0: number; fs0: number; token: number };
 
 /** 図形の固定先: 等高線の ppm か、構造式の枠 (割合)。構造式の上に置いた帰属の文字などは構造式と一緒に動く (1D の図と同じ) */
 type Anchor2d = { kind: 'plot' } | { kind: 'image'; id: string };
@@ -213,6 +226,19 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
     return image ? pxToImageAnchor(px, py, imageRect(image, layout)) : at(px, py);
   };
   const anchorFields = (an: Anchor2d): Partial<Annotation> => (an.kind === 'image' ? { imageId: an.id } : { imageId: undefined });
+  /** クロスピークの山に合わせた ppm (画面で ±14 px のうちいちばん高い点。交点の線・マーカーで使う) */
+  const snapAt = (x: number, y: number) => {
+    const p = at(x, y);
+    if (!data) return p;
+    const span = (px: number, plotPx: number, viewSpan: number, dataSpan: number, n: number) => Math.max(2, Math.round((px / plotPx) * n * (viewSpan / dataSpan)));
+    return snapPeak2d(
+      data,
+      p.x,
+      p.y,
+      span(14, layout.plot.w, view.xMax - view.xMin, Math.abs(data.first2 - data.last2), data.n2),
+      span(14, layout.plot.h, view.yMax - view.yMin, Math.abs(data.first1 - data.last1), data.n1),
+    );
+  };
   const add = (kind: AnnotationKind, p: { x: number; y: number }, q: { x: number; y: number }, extra: Partial<Annotation> = {}) =>
     addAnnotation({ ...annotationDefaults(kind), layerId: scene.meta.id, space: '2d', x1: p.x, y1: p.y, x2: q.x, y2: q.y, ...extra });
 
@@ -245,6 +271,60 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       capture();
       return;
     }
+    // マーカー: 少しずらす・大きさ (1D の図と同じ)
+    if (tool === 'select' && hitKind === 'marker') {
+      const m = doc.markers.find((k) => k.id === hitId);
+      if (!m) return;
+      select({ kind: 'marker', id: hitId });
+      gesture.current = { type: 'markerMove', id: hitId, x0: x, y0: y, dx0: m.dx ?? 0, dy0: m.dy ?? 0, token: beginGesture() };
+      capture();
+      return;
+    }
+    if (tool === 'select' && hitKind === 'markerHandle') {
+      const m = scene.markers.find((k) => k.id === hitId);
+      if (!m) return;
+      const c = markerBounds(m.style.shape, m.x, m.y, doc.figure.markerSize);
+      gesture.current = { type: 'markerResize', cx: c.cx, cy: c.cy, d0: Math.max(4, Math.hypot(x - c.cx, y - c.cy)), s0: doc.figure.markerSize, token: beginGesture() };
+      capture();
+      return;
+    }
+    if (tool === 'select' && (hitKind === 'legend' || hitKind === 'legendHandle') && scene.legend) {
+      select({ kind: 'legend', id: 'legend' });
+      gesture.current =
+        hitKind === 'legendHandle'
+          ? { type: 'legendResize', y0: y, h0: scene.legend.h, fs0: doc.figure.legendFontSize, token: beginGesture() }
+          : { type: 'legend', x0: x, y0: y, lx: scene.legend.x, ly: scene.legend.y, token: beginGesture() };
+      capture();
+      return;
+    }
+    if (tool === 'marker') {
+      const styleId = useEditor.getState().activeMarkerStyleId;
+      if (!styleId) {
+        notify(tr('右の「マーカー・凡例」で付けたい種類を選んでください'), 'error');
+        return;
+      }
+      // ChemDraw の構造式の上なら、いちばん近い原子に付ける (帰属)。端の原子は枠のすぐ端にあるので、枠の少し外まで探す
+      const image = [...doc.figureImages].reverse().find((im) => {
+        if (!im.cdxml) return false;
+        const r = imageRect(im, layout);
+        const pad = 12;
+        return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad && (imageAt(x, y) === im.id || !!nearestAtomAt(im, x, y, layout));
+      });
+      if (image) {
+        const atom = nearestAtomAt(image, x, y, layout);
+        if (atom) toggleAtomMarker(image.id, atom, styleId);
+        else notify(tr('原子の近くをクリックしてください'), 'info');
+        return;
+      }
+      // 等高線の上: いちばん近いクロスピークに付ける (同じ種類がもう付いていれば外す)
+      const { plot } = layout;
+      if (x < plot.x || x > plot.x + plot.w || y < plot.y || y > plot.y + plot.h) return;
+      const q = snapAt(x, y);
+      const tolX = (Math.abs(view.xMax - view.xMin) * 8) / plot.w;
+      const tolY = (Math.abs(view.yMax - view.yMin) * 8) / plot.h;
+      toggleMarker2d(scene.meta.id, styleId, q.x, q.y, tolX, tolY);
+      return;
+    }
     if (tool === 'text') {
       // 構造式の上なら構造式に固定する (帰属の文字など)
       const an = anchorAt(x, y);
@@ -254,18 +334,7 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       return;
     }
     if (tool === 'cross') {
-      // クロスピークの山に合わせる (画面で ±14 px のうちいちばん高い点)
-      const p = at(x, y);
-      const span = (px: number, plotPx: number, viewSpan: number, dataSpan: number, n: number) => Math.max(2, Math.round((px / plotPx) * n * (viewSpan / dataSpan)));
-      const q = data
-        ? snapPeak2d(
-            data,
-            p.x,
-            p.y,
-            span(14, layout.plot.w, view.xMax - view.xMin, Math.abs(data.first2 - data.last2), data.n2),
-            span(14, layout.plot.h, view.yMax - view.yMin, Math.abs(data.first1 - data.last1), data.n1),
-          )
-        : p;
+      const q = snapAt(x, y);
       add('cross', q, q);
       return;
     }
@@ -304,6 +373,28 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       updateFigureImage(cur.id, { x: cur.ox + (x - cur.x0) / layout.width, y: cur.oy + (y - cur.y0) / layout.height }, false);
     } else if (cur.type === 'imageResize') {
       updateFigureImage(cur.id, { w: Math.max(0.03, cur.w0 + (x - cur.x0) / layout.width) }, false);
+    } else if (cur.type === 'markerMove') {
+      setMarkerOffset(cur.id, cur.dx0 + x - cur.x0, cur.dy0 + y - cur.y0, false);
+    } else if (cur.type === 'markerResize') {
+      const size = Math.round(Math.min(30, Math.max(3, cur.s0 + 2 * (Math.hypot(x - cur.cx, y - cur.cy) - cur.d0))));
+      if (size !== doc.figure.markerSize)
+        edit((d) => {
+          d.figure.markerSize = size;
+        }, false);
+    } else if (cur.type === 'legend') {
+      const { plot } = layout;
+      const lx = cur.lx + x - cur.x0;
+      const ly = cur.ly + y - cur.y0;
+      edit((d) => {
+        d.figure.legendPos = { x: (lx - plot.x) / plot.w, y: (ly - plot.y) / plot.h };
+      }, false);
+    } else if (cur.type === 'legendResize') {
+      const k = Math.max(0.3, (cur.h0 + y - cur.y0) / cur.h0);
+      const fs = Math.round(Math.min(40, Math.max(6, cur.fs0 * k)));
+      if (fs !== doc.figure.legendFontSize)
+        edit((d) => {
+          d.figure.legendFontSize = fs;
+        }, false);
     } else {
       cur.x1 = x;
       cur.y1 = y;
@@ -336,7 +427,15 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
     } else if (cur.type === 'move') {
       reanchor(cur.id);
       endGesture(cur.token);
-    } else if (cur.type === 'resize' || cur.type === 'imageMove' || cur.type === 'imageResize') {
+    } else if (
+      cur.type === 'resize' ||
+      cur.type === 'imageMove' ||
+      cur.type === 'imageResize' ||
+      cur.type === 'markerMove' ||
+      cur.type === 'markerResize' ||
+      cur.type === 'legend' ||
+      cur.type === 'legendResize'
+    ) {
       endGesture(cur.token);
     }
   };
@@ -390,7 +489,8 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
   const selected = selection?.kind === 'annotation' ? scene.annotations.find((p) => p.a.id === selection.id) : undefined;
   const selectedImageItem = selection?.kind === 'image' ? doc.figureImages.find((im) => im.id === selection.id) : undefined;
   const selectedImage = selectedImageItem ? imageRect(selectedImageItem, layout) : null;
-  const drawing = SHAPES.includes(tool as AnnotationKind) || tool === 'text' || tool === 'cross';
+  const selectedMarker = selection?.kind === 'marker' ? scene.markers.find((m) => m.id === selection.id) : undefined;
+  const drawing = SHAPES.includes(tool as AnnotationKind) || tool === 'text' || tool === 'cross' || tool === 'marker';
   return (
     <svg
       ref={svgRef}
@@ -420,6 +520,18 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       {tool === 'select' && <ImageHits images={doc.figureImages ?? []} figure={layout} />}
       {tool === 'select' && (
         <g data-ui="hit">
+          <MarkerHits markers={scene.markers} size={doc.figure.markerSize} />
+          {scene.legend && (
+            <rect
+              data-hit="legend:legend"
+              x={scene.legend.x - 3}
+              y={scene.legend.y - 3}
+              width={scene.legend.w + 6}
+              height={scene.legend.h + 6}
+              fill="transparent"
+              className="hit move"
+            />
+          )}
           {scene.annotations.map((pa) => {
             if (pa.a.kind === 'cross') return <circle key={pa.a.id} data-hit={`annotation:${pa.a.id}`} cx={pa.p1.px} cy={pa.p1.py} r={7} fill="transparent" className="hit move" />;
             const b = annotationBox(pa);
@@ -428,6 +540,15 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
         </g>
       )}
       {selected && <Selection2d pa={selected} tool={tool} />}
+      {selectedMarker && <MarkerSelection m={selectedMarker} size={doc.figure.markerSize} tool={tool} />}
+      {selection?.kind === 'legend' && scene.legend && (
+        <g data-ui="sel">
+          <rect x={scene.legend.x - 3} y={scene.legend.y - 3} width={scene.legend.w + 6} height={scene.legend.h + 6} className="sel-outline" />
+          {tool === 'select' && (
+            <rect data-hit="legendHandle:legend" x={scene.legend.x + scene.legend.w - 1} y={scene.legend.y + scene.legend.h - 1} width={8} height={8} className="handle handle-se" />
+          )}
+        </g>
+      )}
       {selectedImage && (
         <rect data-ui="sel" x={selectedImage.x - 2} y={selectedImage.y - 2} width={selectedImage.w + 4} height={selectedImage.h + 4} className="sel-outline" />
       )}

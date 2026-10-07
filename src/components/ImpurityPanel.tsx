@@ -121,7 +121,7 @@ export function MarkerPanel() {
   const markers = useEditor((s) => s.doc.markers);
   const showLegend = useEditor((s) => s.doc.figure.showLegend);
   const activeId = useEditor((s) => s.activeMarkerStyleId);
-  const hasData = useEditor((s) => s.doc.layers.length > 0);
+  const hasData = useEditor((s) => s.doc.layers.length > 0 || !!s.doc.plot2d);
   if (!hasData) return null;
   const setStyle = (id: string, patch: Record<string, unknown>) =>
     edit((d) => {

@@ -23,8 +23,8 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: IconName; hint
   { id: 'cross', label: trk('交点の線'), key: 'X', icon: 'nmr-cross', hint: trk('交点の線: クロスピークをクリック (いちばん近い山に合わせて、上と右の投影まで線を引く)') },
 ];
 
-/** 2D で使える道具 (図形・文字・交点の線と、移動・拡大)。交点の線は 2D だけ */
-const TOOLS_2D: Tool[] = ['select', 'zoom', 'ellipse', 'rect', 'arrow', 'line', 'text', 'cross'];
+/** 2D で使える道具 (図形・文字・交点の線・マーカーと、移動・拡大)。交点の線は 2D だけ */
+const TOOLS_2D: Tool[] = ['select', 'zoom', 'ellipse', 'rect', 'arrow', 'line', 'text', 'cross', 'marker'];
 export function toolUsable(id: Tool, is2d: boolean): boolean {
   return is2d ? TOOLS_2D.includes(id) : id !== 'cross';
 }
@@ -65,6 +65,7 @@ export function Dock() {
           <>
             <span className="bar-sep" aria-hidden="true" />
             {toolButton('cross')}
+            {toolButton('marker')}
             <MenuButton
               label={tr('図形 ({join})', { join: SHAPE_TOOLS.map((id) => tool(id).key).join(tr('・')) })}
               className={`ibtn md tool${SHAPE_TOOLS.includes(current) ? ' on' : ''}`}

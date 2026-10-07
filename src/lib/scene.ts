@@ -197,12 +197,14 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
   const stackCount = new Map<string, number>();
   const size = f.markerSize;
   for (const m of doc.markers) {
+    // 2D の図のクロスピークに付けたものは 2D の図だけ
+    if (m.space === '2d') continue;
     if (m.imageId) {
-      // 帰属: 構造式の原子の横
+      // 帰属: 構造式の原子の横 (少しずらしたものはそのぶん)
       const image = doc.figureImages.find((x) => x.id === m.imageId);
       const style = styleById.get(m.styleId);
       const pos = image && style && m.atomId ? atomMarkerPos(image, m.atomId, layout, size) : null;
-      if (pos && style) markers.push({ id: m.id, x: pos.x, y: pos.y, style, imageId: m.imageId });
+      if (pos && style) markers.push({ id: m.id, x: pos.x + (m.dx ?? 0), y: pos.y + (m.dy ?? 0), style, imageId: m.imageId });
       continue;
     }
     const g = geomById.get(m.layerId);
@@ -213,26 +215,16 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
     const k = stackCount.get(key) ?? 0;
     stackCount.set(key, k + 1);
     const y = Math.max(plot.y + size / 2 + 1, peakTopY(g, m.ppm) - size / 2 - 4 - k * (size + 2));
-    markers.push({ id: m.id, x, y, style });
+    markers.push({ id: m.id, x: x + (m.dx ?? 0), y: y + (m.dy ?? 0), style });
   }
 
-  // 凡例: 表示中のスペクトルで使っている種類だけ
-  let legend: PlacedLegend | null = null;
-  // 名前を入れていない種類 (色だけのマーカー) は凡例に出さない
+  // 凡例: 表示中のスペクトルで使っている種類だけ。名前を入れていない種類 (色だけのマーカー) は凡例に出さない
   const usedStyles = doc.markerStyles.filter(
-    (s) => s.name && doc.markers.some((m) => m.styleId === s.id && (geomById.has(m.layerId) || (!!m.imageId && doc.figureImages.some((x) => x.id === m.imageId)))),
+    (s) =>
+      s.name &&
+      doc.markers.some((m) => m.styleId === s.id && m.space !== '2d' && (geomById.has(m.layerId) || (!!m.imageId && doc.figureImages.some((x) => x.id === m.imageId)))),
   );
-  if (f.showLegend && usedStyles.length) {
-    const lfs = f.legendFontSize;
-    const rowH = Math.round(lfs * 1.45);
-    // 凡例の印は文字の大きさに合わせる (既定の 13 pt で図のマーカーと同じ大きさ)
-    const glyph = legendGlyphSize(f);
-    const w = glyph + 8 + Math.max(...usedStyles.map((s) => estimateWidth(s.name, lfs))) + 6;
-    const h = rowH * usedStyles.length + 4;
-    const x = f.legendPos ? plot.x + f.legendPos.x * plot.w : plot.x + plot.w - w - 10;
-    const y = f.legendPos ? plot.y + f.legendPos.y * plot.h : plot.y + 8;
-    legend = { x, y, w, h, rowH, rows: usedStyles };
-  }
+  const legend = placeLegend(f, usedStyles, plot);
 
   const annotations: PlacedAnnotation[] = [];
   for (const a of doc.annotations) {
@@ -274,6 +266,34 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
 /** 凡例の印の大きさ (凡例の文字の大きさに合わせる。既定の 13 pt で図のマーカーと同じ) */
 export function legendGlyphSize(f: FigureStyle): number {
   return (f.markerSize * f.legendFontSize) / 13;
+}
+
+/** 凡例の位置と大きさ (1D・2D の図で共通)。rows は出す種類 (名前のあるものを呼ぶ側で選ぶ)。位置はプロットに対する割合 */
+export function placeLegend(f: FigureStyle, rows: MarkerStyle[], plot: { x: number; y: number; w: number; h: number }): PlacedLegend | null {
+  if (!f.showLegend || !rows.length) return null;
+  const lfs = f.legendFontSize;
+  const rowH = Math.round(lfs * 1.45);
+  // 凡例の印は文字の大きさに合わせる (既定の 13 pt で図のマーカーと同じ大きさ)
+  const glyph = legendGlyphSize(f);
+  const w = glyph + 8 + Math.max(...rows.map((s) => estimateWidth(s.name, lfs))) + 6;
+  const h = rowH * rows.length + 4;
+  const x = f.legendPos ? plot.x + f.legendPos.x * plot.w : plot.x + plot.w - w - 10;
+  const y = f.legendPos ? plot.y + f.legendPos.y * plot.h : plot.y + 8;
+  return { x, y, w, h, rowH, rows };
+}
+
+/** 構造式のその場所にいちばん近い原子 (結合の長さの半分より遠ければ null)。1D・2D の図で共通 */
+export function nearestAtomAt(image: FigureImage, x: number, y: number, figure: { width: number; height: number }): string | null {
+  const box = image.cdxml ? drawCdxml(image.cdxml, 1)?.box : null;
+  if (!image.cdxml || !box) return null;
+  const r = imageRect(image, figure);
+  const k = r.w / (box.r - box.l);
+  let best: { id: string; d: number } | null = null;
+  for (const s of cdxmlAtomSites(image.cdxml)) {
+    const d = Math.hypot(r.x + (s.x - box.l) * k - x, r.y + (s.y - box.t) * k - y);
+    if (!best || d < best.d) best = { id: s.id, d };
+  }
+  return best && best.d <= Math.max(8, 7.5 * k) ? best.id : null;
 }
 
 /** 注釈の枠 (px)。テキストは文字幅から概算 */
@@ -340,38 +360,37 @@ export function arrowHead(x1: number, y1: number, x2: number, y2: number, stroke
   return `${r(x2)},${r(y2)} ${r(bx + nx)},${r(by + ny)} ${r(bx - nx)},${r(by - ny)}`;
 }
 
-export function markerPath(shape: MarkerStyle['shape'], x: number, y: number, size: number): string {
-  const r = size / 2;
-  const pts = (list: [number, number][]) => 'M' + list.map(([px, py]) => `${(x + px).toFixed(1)} ${(y + py).toFixed(1)}`).join('L') + 'Z';
+/** マーカーの形の頂点 (基準点からのずれ)。丸は null */
+function markerPoints(shape: MarkerStyle['shape'], r: number): [number, number][] | null {
   switch (shape) {
     case 'circle':
-      return `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+      return null;
     case 'square':
-      return pts([
+      return [
         [-r * 0.85, -r * 0.85],
         [r * 0.85, -r * 0.85],
         [r * 0.85, r * 0.85],
         [-r * 0.85, r * 0.85],
-      ]);
+      ];
     case 'triangle':
-      return pts([
+      return [
         [0, -r * 1.1],
         [r, r * 0.75],
         [-r, r * 0.75],
-      ]);
+      ];
     case 'invtriangle':
-      return pts([
+      return [
         [0, r * 1.1],
         [r, -r * 0.75],
         [-r, -r * 0.75],
-      ]);
+      ];
     case 'diamond':
-      return pts([
+      return [
         [0, -r * 1.15],
         [r * 0.9, 0],
         [0, r * 1.15],
         [-r * 0.9, 0],
-      ]);
+      ];
     case 'star': {
       const list: [number, number][] = [];
       for (let k = 0; k < 10; k++) {
@@ -379,9 +398,29 @@ export function markerPath(shape: MarkerStyle['shape'], x: number, y: number, si
         const ang = -Math.PI / 2 + (k * Math.PI) / 5;
         list.push([rr * Math.cos(ang), rr * Math.sin(ang)]);
       }
-      return pts(list);
+      return list;
     }
   }
+}
+
+export function markerPath(shape: MarkerStyle['shape'], x: number, y: number, size: number): string {
+  const r = size / 2;
+  const list = markerPoints(shape, r);
+  if (!list) return `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+  return 'M' + list.map(([px, py]) => `${(x + px).toFixed(1)} ${(y + py).toFixed(1)}`).join('L') + 'Z';
+}
+
+/**
+ * マーカーの見た目の中心と半径 (選択の枠・つかむ所)。三角・星などは形の真ん中が基準点からずれるので、
+ * 基準点を中心にすると選択の枠がずれて見えた (本人の報告 2026-10-07「マーカーの選択位置が少しずれている」)
+ */
+export function markerBounds(shape: MarkerStyle['shape'], x: number, y: number, size: number): { cx: number; cy: number; r: number } {
+  const list = markerPoints(shape, size / 2);
+  if (!list) return { cx: x, cy: y, r: size / 2 };
+  const xs = list.map((p) => p[0]);
+  const ys = list.map((p) => p[1]);
+  const [l, rr, t, b] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return { cx: x + (l + rr) / 2, cy: y + (t + b) / 2, r: Math.max(rr - l, b - t) / 2 };
 }
 
 export function dashArray(dash: Dash, w: number): string | undefined {

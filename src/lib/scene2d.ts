@@ -7,7 +7,7 @@ import { solventInfo } from './solvents';
 import type { NmrDocument, Plot2d, Spectrum2dMeta } from '../state/types';
 import { experimentLabel2d } from './jdf2d';
 import type { Rect } from './layout';
-import { imageAnchorToPx, imageRect, type PlacedAnnotation } from './scene';
+import { atomMarkerPos, imageAnchorToPx, imageRect, placeLegend, type PlacedAnnotation, type PlacedLegend, type PlacedMarker } from './scene';
 
 export interface Layout2d {
   width: number;
@@ -42,6 +42,9 @@ export interface Scene2d {
   title: string;
   /** 図形・文字・交点の線 (2D に置いたもの。x, y は F2・F1 の ppm) */
   annotations: PlacedAnnotation[];
+  /** マーカー (クロスピークと、構造式の原子に付けたもの) と凡例 */
+  markers: PlacedMarker[];
+  legend: PlacedLegend | null;
 }
 
 const TOP = 14;
@@ -138,10 +141,41 @@ export function buildScene2d(doc: NmrDocument, data: Spectrum2dData | undefined)
     rightPath = bandPath(right, layout.rightBand, 'y', grid, layout);
   }
 
+  // マーカー: 構造式の原子 (帰属。1D の図と同じ) と、この 2D のクロスピーク (山の右上に少し離して置く。等高線に重ねない)
+  const styleById = new Map(doc.markerStyles.map((s) => [s.id, s]));
+  const size = doc.figure.markerSize;
+  const markers: PlacedMarker[] = [];
+  for (const m of doc.markers) {
+    const style = styleById.get(m.styleId);
+    if (!style) continue;
+    const dx = m.dx ?? 0;
+    const dy = m.dy ?? 0;
+    if (m.imageId) {
+      const image = doc.figureImages.find((x) => x.id === m.imageId);
+      const pos = image && m.atomId ? atomMarkerPos(image, m.atomId, layout, size) : null;
+      if (pos) markers.push({ id: m.id, x: pos.x + dx, y: pos.y + dy, style, imageId: m.imageId });
+      continue;
+    }
+    if (m.space !== '2d' || m.layerId !== meta.id || m.ppm1 === undefined) continue;
+    const px = layout.xToPx(m.ppm);
+    const py = layout.yToPx(m.ppm1);
+    if (px < plot.x || px > plot.x + plot.w || py < plot.y || py > plot.y + plot.h) continue;
+    markers.push({ id: m.id, x: px + size * 0.9 + dx, y: py - size * 0.9 + dy, style });
+  }
+  // 凡例: この図に出ているマーカーの種類だけ (名前のないものは出さない)
+  const shown = new Set(markers.map((m) => m.style.id));
+  const legend = placeLegend(
+    doc.figure,
+    doc.markerStyles.filter((s) => s.name && shown.has(s.id)),
+    plot,
+  );
+
   return {
     layout,
     meta,
     plot: plot2d,
+    markers,
+    legend,
     contours,
     tooDense,
     xTicks,

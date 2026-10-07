@@ -67,6 +67,8 @@ export const EN_PANELS1: Record<string, string> = {
   選択中のマーカー: 'Selected marker',
   '図のマーカー全部 (凡例の印も) がこの大きさになります。選んだマーカーの右下の四角をドラッグしても変えられます。':
     'All markers in the figure (including the legend symbols) use this size. You can also drag the small square at the lower right of the selected marker.',
+  'マーカーをドラッグするか、矢印キー (Shift で大きく) で、置いた位置から少しずらせます。': 'Drag a marker or use the arrow keys (Shift for bigger steps) to shift it slightly from where it was placed.',
+  位置を戻す: 'Reset position',
   選択中のピーク値: 'Selected peak label',
   選択中の構造式: 'Selected structure',
   選択中の画像: 'Selected image',

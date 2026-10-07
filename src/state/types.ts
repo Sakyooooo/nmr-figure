@@ -140,7 +140,8 @@ export interface MarkerStyle {
 
 /** ppm はすべて基準合わせ前の値。表示位置は ppm + refOffset */
 /**
- * マーカー。ピークに付けるもの (layerId と ppm) と、構造式の原子に付けるもの (帰属。imageId と atomId、layerId は空) がある
+ * マーカー。ピークに付けるもの (layerId と ppm) と、構造式の原子に付けるもの (帰属。imageId と atomId、layerId は空) と、
+ * 2D の図のクロスピークに付けるもの (space = '2d'、layerId は 2D のスペクトル、ppm は横軸 F2・ppm1 は縦軸 F1) がある
  */
 export interface Marker {
   id: string;
@@ -150,6 +151,12 @@ export interface Marker {
   /** 構造式の原子に付けたとき: その構造式 (FigureImage) の id と、CDXML の原子の id */
   imageId?: string;
   atomId?: string;
+  /** 2D の図のクロスピークに付けたとき */
+  space?: '2d';
+  ppm1?: number;
+  /** 置いた位置からのずれ (図の座標)。ドラッグ・矢印キーで少しずらしたとき (本人の希望 2026-10-07) */
+  dx?: number;
+  dy?: number;
 }
 
 export interface PeakLabel {

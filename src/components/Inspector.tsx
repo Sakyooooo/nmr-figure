@@ -29,7 +29,9 @@ export function Inspector() {
   if (is2d) {
     return (
       <div className="inspector-body">
+        <PropertiesPanel only="analysis" />
         <Plot2dPanel />
+        <MarkerPanel />
         <FigurePanel />
         <TemplatePanel />
       </div>
