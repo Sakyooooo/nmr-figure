@@ -1,12 +1,24 @@
 import { tr } from '../i18n';
 import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Spectrum2dData } from '../lib/fid2d';
-import { annotationBox, dashArray, type PlacedAnnotation } from '../lib/scene';
+import { annotationBox, dashArray, imageRect, pxToImageAnchor, type PlacedAnnotation } from '../lib/scene';
 import { buildScene2d, fullView2d, type Layout2d, type Scene2d } from '../lib/scene2d';
-import { addAnnotation, beginGesture, endGesture, select, setView2d, updateAnnotation, useEditor } from '../state/store';
+import { drawInChemDraw } from '../state/chemdraw';
+import {
+  addAnnotation,
+  beginGesture,
+  editAnnotationText,
+  endGesture,
+  openStructureEditor,
+  select,
+  setView2d,
+  updateAnnotation,
+  updateFigureImage,
+  useEditor,
+} from '../state/store';
 import { annotationDefaults, type Annotation, type AnnotationKind, type FigureImage, type FigureStyle } from '../state/types';
 import { AnnotationShape } from './FigureContent';
-import { constrain, resizePoints, type Handle } from './FigureView';
+import { constrain, ImageHits, resizePoints, type Handle } from './FigureView';
 import { FigureImages } from './FigureImages';
 import { RichSvgText } from './RichText';
 
@@ -128,8 +140,13 @@ type Gesture =
   | { type: 'pan'; x0: number; y0: number; view: Scene2d['plot']['view'] }
   | { type: 'zoom'; x0: number; y0: number; x1: number; y1: number }
   | { type: 'create'; kind: AnnotationKind; x0: number; y0: number; x1: number; y1: number }
-  | { type: 'move'; id: string; x0: number; y0: number; orig: Annotation; token: number }
-  | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; token: number };
+  | { type: 'move'; id: string; x0: number; y0: number; orig: PlacedAnnotation; at: Anchor2d; token: number }
+  | { type: 'resize'; id: string; handle: Handle; orig: PlacedAnnotation; at: Anchor2d; token: number }
+  | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
+  | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
+
+/** 図形の固定先: 等高線の ppm か、構造式の枠 (割合)。構造式の上に置いた帰属の文字などは構造式と一緒に動く (1D の図と同じ) */
+type Anchor2d = { kind: 'plot' } | { kind: 'image'; id: string };
 
 const SHAPES: AnnotationKind[] = ['ellipse', 'rect', 'arrow', 'line'];
 
@@ -176,6 +193,26 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
     return { x: pt.x, y: pt.y };
   };
   const at = (x: number, y: number) => ({ x: layout.pxToX(x), y: layout.pxToY(y) });
+  /** その場所にある構造式・画像 (後から置いたものが上) */
+  const imageAt = (x: number, y: number) => {
+    const images = doc.figureImages ?? [];
+    for (let i = images.length - 1; i >= 0; i--) {
+      const r = imageRect(images[i], layout);
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return images[i].id;
+    }
+    return null;
+  };
+  const anchorAt = (x: number, y: number): Anchor2d => {
+    const id = imageAt(x, y);
+    return id ? { kind: 'image', id } : { kind: 'plot' };
+  };
+  const anchorOf = (a: Annotation): Anchor2d => (a.imageId && doc.figureImages.some((x) => x.id === a.imageId) ? { kind: 'image', id: a.imageId } : { kind: 'plot' });
+  const fromPx = (an: Anchor2d, px: number, py: number) => {
+    if (an.kind === 'plot') return at(px, py);
+    const image = doc.figureImages.find((x) => x.id === an.id);
+    return image ? pxToImageAnchor(px, py, imageRect(image, layout)) : at(px, py);
+  };
+  const anchorFields = (an: Anchor2d): Partial<Annotation> => (an.kind === 'image' ? { imageId: an.id } : { imageId: undefined });
   const add = (kind: AnnotationKind, p: { x: number; y: number }, q: { x: number; y: number }, extra: Partial<Annotation> = {}) =>
     addAnnotation({ ...annotationDefaults(kind), layerId: scene.meta.id, space: '2d', x1: p.x, y1: p.y, x2: q.x, y2: q.y, ...extra });
 
@@ -190,12 +227,29 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       if (!pa) return;
       select({ kind: 'annotation', id: pa.a.id });
       const token = beginGesture();
-      gesture.current = hitKind === 'handle' ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, token } : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa.a, token };
+      const an = anchorOf(pa.a);
+      gesture.current =
+        hitKind === 'handle' ? { type: 'resize', id: pa.a.id, handle: hitHandle as Handle, orig: pa, at: an, token } : { type: 'move', id: pa.a.id, x0: x, y0: y, orig: pa, at: an, token };
+      capture();
+      return;
+    }
+    // 構造式・画像: つかんで動かす、右下の角で大きさを変える (縦横比はそのまま)
+    if (tool === 'select' && (hitKind === 'image' || hitKind === 'imageHandle') && hitId) {
+      const image = doc.figureImages.find((im) => im.id === hitId);
+      if (!image) return;
+      select({ kind: 'image', id: hitId });
+      gesture.current =
+        hitKind === 'imageHandle'
+          ? { type: 'imageResize', id: hitId, x0: x, w0: image.w, token: beginGesture() }
+          : { type: 'imageMove', id: hitId, x0: x, y0: y, ox: image.x, oy: image.y, token: beginGesture() };
       capture();
       return;
     }
     if (tool === 'text') {
-      add('text', at(x, y), at(x, y));
+      // 構造式の上なら構造式に固定する (帰属の文字など)
+      const an = anchorAt(x, y);
+      const p = fromPx(an, x, y);
+      add('text', p, p, anchorFields(an));
       requestAnimationFrame(() => document.getElementById('annotation-text')?.focus());
       return;
     }
@@ -236,14 +290,20 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       const dy = ((y - cur.y0) / layout.plot.h) * (cur.view.yMax - cur.view.yMin);
       setView2d({ xMax: cur.view.xMax + dx, xMin: cur.view.xMin + dx, yMax: cur.view.yMax + dy, yMin: cur.view.yMin + dy });
     } else if (cur.type === 'move') {
-      const dx = layout.pxToX(x) - layout.pxToX(cur.x0);
-      const dy = layout.pxToY(y) - layout.pxToY(cur.y0);
-      updateAnnotation(cur.id, { x1: cur.orig.x1 + dx, x2: cur.orig.x2 + dx, y1: cur.orig.y1 + dy, y2: cur.orig.y2 + dy }, false);
+      const dx = x - cur.x0;
+      const dy = y - cur.y0;
+      const p = fromPx(cur.at, cur.orig.p1.px + dx, cur.orig.p1.py + dy);
+      const q = fromPx(cur.at, cur.orig.p2.px + dx, cur.orig.p2.py + dy);
+      updateAnnotation(cur.id, { x1: p.x, y1: p.y, x2: q.x, y2: q.y }, false);
     } else if (cur.type === 'resize') {
       const next = resizePoints(cur.orig, cur.handle, x, y, e.shiftKey);
-      const p = at(next.p1.px, next.p1.py);
-      const q = at(next.p2.px, next.p2.py);
+      const p = fromPx(cur.at, next.p1.px, next.p1.py);
+      const q = fromPx(cur.at, next.p2.px, next.p2.py);
       updateAnnotation(cur.id, { x1: p.x, y1: p.y, x2: q.x, y2: q.y }, false);
+    } else if (cur.type === 'imageMove') {
+      updateFigureImage(cur.id, { x: cur.ox + (x - cur.x0) / layout.width, y: cur.oy + (y - cur.y0) / layout.height }, false);
+    } else if (cur.type === 'imageResize') {
+      updateFigureImage(cur.id, { w: Math.max(0.03, cur.w0 + (x - cur.x0) / layout.width) }, false);
     } else {
       cur.x1 = x;
       cur.y1 = y;
@@ -269,10 +329,49 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       // クリックだけのときは既定の大きさで作る
       const x1 = tiny ? cur.x0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 40) : cur.x1;
       const y1 = tiny ? cur.y0 + (cur.kind === 'ellipse' || cur.kind === 'rect' ? 30 : 0) : cur.y1;
-      add(cur.kind, at(cur.x0, cur.y0), at(x1, y1));
-    } else if (cur.type === 'move' || cur.type === 'resize') {
+      // 丸・四角は構造式の上なら構造式に固定する。線・矢印は両端が同じ構造式の上のときだけ
+      let an = anchorAt(cur.x0, cur.y0);
+      if ((cur.kind === 'line' || cur.kind === 'arrow') && an.kind === 'image' && imageAt(x1, y1) !== an.id) an = { kind: 'plot' };
+      add(cur.kind, fromPx(an, cur.x0, cur.y0), fromPx(an, x1, y1), anchorFields(an));
+    } else if (cur.type === 'move') {
+      reanchor(cur.id);
+      endGesture(cur.token);
+    } else if (cur.type === 'resize' || cur.type === 'imageMove' || cur.type === 'imageResize') {
       endGesture(cur.token);
     }
+  };
+
+  /** 文字・丸・四角を構造式の上へ動かしたら構造式に、外へ出したら等高線に固定し直す (見た目の位置は変えない。1D の図と同じ) */
+  const reanchor = (id: string) => {
+    const state = useEditor.getState();
+    const now = buildScene2d(state.doc, state.doc.plot2d ? state.data2d[state.doc.plot2d.spectrumId] : undefined)?.annotations.find((p) => p.a.id === id);
+    if (!now || now.a.kind === 'line' || now.a.kind === 'arrow' || now.a.kind === 'cross') return;
+    const box = annotationBox(now);
+    const an = anchorAt(box.x + box.w / 2, box.y + box.h / 2);
+    const same = an.kind === 'image' ? now.a.imageId === an.id : !now.a.imageId;
+    if (same) return;
+    const p = fromPx(an, now.p1.px, now.p1.py);
+    const q = fromPx(an, now.p2.px, now.p2.py);
+    updateAnnotation(id, { ...anchorFields(an), x1: p.x, y1: p.y, x2: q.x, y2: q.y }, false);
+  };
+
+  const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    // ポインタを図全体で受けているので、ダブルクリックの対象は図全体になる。場所から探し直す
+    const under = document.elementFromPoint(e.clientX, e.clientY) ?? (e.target as Element);
+    const value = (under.closest('[data-hit]') ?? (e.target as Element).closest('[data-hit]'))?.getAttribute('data-hit') ?? '';
+    if (value.startsWith('image:')) {
+      // ChemDraw の構造式は ChemDraw で、アプリで描いた構造式は構造式エディタで直す
+      const image = doc.figureImages.find((im) => im.id === value.slice('image:'.length));
+      if (image?.cdxml) void drawInChemDraw(image.id);
+      else if (image?.source) openStructureEditor(image.id);
+      return;
+    }
+    if (value.startsWith('annotation:')) {
+      const a = doc.annotations.find((x) => x.id === value.slice('annotation:'.length));
+      if (a?.kind === 'text') editAnnotationText();
+      return;
+    }
+    setView2d(fullView2d(scene.meta));
   };
 
   const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
@@ -289,6 +388,8 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
   };
 
   const selected = selection?.kind === 'annotation' ? scene.annotations.find((p) => p.a.id === selection.id) : undefined;
+  const selectedImageItem = selection?.kind === 'image' ? doc.figureImages.find((im) => im.id === selection.id) : undefined;
+  const selectedImage = selectedImageItem ? imageRect(selectedImageItem, layout) : null;
   const drawing = SHAPES.includes(tool as AnnotationKind) || tool === 'text' || tool === 'cross';
   return (
     <svg
@@ -301,7 +402,7 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
       onPointerCancel={onPointerUp}
       onPointerLeave={() => useEditor.setState({ cursor2d: null })}
       onWheel={onWheel}
-      onDoubleClick={() => setView2d(fullView2d(scene.meta))}
+      onDoubleClick={onDoubleClick}
     >
       <defs>
         <clipPath id="plot2d-clip">
@@ -315,7 +416,8 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
           {tr('等高線が多すぎます。右の「等高線」で下限を上げてください')}
         </text>
       )}
-      {/* 選択ツールのときの、図形をつかむ所 */}
+      {/* 選択ツールのときの、構造式・画像と図形をつかむ所 (図形が上: 構造式の上の文字を選べるように) */}
+      {tool === 'select' && <ImageHits images={doc.figureImages ?? []} figure={layout} />}
       {tool === 'select' && (
         <g data-ui="hit">
           {scene.annotations.map((pa) => {
@@ -326,6 +428,9 @@ export function Figure2dView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement
         </g>
       )}
       {selected && <Selection2d pa={selected} tool={tool} />}
+      {selectedImage && (
+        <rect data-ui="sel" x={selectedImage.x - 2} y={selectedImage.y - 2} width={selectedImage.w + 4} height={selectedImage.h + 4} className="sel-outline" />
+      )}
       {draft?.type === 'zoom' && (
         <rect
           data-ui="zoom"

@@ -627,8 +627,8 @@ export function resizePoints(orig: PlacedAnnotation, handle: Handle, x: number, 
 }
 
 /** 選択ツールのときだけ出す、クリック判定用の透明な図形 */
-/** 構造式・画像をつかむ場所 (本体と、右下の角) */
-function ImageHits({ images, figure }: { images: NmrDocument['figureImages']; figure: { width: number; height: number } }) {
+/** 構造式・画像をつかむ場所 (本体と、右下の角)。2D の図でも使う */
+export function ImageHits({ images, figure }: { images: NmrDocument['figureImages']; figure: { width: number; height: number } }) {
   return (
     <g data-ui="hit">
       {images.map((image) => {

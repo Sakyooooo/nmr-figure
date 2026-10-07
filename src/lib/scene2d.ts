@@ -7,7 +7,7 @@ import { solventInfo } from './solvents';
 import type { NmrDocument, Plot2d, Spectrum2dMeta } from '../state/types';
 import { experimentLabel2d } from './jdf2d';
 import type { Rect } from './layout';
-import type { PlacedAnnotation } from './scene';
+import { imageAnchorToPx, imageRect, type PlacedAnnotation } from './scene';
 
 export interface Layout2d {
   width: number;
@@ -151,9 +151,16 @@ export function buildScene2d(doc: NmrDocument, data: Spectrum2dData | undefined)
     rightPath,
     caption: `X : ${meta.x.axisName}   Y : ${meta.y.axisName}  (parts per Million)`,
     title: title2d(doc),
-    annotations: doc.annotations
-      .filter((a) => a.space === '2d' && a.layerId === meta.id)
-      .map((a) => ({ a, p1: { px: layout.xToPx(a.x1), py: layout.yToPx(a.y1) }, p2: { px: layout.xToPx(a.x2), py: layout.yToPx(a.y2) } })),
+    annotations: doc.annotations.flatMap((a): PlacedAnnotation[] => {
+      if (a.space !== '2d') return [];
+      // 構造式に固定した印 (帰属の文字など): 構造式の枠に対する割合。構造式を動かすと一緒に動く
+      if (a.imageId) {
+        const image = doc.figureImages.find((x) => x.id === a.imageId);
+        return image ? [{ a, ...imageAnchorToPx(a, imageRect(image, layout)) }] : [];
+      }
+      if (a.layerId !== meta.id) return [];
+      return [{ a, p1: { px: layout.xToPx(a.x1), py: layout.yToPx(a.y1) }, p2: { px: layout.xToPx(a.x2), py: layout.yToPx(a.y2) } }];
+    }),
   };
 }
 
