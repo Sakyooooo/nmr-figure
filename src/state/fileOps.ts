@@ -60,7 +60,8 @@ export function readOptions(): ReadOptions {
 /** 保存していない図があれば、どうするか聞く。続けてよければ true */
 async function confirmDiscard(): Promise<boolean> {
   const { dirty, doc } = useEditor.getState();
-  if (!dirty || !doc.layers.length) return true;
+  // 2D の図 (layers は空) も聞く (前は 2D の図の変更を聞かずに捨てていた)
+  if (!dirty || (!doc.layers.length && !doc.plot2d)) return true;
   const choice = await ask(tr('保存していない図があります'), tr('編集中の図に保存していない変更があります。どうしますか？'), [
     { label: tr('保存しないで続ける'), value: 'discard', kind: 'danger' },
     { label: tr('保存してから続ける'), value: 'save', kind: 'primary' },
@@ -117,6 +118,8 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         // ドロップ・「開く」で開いた .jdf も、Delta と同期できるようにファイルを覚えておく
         if (handle) registerJdfHandle(file.name, handle);
         if (is2d(buffer)) {
+          // 2D は新しい図で開く (編集中の図に足したときも。2D はほかのスペクトルと重ねられない)
+          if (!(await confirmDiscard())) continue;
           addSpectrum2d(readJdf2d(buffer, file.name));
           notify(tr('{name} (2D) を開きました', { name: file.name }));
           opened2d = true;

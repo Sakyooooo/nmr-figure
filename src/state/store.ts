@@ -332,22 +332,20 @@ export function addSpectra(items: LoadedSpectrum[]) {
   if (nuclei.size > 1) notify(tr('核種の違うスペクトルが入っています ({join})。重ね書きには向きませんが、SI 用テキストはまとめて作れます', { join: [...nuclei].join(', ') }));
 }
 
-/** 2D のスペクトルを開く (1つの図に 1本)。前の図は置き換える */
+/**
+ * 2D のスペクトルを新しい図で開く (1つの図に 1本)。前の図の中身だけを入れ替えると、図の id・保存先のファイル・名前が
+ * 前の図のまま残り、上書き保存で前の図 (HMBC など) のファイルとホーム画面の版に書いていた (本人の報告 2026-10-07)。
+ * 1D と同じく、空の図から始める
+ */
 export function addSpectrum2d(item: Loaded2dSpectrum) {
   const { meta, data, fid } = item;
-  set((s) => ({ data2d: { ...s.data2d, [meta.id]: data }, fids2d: { ...s.fids2d, [meta.id]: fid } }));
+  loadDocument(emptyDocument(), {}, null, null, {}, { data2d: { [meta.id]: data }, fids2d: { [meta.id]: fid } });
   edit((d) => {
     d.spectra2d = [meta];
     d.plot2d = defaultPlot2d(meta);
     // 2D は正方形の図にする (対角線が 45°)
     d.figure.width = 700;
     d.figure.height = squareHeight(d as unknown as NmrDocument, d.plot2d);
-    d.spectra = [];
-    d.layers = [];
-    d.markers = [];
-    d.peakLabels = [];
-    d.integrals = [];
-    d.annotations = [];
   });
   set({ activeLayerId: null, selection: null, canvasTab: 'spectrum', screen: 'editor' });
 }

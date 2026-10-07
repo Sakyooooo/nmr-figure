@@ -5,7 +5,7 @@ import { buildScene2d } from '../lib/scene2d';
 import { DEMO_CDXML } from '../demoCdxml';
 import { cdxmlAtomSites } from '../lib/cdxml';
 import { clearSide1d, markCrossPeaksFromSides, sameStructure, setSide1d, sideFromProject, sidesFor, type SideSource } from './side2d';
-import { loadDocument, toggleMarker2d, toggleSideMarker, useEditor } from './store';
+import { addSpectrum2d, loadDocument, toggleMarker2d, toggleSideMarker, useEditor } from './store';
 import {
   annotationDefaults,
   DEFAULT_MARKER_COLORS,
@@ -352,5 +352,24 @@ describe('構造式と原子のマーカーも持ってくる', () => {
     expect(src.atomMarks!.map((x) => x.atomId)).toEqual([atoms[0]]);
     expect(src.imageNotes!.map((x) => x.id)).toEqual(['n1']);
     expect(src.figureSize).toEqual({ width: 940, height: 400 });
+  });
+});
+
+describe('2D を開くと新しい図になる', () => {
+  it('前の図の id・保存先・名前・構造式を引き継がない (上書き保存で前の 2D のファイルに書かない)', () => {
+    open2d();
+    const before = doc().id;
+    useEditor.setState({ projectName: 'HMBC.nmrfig', fileHandle: { name: 'HMBC.nmrfig' } as never, dirty: false });
+    useEditor.setState((s) => ({ doc: { ...s.doc, figureImages: [{ id: 'i', svg: '<svg/>', href: null, source: null, x: 0, y: 0, w: 0.2, ratio: 1 }] } }));
+    const m = { ...meta2d(), id: 'S3', fileName: 'hmqc.jdf' };
+    addSpectrum2d({ meta: m, data: data2d(m, []), fid: {} as never });
+    const st = useEditor.getState();
+    expect(st.doc.id).not.toBe(before);
+    expect(st.projectName).toBeNull();
+    expect(st.fileHandle).toBeNull();
+    expect(st.doc.figureImages).toEqual([]);
+    expect(st.doc.spectra2d.map((x) => x.fileName)).toEqual(['hmqc.jdf']);
+    expect(st.data2d.S3).toBeDefined();
+    expect(st.doc.figure.width).toBe(700);
   });
 });
