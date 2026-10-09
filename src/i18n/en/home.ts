@@ -5,7 +5,7 @@ export const EN_HOME: Record<string, string> = {
   '初めて開いたときの使い方の説明を、もう一度見る': 'Show the getting-started guide again',
   使い方: 'Guide',
   編集中の図に戻る: 'Back to the figure',
-  'このフォルダには .jdf がありません。': 'There are no .jdf files in this folder.',
+  "このフォルダには .jdf も TopSpin の測定もありません。": "There are no .jdf files or TopSpin experiments in this folder.",
   '条件に合う実験はありません。': 'No experiments match the filters.',
   '{n} 測定': '{n} {n|measurement|measurements}',
   '読めなかったファイル ({n})': 'Files that could not be read ({n})',
@@ -41,8 +41,7 @@ export const EN_HOME: Record<string, string> = {
     'A version edited and saved in this app. Opens the whole figure, including peak labels, integrals, and overlays (choose other versions under "File" on the right)',
   '2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します':
     'Raw 2D data. Opening it runs a 2D FT in this app and shows contours',
-  'Delta で処理していない生データです。開くとこのアプリで FT・位相補正します':
-    'Raw data not processed in Delta. Opening it runs FT and phase correction in this app',
+  "{app} で処理していない生データです。開くとこのアプリで FT・位相補正します": "Raw data not processed in {app}. Opening it runs FT and phase correction in this app",
   編集: 'Edited',
   '{n} 版': '{n} versions',
   '{name}\n{layers} 本を重ねた図 ({formatStamp})': '{name}\nFigure with {layers} {layers|spectrum|spectra} ({formatStamp})',
@@ -89,10 +88,8 @@ export const EN_HOME: Record<string, string> = {
   'チェックを付けて複数まとめて開くと、重ね書き・推移グラフに使えます。': 'Check several and open them together to overlay them or make a trend plot.',
   'サンプルを選ぶと、スキーム画像 (ChemDraw などからコピーして貼り付け)・メモ・タグを付けられます。':
     'Select a sample to add a scheme image (copy from ChemDraw and paste), a memo, and tags.',
-  '最初に .jdf が入っているフォルダを選んでください。次からは自動で読み込みます。':
-    'First, choose the folder that contains your .jdf files. It will be loaded automatically next time.',
-  '最初に .jdf が入っているフォルダを選んでください。このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。':
-    'First, choose the folder that contains your .jdf files. In this browser you need to choose it every time (Chrome / Edge can remember it).',
+  "最初に .jdf (Delta) か TopSpin のデータが入っているフォルダを選んでください。次からは自動で読み込みます。": "First, choose the folder that contains your .jdf (Delta) files or TopSpin data. It will be loaded automatically next time.",
+  "最初に .jdf (Delta) か TopSpin のデータが入っているフォルダを選んでください。このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。": "First, choose the folder that contains your .jdf (Delta) files or TopSpin data. In this browser you need to choose it every time (Chrome / Edge can remember it).",
   '{n} 件の実験': '{n} {n|experiment|experiments}',
   スキーム: 'Scheme',
   '「描く」か、画像を貼り付け (Ctrl+V)・ドロップ': 'Click "Draw", or paste (Ctrl+V) or drop an image',
@@ -132,10 +129,8 @@ export const EN_HOME: Record<string, string> = {
 
   // Onboarding.tsx (使い方の説明)
   'NMR Figure Editor へようこそ': 'Welcome to NMR Figure Editor',
-  'JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。':
-    'Make clean figures for Word and PowerPoint from JEOL Delta spectra (.jdf). Your data never leaves this computer. Only the number of opens and edits is sent to the developer (you can turn this off in Settings).',
-  'ホーム画面で「データフォルダを選ぶ」を押し、.jdf の入ったフォルダを選びます。測定日・サンプルごとに並び、ダブルクリックで開きます。チェックを付けてまとめて開くと、重ね書きになります。':
-    'On the home screen, click "Choose data folder" and pick the folder with your .jdf files. They are listed by date and sample; double-click to open. Check several and open them together to overlay them.',
+  "JEOL Delta (.jdf)・Bruker TopSpin のスペクトルから、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。": "Make clean figures for Word and PowerPoint from JEOL Delta (.jdf) and Bruker TopSpin spectra. Your data never leaves this computer. Only the number of opens and edits is sent to the developer (you can turn this off in Settings).",
+  "ホーム画面で「データフォルダを選ぶ」を押し、.jdf (または TopSpin のデータ) の入ったフォルダを選びます。測定日・サンプルごとに並び、ダブルクリックで開きます。チェックを付けてまとめて開くと、重ね書きになります。": "On the home screen, click \"Choose data folder\" and pick the folder with your .jdf files (or TopSpin data). Experiments are listed by date and sample; double-click to open. Check several and open them together to overlay them.",
   図を作る: 'Build the figure',
   '下の道具で、ピーク値・積分・図形・文字を付けます。右のパネルで、不純物の候補や図に入れるもの・大きさを決めます。操作が見つからないときは Ctrl+K で名前から探せます。':
     'Use the bottom toolbar to add peak labels, integrals, shapes, and text. The right panel handles impurity candidates, what goes into the figure, and its size. Can’t find something? Press Ctrl+K to search commands by name.',
@@ -169,4 +164,10 @@ export const EN_HOME: Record<string, string> = {
   図がありません: 'There is no figure',
   "ChemDraw で構造式を描く": "Draw structures in ChemDraw",
   "ChemDraw を使うなら、ここで連携を準備します (この PC で 1 回だけ)。構造式ボタンを押すと ChemDraw が開き、描いた内容が保存しなくてもそのまま図に入ります。使わないときは「次へ」で進めます。": "If you use ChemDraw, set up the link here (once on this PC). The structure button then opens ChemDraw, and what you draw goes straight into the figure without saving. If not, just press Next.",
+  "TopSpin の測定を探しています (フォルダ {dirs})": "Looking for TopSpin experiments ({dirs} {dirs|folder|folders})",
+  "TopSpin で処理した 2D です。開くと等高線で表示します": "2D processed in TopSpin. Opening it shows contours",
+  "TopSpin で処理した 2D です。開くと等高線で表示します (負の山も正の山と同じ線で出します)。": "2D processed in TopSpin. Opening it shows contours (negative peaks are drawn with the same lines as positive ones).",
+  "TopSpin で処理したスペクトルです。積分・ピーク値は TopSpin のもの (intrng・peaklist.xml) と行き来します。": "Spectrum processed in TopSpin. Integrals and peak labels sync with TopSpin’s (intrng, peaklist.xml).",
+  "TopSpin で処理した版 (処理番号 {procno})": "Processed in TopSpin (PROCNO {procno})",
+  "TopSpin で処理した版": "Processed in TopSpin",
 };

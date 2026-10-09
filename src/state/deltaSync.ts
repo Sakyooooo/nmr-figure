@@ -7,7 +7,7 @@
  * - 書く前のファイルは必ず記録に残す (初めて書くときはファイルを丸ごと)。記録からどの時点にも戻せる
  * - Delta で開いたままの画面は外から書き換えられないので、Delta ではファイルを開き直すと反映される
  */
-import { locale, tr, trk } from '../i18n';
+import { locale, tr } from '../i18n';
 import { create } from 'zustand';
 import { dbGet, dbPut } from '../lib/db';
 import {
@@ -29,6 +29,8 @@ import { figureBaseOf } from '../lib/figureJdf';
 import { readJdf } from '../lib/jdf';
 import { writeProcessedJdf } from '../lib/jdfProcessed';
 import { annotationBlock, withAnnotationBlock, writeAnnotations, type WritableAnnotations } from '../lib/jdfWrite';
+import { bundleAnnotations, bundleBlock, decodeBundle, isBundle, withBundleBlock, writeBundle } from '../lib/topspin';
+import { isTopspinHandle } from './bruker';
 import { invalidateSavedData } from './autosave';
 import { ask } from './dialog';
 import { addHistory, keepOriginal, originalOf, type HistoryEntry } from './history';
@@ -40,6 +42,8 @@ export type SyncStatus = 'waiting' | 'synced' | 'pending' | 'need-permission' | 
 
 export interface LinkView {
   fileName: string;
+  /** 同期の相手のソフト (Delta か TopSpin) */
+  app: 'Delta' | 'TopSpin';
   status: SyncStatus;
   message: string;
   /** 最後に合わせた時刻と向き (pull = Delta → このソフト、push = このソフト → Delta) */
@@ -54,6 +58,8 @@ interface Link {
   layerId: string;
   spectrumId: string;
   fileName: string;
+  /** 同期の相手のソフト。TopSpin は仮のファイル (state/bruker.ts) */
+  app: 'Delta' | 'TopSpin';
   handle: FileHandle | null;
   /** 最後に合わせたときのファイルの更新時刻と中身の鍵 */
   mtime: number | null;
@@ -69,10 +75,6 @@ interface Link {
   chain: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
 }
-
-/** 書き込みを許してもらえなかったとき (アプリの中のブラウザは、許可の確認そのものを出せない) */
-const NO_PERMISSION =
-  trk('Delta のファイルへの書き込みが許可されていません。アプリの中のブラウザなど、許可の確認を出せない所では書き込めないので、Chrome か Edge で開いてください (このソフトでの変更は図に残っています)');
 
 /** 変更が止まってから書くまでの待ち時間 */
 const DEBOUNCE = 1500;
@@ -117,7 +119,7 @@ export function startDeltaSync() {
 /** 図のスペクトルと同期の組をそろえる (足されたら始め、消えたら止める) */
 function reconcile() {
   const { doc, data } = useEditor.getState();
-  const wanted = new Map<string, { spectrumId: string; fileName: string }>();
+  const wanted = new Map<string, { spectrumId: string; fileName: string; app: Link['app'] }>();
   const byFile = new Set<string>();
   const duplicates: string[] = [];
   // 図の土台を先に見る: 前の版で保存した図には、図の .jdf を 2 本のスペクトルが指しているものがある (土台を変えて保存し直した)。
@@ -135,7 +137,7 @@ function reconcile() {
       continue;
     }
     byFile.add(fileName);
-    wanted.set(layer.id, { spectrumId: meta.id, fileName });
+    wanted.set(layer.id, { spectrumId: meta.id, fileName, app: meta.vendor === 'bruker' ? 'TopSpin' : 'Delta' });
   }
   for (const [layerId, link] of links) {
     const w = wanted.get(layerId);
@@ -152,23 +154,23 @@ function reconcile() {
       const l = link;
       queue(l, () => attach(l));
     }
-    views[layerId] = useSync.getState().links[layerId] ?? blankView(w.fileName);
+    views[layerId] = useSync.getState().links[layerId] ?? blankView(w.fileName, w.app);
   }
   const current = useSync.getState().links;
   for (const layerId of duplicates) {
-    views[layerId] = current[layerId]?.status === 'duplicate' ? current[layerId] : { ...blankView(''), status: 'duplicate', message: tr('同じ .jdf がほかのスペクトルで同期しているので、こちらは同期しません') };
+    views[layerId] = current[layerId]?.status === 'duplicate' ? current[layerId] : { ...blankView('', 'Delta'), status: 'duplicate', message: tr('同じファイルがほかのスペクトルで同期しているので、こちらは同期しません') };
   }
   const same = Object.keys(views).length === Object.keys(current).length && Object.keys(views).every((k) => views[k] === current[k]);
   if (!same) useSync.setState({ links: views });
 }
 
-function blankView(fileName: string): LinkView {
-  return { fileName, status: 'waiting', message: tr('Delta のファイルを確かめています…'), lastSyncAt: null, direction: null };
+function blankView(fileName: string, app: Link['app']): LinkView {
+  return { fileName, app, status: 'waiting', message: tr('{app} のファイルを確かめています…', { app }), lastSyncAt: null, direction: null };
 }
 
 function show(link: Link, patch: Partial<LinkView>) {
   if (links.get(link.layerId) !== link) return;
-  const before = useSync.getState().links[link.layerId] ?? blankView(link.fileName);
+  const before = useSync.getState().links[link.layerId] ?? blankView(link.fileName, link.app);
   const next = { ...before, ...patch };
   if ((Object.keys(next) as (keyof LinkView)[]).every((k) => next[k] === before[k])) return;
   useSync.setState((s) => ({ links: { ...s.links, [link.layerId]: next } }));
@@ -177,19 +179,23 @@ function show(link: Link, patch: Partial<LinkView>) {
 /** 1 つの .jdf への読み書きは 1 つずつ順に行う */
 function queue(link: Link, fn: () => Promise<void>) {
   link.chain = link.chain.then(fn).catch((e) => {
-    show(link, { status: 'error', message: errorText(e) });
+    show(link, { status: 'error', message: errorText(e, link.app) });
   });
   return link.chain;
 }
 
-function errorText(e: unknown) {
+function errorText(e: unknown, app: Link['app']) {
   const err = e as Error;
   if (err?.name === 'NoModificationAllowedError' || err?.name === 'InvalidStateError') {
-    return tr('ファイルに書き込めませんでした (Delta など、ほかのソフトが使っている可能性があります)。次に変更したとき、もう一度書きます');
+    return tr('ファイルに書き込めませんでした ({app} など、ほかのソフトが使っている可能性があります)。次に変更したとき、もう一度書きます', { app });
   }
-  if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return tr(NO_PERMISSION);
+  if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return noPermission(app);
   if (err?.name === 'NotFoundError') return tr('ファイルが見つかりません (動かしたか、消した可能性があります)');
-  return tr('Delta との同期でエラーが出ました: {v0}', { v0: err?.message ?? String(e) });
+  return tr('{app} との同期でエラーが出ました: {v0}', { app, v0: err?.message ?? String(e) });
+}
+
+function noPermission(app: Link['app']) {
+  return tr('{app} のファイルへの書き込みが許可されていません。アプリの中のブラウザなど、許可の確認を出せない所では書き込めないので、Chrome か Edge で開いてください (このソフトでの変更は図に残っています)', { app });
 }
 
 // ---------------------------------------------------------------- 今の中身
@@ -211,15 +217,27 @@ function layerState(layerId: string) {
 
 type AppState = NonNullable<ReturnType<typeof layerState>>;
 
-/** ファイルのピーク値・積分を、図の軸 (基準合わせのずれの前) で */
+/** ファイルのピーク値・積分を、図の軸 (基準合わせのずれの前) で。TopSpin は仮のファイルの中身 (lib/topspin.ts) */
 function fileState(bytes: ArrayBuffer, app: AppState) {
-  const ann = shiftAnnotations(fileAnnotations(bytes), -fileShift(bytes, app.meta));
+  const bundle = decodeBundle(bytes);
+  const ann = bundle ? bundleAnnotations(bundle, app.data, app.meta) : shiftAnnotations(fileAnnotations(bytes), -fileShift(bytes, app.meta));
   return { ann, key: annotationKey(ann, app.data, app.meta) };
 }
 
 /** 図のピーク値・積分を、このファイルの軸にして書く */
-function writeLayerAnnotations(bytes: ArrayBuffer, ann: WritableAnnotations, meta: SpectrumMeta) {
+function writeLayerAnnotations(bytes: ArrayBuffer, ann: WritableAnnotations, meta: SpectrumMeta, data: Float32Array) {
+  if (isBundle(bytes)) return writeBundle(bytes, ann, data, meta);
   return writeAnnotations(bytes, shiftAnnotations(ann, fileShift(bytes, meta)));
+}
+
+/** 記録に残す、ファイルが書いた中身 (Delta は注釈の場所、TopSpin は積分・ピーク値・INTSCL) */
+function blockOf(bytes: ArrayBuffer): Uint8Array | null {
+  const bundle = decodeBundle(bytes);
+  return bundle ? bundleBlock(bundle) : annotationBlock(bytes);
+}
+
+function withBlock(bytes: ArrayBuffer, block: Uint8Array): ArrayBuffer {
+  return isBundle(bytes) ? withBundleBlock(bytes, block) : withAnnotationBlock(bytes, block);
 }
 
 function entryOf(source: HistoryEntry['source'], note: string, ann: WritableAnnotations, key: string, app: AppState, block?: Uint8Array | null) {
@@ -260,7 +278,13 @@ function settle(link: Link, mtime: number, key: string, direction: LinkView['dir
 async function attach(link: Link) {
   const handle = jdfHandle(link.fileName);
   if (!handle) {
-    show(link, { status: 'waiting', message: tr('データフォルダにこの .jdf が見つからないので、まだ同期していません (ホーム画面でフォルダを読み込むと始まります)') });
+    show(link, {
+      status: 'waiting',
+      message:
+        link.app === 'TopSpin'
+          ? tr('データフォルダにこの測定が見つからないので、まだ TopSpin と同期していません (ホーム画面でフォルダを読み込むと始まります)')
+          : tr('データフォルダにこの .jdf が見つからないので、まだ同期していません (ホーム画面でフォルダを読み込むと始まります)'),
+    });
     return;
   }
   link.handle = handle;
@@ -272,7 +296,7 @@ async function attach(link: Link) {
   if (!app) return;
   const fromFile = fileState(bytes, app);
   // 開いただけのときは、前に見たときと同じ中身なら記録を足さない
-  await addHistory(link.fileName, entryOf('delta', tr('Delta のファイルを開いたときの中身'), fromFile.ann, fromFile.key, app, annotationBlock(bytes)), {
+  await addHistory(link.fileName, entryOf('delta', tr('{app} のファイルを開いたときの中身', { app: link.app }), fromFile.ann, fromFile.key, app, blockOf(bytes)), {
     skipIfSeen: true,
   });
   link.attached = true;
@@ -300,11 +324,11 @@ async function attach(link: Link) {
   // この機能を使う前に作った図で、図にもピーク値・積分がある: どちらが新しいか分からないので、一度だけ聞く
   if (!record && (app.ann.peaks.length || app.ann.integrals.length)) {
     const choice = await askInTurn(
-      tr('Delta のファイルと中身が違います'),
-      tr('{fileName}: この図のピーク値・積分 ({summary}) と、Delta のファイルの中身 ({summary2}) が違います。どちらに合わせますか？ 選ばなかった方も記録に残るので、あとから戻せます。', { fileName: link.fileName, summary: summary(app.ann), summary2: summary(fromFile.ann) }),
+      tr('{app} のファイルと中身が違います', { app: link.app }),
+      tr('{fileName}: この図のピーク値・積分 ({summary}) と、{app} のファイルの中身 ({summary2}) が違います。どちらに合わせますか？ 選ばなかった方も記録に残るので、あとから戻せます。', { fileName: link.fileName, summary: summary(app.ann), summary2: summary(fromFile.ann), app: link.app }),
       [
-        { label: tr('この図に合わせる (Delta に書き込む)'), value: 'app' },
-        { label: tr('Delta のファイルに合わせる'), value: 'file', kind: 'primary' },
+        { label: tr('この図に合わせる ({app} に書き込む)', { app: link.app }), value: 'app' },
+        { label: tr('{app} のファイルに合わせる', { app: link.app }), value: 'file', kind: 'primary' },
       ],
     );
     if (choice === 'app') {
@@ -315,13 +339,13 @@ async function attach(link: Link) {
       return;
     }
   }
-  await pull(link, file.lastModified, fromFile, app, record ? tr('Delta で保存された中身を反映') : tr('Delta のピーク値・積分を読み込み'));
+  await pull(link, file.lastModified, fromFile, app, record ? tr('{app} で保存された中身を反映', { app: link.app }) : tr('{app} のピーク値・積分を読み込み', { app: link.app }));
   if (!dataOk) await rewriteData(link);
 }
 
-/** FID から処理したスペクトル: ファイルのデータが、今の処理で作ったものと同じか (Delta で処理したスペクトルは常に true) */
+/** FID から処理したスペクトル: ファイルのデータが、今の処理で作ったものと同じか (Delta・TopSpin で処理したスペクトルは常に true) */
 function fileDataMatches(bytes: ArrayBuffer, app: AppState) {
-  if (!app.meta.processing) return true;
+  if (!app.meta.processing || isBundle(bytes)) return true;
   try {
     const loaded = readJdf(bytes, 'check.jdf');
     return loaded.meta.n === app.meta.n && Math.abs(loaded.meta.first - (app.meta.first + app.meta.refOffset)) < 1e-6 && sameShape(loaded.data, app.data);
@@ -356,7 +380,7 @@ function retryWaiting() {
 async function pull(link: Link, mtime: number, fromFile: { ann: WritableAnnotations; key: string }, app: AppState, message: string) {
   // 置き換えられる図の中身が、まだ Delta に書いていない変更なら記録に残す
   if (link.attached && app.key !== link.key && (app.ann.peaks.length || app.ann.integrals.length)) {
-    await addHistory(link.fileName, entryOf('app', tr('このソフトでの変更 (Delta の方が新しかったので使わなかったもの)'), app.ann, app.key, app));
+    await addHistory(link.fileName, entryOf('app', tr('このソフトでの変更 ({app} の方が新しかったので使わなかったもの)', { app: link.app }), app.ann, app.key, app));
   }
   applying = true;
   try {
@@ -379,6 +403,10 @@ async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer, fileChanged =
   const meta = s.doc.spectra.find((x) => x.id === link.spectrumId);
   const data = s.data[link.spectrumId];
   if (!meta || !data) return;
+  if (isBundle(bytes)) {
+    if (fileChanged) await reloadTopspin(link, meta, data);
+    return;
+  }
   let loaded;
   try {
     loaded = readJdf(bytes, link.fileName);
@@ -453,6 +481,36 @@ async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer, fileChanged =
   notify(tr('Delta で処理し直したスペクトルを読み込みました: {fileName}', { fileName: link.fileName }));
 }
 
+/** TopSpin で処理し直して (位相・基準など) 保存されていたら、1r を読み直す */
+async function reloadTopspin(link: Link, meta: SpectrumMeta, data: Float32Array) {
+  if (!isTopspinHandle(link.handle)) return;
+  let loaded;
+  try {
+    loaded = await link.handle.readSpectrum();
+  } catch {
+    return;
+  }
+  if (loaded.meta.nucleus !== meta.nucleus || sameSpectrum(meta, data, loaded.meta, loaded.data)) return;
+  useEditor.setState((st) => ({ data: { ...st.data, [link.spectrumId]: loaded.data } }));
+  applying = true;
+  try {
+    edit((d) => {
+      const m = d.spectra.find((x) => x.id === link.spectrumId);
+      if (!m) return;
+      m.first = loaded.meta.first;
+      m.last = loaded.meta.last;
+      m.n = loaded.meta.n;
+      m.freqMHz = loaded.meta.freqMHz;
+      m.maxAbs = loaded.meta.maxAbs;
+      m.delta = loaded.meta.delta ?? null;
+    }, false);
+  } finally {
+    applying = false;
+  }
+  invalidateSavedData();
+  notify(tr('TopSpin で処理し直したスペクトルを読み込みました: {fileName}', { fileName: link.fileName }));
+}
+
 function sameSpectrum(meta: SpectrumMeta, data: Float32Array, m2: SpectrumMeta, d2: Float32Array) {
   if (meta.n !== m2.n || meta.first !== m2.first || meta.last !== m2.last || data.length !== d2.length) return false;
   for (let i = 0; i < data.length; i++) if (data[i] !== d2[i]) return false;
@@ -506,7 +564,7 @@ async function push(link: Link) {
   // 編集した直後ならブラウザが許可の確認を出せる
   const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive ?? false;
   if (!(await writable(link, activation))) {
-    show(link, { status: 'need-permission', message: tr('Delta のファイルに書き込むには、データフォルダへの書き込みを許可してください') });
+    show(link, { status: 'need-permission', message: tr('{app} のファイルに書き込むには、データフォルダへの書き込みを許可してください', { app: link.app }) });
     void saveRecord(link);
     return;
   }
@@ -518,9 +576,9 @@ async function push(link: Link) {
     const now = appState(link)!;
     const fromFile = fileState(bytes, now);
     if (fromFile.key !== link.key) {
-      await addHistory(link.fileName, entryOf('delta', tr('Delta で保存'), fromFile.ann, fromFile.key, now, annotationBlock(bytes)));
+      await addHistory(link.fileName, entryOf('delta', tr('{app} で保存', { app: link.app }), fromFile.ann, fromFile.key, now, blockOf(bytes)));
       if (file.lastModified > (link.localChangedAt ?? 0)) {
-        await pull(link, file.lastModified, fromFile, now, tr('Delta の方が新しかったので、Delta の中身を反映'));
+        await pull(link, file.lastModified, fromFile, now, tr('{app} の方が新しかったので、{app} の中身を反映', { app: link.app }));
         return;
       }
     }
@@ -529,11 +587,11 @@ async function push(link: Link) {
   const before = fileState(bytes, current);
   await keepOriginal(link.fileName, bytes);
   // 上書きする前の中身 (直前の記録と同じなら足さない)
-  await addHistory(link.fileName, entryOf('delta', tr('書き込む前の Delta のファイル'), before.ann, before.key, current, annotationBlock(bytes)));
+  await addHistory(link.fileName, entryOf('delta', tr('書き込む前の {app} のファイル', { app: link.app }), before.ann, before.key, current, blockOf(bytes)));
   // FID から処理したスペクトルは、今の処理 (位相・線幅・基準) でデータも書き直す (図の中身のパラメーターはそのまま残る)
   const fid = current.meta.processing ? useEditor.getState().fids[current.meta.id] : undefined;
   const base = fid && current.meta.processing ? writeProcessedJdf(bytes, fid, current.meta.processing, current.meta.refOffset) : bytes;
-  const out = writeLayerAnnotations(base, current.ann, current.meta);
+  const out = writeLayerAnnotations(base, current.ann, current.meta, current.data);
   await writeFile(link.handle, out);
   const written = await link.handle.getFile();
   await addHistory(link.fileName, entryOf('app', tr('このソフトで編集'), current.ann, current.key, current));
@@ -575,12 +633,12 @@ async function poll(link: Link) {
     void saveRecord(link);
     return;
   }
-  await addHistory(link.fileName, entryOf('delta', tr('Delta で保存'), fromFile.ann, fromFile.key, app, annotationBlock(bytes)));
+  await addHistory(link.fileName, entryOf('delta', tr('{app} で保存', { app: link.app }), fromFile.ann, fromFile.key, app, blockOf(bytes)));
   if (link.localChangedAt && link.localChangedAt > file.lastModified) {
     await push(link);
     return;
   }
-  await pull(link, file.lastModified, fromFile, app, tr('Delta で保存された中身を反映'));
+  await pull(link, file.lastModified, fromFile, app, tr('{app} で保存された中身を反映', { app: link.app }));
 }
 
 // ---------------------------------------------------------------- 画面から
@@ -590,8 +648,8 @@ export async function grantDeltaWrite(layerId: string) {
   const link = links.get(layerId);
   if (!link) return;
   if (!(await writable(link, true))) {
-    show(link, { status: 'need-permission', message: tr(NO_PERMISSION) });
-    notify(tr(NO_PERMISSION), 'error');
+    show(link, { status: 'need-permission', message: noPermission(link.app) });
+    notify(noPermission(link.app), 'error');
     return;
   }
   for (const l of links.values()) if (l.localChangedAt) queue(l, () => push(l));
@@ -610,7 +668,7 @@ export async function recordNow(layerId: string, memo: string) {
   if (link?.handle && link.attached) {
     try {
       const bytes = await (await link.handle.getFile()).arrayBuffer();
-      if (fileState(bytes, state).key === state.key) block = annotationBlock(bytes);
+      if (fileState(bytes, state).key === state.key) block = blockOf(bytes);
     } catch {
       // ファイルが読めなくても、図の中身だけで記録する
     }
@@ -634,7 +692,7 @@ export async function restoreEntry(layerId: string, entry: HistoryEntry) {
     notify(tr('{time} の記録に戻しました', { time }));
     return;
   }
-  const ok = await ask(tr('この時点に戻す'), tr('{time} の中身 ({summary}) に戻します。Delta の {fileName} も書き換わります。今の中身は記録に残ります。', { time, summary: summary(entry.annotations), fileName: link.fileName }), [
+  const ok = await ask(tr('この時点に戻す'), tr('{time} の中身 ({summary}) に戻します。{app} の {fileName} も書き換わります。今の中身は記録に残ります。', { time, summary: summary(entry.annotations), fileName: link.fileName, app: link.app }), [
     { label: tr('戻す'), value: 'ok', kind: 'primary' },
   ]);
   if (ok !== 'ok') return;
@@ -645,8 +703,8 @@ export async function restoreEntry(layerId: string, entry: HistoryEntry) {
     const before = appState(link)!;
     const now = fileState(bytes, before);
     await keepOriginal(link.fileName, bytes);
-    await addHistory(link.fileName, entryOf('delta', tr('戻す前の Delta のファイル'), now.ann, now.key, before, annotationBlock(bytes)));
-    const out = entry.block ? withAnnotationBlock(bytes, entry.block) : writeLayerAnnotations(bytes, entry.annotations, before.meta);
+    await addHistory(link.fileName, entryOf('delta', tr('戻す前の {app} のファイル', { app: link.app }), now.ann, now.key, before, blockOf(bytes)));
+    const out = entry.block ? withBlock(bytes, entry.block) : writeLayerAnnotations(bytes, entry.annotations, before.meta, before.data);
     await writeFile(link.handle!, out);
     await applyFile(link, out, tr('{time} の記録から戻した', { time }));
   });
@@ -658,7 +716,12 @@ export async function restoreOriginal(layerId: string) {
   if (!link?.handle) return;
   const original = await originalOf(link.fileName);
   if (!original) return notify(tr('まだこのソフトから書き込んでいないので、ファイルは元のままです'));
-  const ok = await ask(tr('最初のファイルに戻す'), tr('{fileName} を、このソフトで初めて書き込む前のファイルに戻します (スペクトルも注釈も)。今の中身は記録に残ります。', { fileName: link.fileName }), [
+  const ok = await ask(
+    tr('最初のファイルに戻す'),
+    link.app === 'TopSpin'
+      ? tr('{fileName} の積分・ピーク値を、このソフトで初めて書き込む前の中身に戻します。今の中身は記録に残ります。', { fileName: link.fileName })
+      : tr('{fileName} を、このソフトで初めて書き込む前のファイルに戻します (スペクトルも注釈も)。今の中身は記録に残ります。', { fileName: link.fileName }),
+    [
     { label: tr('戻す'), value: 'ok', kind: 'danger' },
   ]);
   if (ok !== 'ok') return;
@@ -668,7 +731,7 @@ export async function restoreOriginal(layerId: string) {
     const bytes = await file.arrayBuffer();
     const before = appState(link)!;
     const now = fileState(bytes, before);
-    await addHistory(link.fileName, entryOf('delta', tr('戻す前の Delta のファイル'), now.ann, now.key, before, annotationBlock(bytes)));
+    await addHistory(link.fileName, entryOf('delta', tr('戻す前の {app} のファイル', { app: link.app }), now.ann, now.key, before, blockOf(bytes)));
     await writeFile(link.handle!, original.bytes);
     await applyFile(link, original.bytes, tr('最初のファイルに戻した'));
   });
@@ -688,18 +751,18 @@ async function applyFile(link: Link, bytes: ArrayBuffer, note: string) {
   }
   const after = appState(link)!;
   const written = await link.handle!.getFile();
-  await addHistory(link.fileName, entryOf('app', note, fromFile.ann, after.key, after, annotationBlock(bytes)));
+  await addHistory(link.fileName, entryOf('app', note, fromFile.ann, after.key, after, blockOf(bytes)));
   settle(link, written.lastModified, after.key, 'push');
   notify(`${note}: ${link.fileName} (${summary(fromFile.ann)})`);
 }
 
-/** 記録のある時点の中身を、別の .jdf として書き出す (元のファイルは変えない) */
+/** 記録のある時点の中身を、別の .jdf として書き出す (元のファイルは変えない。Delta だけ) */
 export async function exportEntry(layerId: string, entry: HistoryEntry) {
   const link = links.get(layerId);
-  if (!link?.handle) return;
+  if (!link?.handle || link.app !== 'Delta') return;
   const bytes = await (await link.handle.getFile()).arrayBuffer();
-  const meta = appState(link)?.meta;
-  const out = entry.block ? withAnnotationBlock(bytes, entry.block) : meta ? writeLayerAnnotations(bytes, entry.annotations, meta) : writeAnnotations(bytes, entry.annotations);
+  const app = appState(link);
+  const out = entry.block ? withBlock(bytes, entry.block) : app ? writeLayerAnnotations(bytes, entry.annotations, app.meta, app.data) : writeAnnotations(bytes, entry.annotations);
   const stamp = new Date(entry.at).toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const name = `${baseName(link.fileName)}-${stamp}.jdf`;
   const picker = (window as Window & { showSaveFilePicker?: (o: object) => Promise<FileHandle> }).showSaveFilePicker;

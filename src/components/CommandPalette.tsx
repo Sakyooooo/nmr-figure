@@ -258,7 +258,7 @@ function useCommands(svgRef: RefObject<SVGSVGElement | null>, onSettings: () => 
 
     ...(['analysis', 'figure', 'record'] as const).map((id) => ({
       group: tr('右のパネル'),
-      label: { analysis: tr('解析 (積分・ピーク値・不純物・SI 用の文)'), figure: tr('図 (図に入れるもの・大きさ・字体・テンプレート)'), record: tr('記録 (Delta との同期・編集記録)') }[id],
+      label: { analysis: tr('解析 (積分・ピーク値・不純物・SI 用の文)'), figure: tr('図 (図に入れるもの・大きさ・字体・テンプレート)'), record: tr('記録 (Delta・TopSpin との同期、編集記録)') }[id],
       icon: ({ analysis: 'nmr-integral', figure: 'image', record: 'history' } as const)[id],
       run: () => {
         setInspectorTab(id);

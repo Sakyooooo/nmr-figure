@@ -96,6 +96,8 @@ export function Spectrum2dPanel() {
 export function Plot2dPanel() {
   const plot = useEditor((s) => s.doc.plot2d);
   const meta = useEditor((s) => s.doc.spectra2d[0]);
+  // 生データ (FID) があるときだけ処理し直せる (TopSpin で処理した 2D には無い)
+  const hasFid = useEditor((s) => !!meta && !!s.fids2d[meta.id]);
   if (!plot || !meta) return null;
   const p = meta.processing;
   return (
@@ -177,6 +179,7 @@ export function Plot2dPanel() {
         </div>
       </Section>
 
+      {hasFid ? (
       <Section title={tr('2D の処理')} defaultOpen={false}>
         <p className="hint">{tr('COSY・HMBC などは絶対値で表示します (位相補正は要りません)。変えると計算し直します。')}</p>
         <label className="field block">
@@ -208,6 +211,14 @@ export function Plot2dPanel() {
           {tr('点の数: F2')}{' '}{meta.x.n} × F1 {meta.y.n}
         </p>
       </Section>
+      ) : (
+        <Section title={tr('2D の処理')} defaultOpen={false}>
+          <p className="hint">{tr('TopSpin で処理した 2D をそのまま使っています (負の山も正の山と同じ線で出します)。処理を変えるときは TopSpin で処理し直すか、ホーム画面で生データ (ser) の版を開いてください。')}</p>
+          <p className="hint">
+            {tr('点の数: F2')}{' '}{meta.x.n} × F1 {meta.y.n}
+          </p>
+        </Section>
+      )}
     </>
   );
 }

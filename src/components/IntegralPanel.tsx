@@ -34,6 +34,7 @@ export function IntegralPanel() {
   const meta = doc.spectra.find((s) => s.id === layer.spectrumId);
   const mine = doc.integrals.filter((x) => x.layerId === layer.id).sort((a, b) => b.from - a.from);
   const fromDelta = meta?.delta?.integrals ?? [];
+  const app = meta?.vendor === 'bruker' ? 'TopSpin' : 'Delta';
   const f = doc.figure;
   const set = (patch: Partial<FigureStyle>) =>
     edit((d) => {
@@ -66,13 +67,13 @@ export function IntegralPanel() {
       {fromDelta.length > 0 && !synced && (
         <div className="row wrap">
           <button
-            title={tr('この .jdf に入っている、Delta で引いた積分の範囲をそのまま使います')}
+            title={app === 'TopSpin' ? tr('TopSpin で引いた積分の範囲 (intrng) と値のそろえ方をそのまま使います') : tr('この .jdf に入っている、Delta で引いた積分の範囲をそのまま使います')}
             onClick={() => {
               const n = importDeltaIntegrals(layer.id);
-              notify(n ? tr('Delta の積分を {n} 件取り込みました', { n }) : tr('すべて取り込み済みです'));
+              notify(n ? tr('{app} の積分を {n} 件取り込みました', { app, n }) : tr('すべて取り込み済みです'));
             }}
           >
-            {tr('Delta の積分を取り込む ({n})', { n: fromDelta.length })}
+            {tr('{app} の積分を取り込む ({n})', { app, n: fromDelta.length })}
           </button>
         </div>
       )}

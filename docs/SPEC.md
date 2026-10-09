@@ -381,6 +381,33 @@ Delta も「同じファイルに上書き」で保存するので、このア�
     図が空なら黙って読む (ファイルは書き換えない)
 - Delta で開いたままの画面は外から書き換えられない (Delta 側で開き直すと反映される)
 
+## Bruker (TopSpin) のデータ (lib/bruker.ts, lib/topspin.ts, state/bruker.ts)
+2026-10-09、本人「Bruker (TopSpin) にも対応できるようにして」。聞いて「生データも TopSpin で処理したものも」「積分・ピークは取り込んで、書き戻しも」。
+確かめるのに本人のデスクトップの NMR フォルダ (TopSpin 3.6.5、292 測定) を読むだけで使ってよい (書き戻しは写しで試す)。マニュアルには今は足さない。
+- 測定 = 「データ名/実験番号/」(acqus があるフォルダ)。データフォルダの下を 5 段まで探す (state/bruker.ts の findDatasets)。
+  実験番号のフォルダだけを選んだときは audita.txt の場所 (`$$ D:/…/データ名/実験番号/audita.txt`) からデータ名を取る。fid・ser が空 (測定していない) なら出さない
+- ファイル名 (同期・記録の鍵): 処理した版は `データ名/実験番号` (処理番号 1 以外は `/pdata/番号`)、生データは `…/fid`・`…/ser`。
+  保存するファイルの名前では / を _ にする (lib/exportFigure.ts の baseName)。サンプル名 (title) はデータ名
+- 1r: OFFSET が最初の点の ppm、SI 点で SW_p (Hz) の幅 (最後の点は OFFSET − (SI−1)·SW_p/SF/SI)。強度は整数 × 2^NC_proc。DTYPP = 2 は 64 ビット小数、BYTORDP = 1 はビッグエンディアン
+- fid: Delta の生データと同じ処理 (lib/fid.ts)。**虚部の符号は JEOL と違いそのまま** (逆にすると搬送波を中心に反転する。本人のデータ 43 件で 1r と山の位置が一致)。
+  デジタルフィルターの遅れは GRPDLY、無ければ DECIM と DSPFVS の表 (nmrglue と同じ)。0 ppm の周波数は procs の SF (無ければ BF1)
+- 2rr: XDIM × XDIM の小さな行列の並びを戻す。位相を合わせた値なので絶対値にする (このアプリの等高線は正の側だけ)。プロジェクトファイルには行列を入れる (生データが無いため)
+- ser: 行ごとに 256 点 (1024 バイト) 区切り。デジタルフィルターの遅れの点は捨てる (絶対値なので位相は要らないが、窓関数の始まりをそろえる)。
+  F1 は FnMODE (古いデータは proc2s の MC2): QF は Delta と同じ、States・States-TPPI・Echo-Antiecho は 2 行で 1 点
+  (F2 の実部・虚部それぞれで F1 の点を作り、絶対値の 2 乗和)、TPPI は実数の点の FT の正の側。
+  **F1 の幅は acqu2s の SW (ppm) × SFO1** (SW_h は古い値のまま残っていることがあった。公開データの COSY で 1.4 倍違った)。
+  本人の HSQC (hsqcetgpsi2) と公開データの QF の COSY 7 件で、2rr と同じ所に山が出る。公開データの古い HMBC (hmbcg.cui2、MC2 = 5) は echo と antiecho の順が逆で F1 が反転する (直していない)
+- TopSpin の積分: intrng (A 1.0 #regions in PPM。範囲・bias・slope。古い形「P 0」は範囲だけ)。値 = Σ(整数 − bias − slope·j) × INTSCL (j は低磁場の端から)。
+  **範囲の点は、両端をそれぞれ一番近い点にして高磁場の端の点を足さない**。研究室の積分 901 件 (今の INTSCL と合う integrals.txt のもの) で 893 件が 0.01% 以内。
+  Bruker のスペクトルは、このアプリの積分も同じ足し方にする (lib/integrals.ts の integralRange)。TopSpin で値を入れた積分 (整数に 0.1% 以内) を基準にする (201 件中 201 件)
+- TopSpin のピーク値: peaklist.xml の Peak1D の F1 (ppm)。intensity は画面の目盛り (一番高い山がほぼ 15) なので読まない。書くときは元のピークの倍率に合わせ、
+  見出し (PeakList1DHeader・ピークを拾った条件) は元のものを残す。古い形の peaks (バイナリ) は書かない (TopSpin 3 以降は peaklist.xml を読むはず。確かめていない)
+- TopSpin との同期: Delta との同期 (state/deltaSync.ts) にそのまま載せる。intrng・peaklist.xml・INTSCL・NC_proc をまとめた中身を「仮のファイル」(TopspinHandle) の
+  バイト列にし (lib/topspin.ts の bundle)、更新時刻は procs・intrng・peaklist.xml・1r の一番新しいもの。書くときは変わったファイルだけ書き、procs は INTSCL の行だけ
+  (数の書き方は TopSpin と同じ: 有効数字 15 桁・指数 3 桁)。元から無く書くものも無いファイルは作らず、「書く前のファイルに戻す」では作ったファイルを消す。
+  1r が変わっていたら (TopSpin で処理し直した) スペクトルを読み直す。auditp.txt (処理の記録) には書かない (1r を変えないので、データの MD5 は変わらない)
+- 開き方: ホーム画面 (データフォルダ)、フォルダのドロップ (getAsFileSystemHandle。無いブラウザは webkitGetAsEntry で読むだけ)、「TopSpin の測定を開く」(showDirectoryPicker)
+
 ## 記録 (state/history.ts)
 - **自分で付ける記録** (2026-09-23 本人の希望: 「任意のタイミングで、メモは任意で。毎回付けていたらきりがない」)。
   「記録を付ける」で今の中身を残す (manual、memo)。一覧の中心はこれ。メモはあとから直せる・記録は消せる。自動では消さない。

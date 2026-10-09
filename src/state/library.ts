@@ -5,6 +5,7 @@ import { readJdf, type LoadedSpectrum, type ReadOptions } from '../lib/jdf';
 import { readJdf2d, type Loaded2dSpectrum } from '../lib/jdf2d';
 import { figureBaseOf } from '../lib/figureJdf';
 import { experimentKey, readJdfMeta, type ExperimentMeta } from '../lib/jdfMeta';
+import { datasetKey, datasetMeta, filesDir, findDatasets, readDataset, topspinHandle, type BrukerDataset, type DirLike } from './bruker';
 import { notify, type FileHandle } from './store';
 import type { NmrDocument } from './types';
 import type { HomeSort } from '../lib/settings';
@@ -55,7 +56,8 @@ interface LibraryState {
   /** データフォルダの .jdf (このソフトで保存した図入りの .jdf も。元の測定の版としてまとめて出す) */
   experiments: ExperimentMeta[];
   failed: { fileName: string; message: string }[];
-  progress: { done: number; total: number } | null;
+  /** dirs: TopSpin の測定を探して見たフォルダの数 (探している間だけ) */
+  progress: { done: number; total: number; dirs?: number } | null;
   notes: Record<string, SampleNote>;
   /** 保存した図 (新しい順) */
   figures: SavedFigure[];
@@ -94,24 +96,29 @@ const set = useLibrary.setState;
 const get = useLibrary.getState;
 
 type FileEntry = FileHandle & { kind: 'file' };
-type DirHandle = {
-  kind: 'directory';
-  name: string;
-  values(): AsyncIterable<FileEntry | { kind: 'directory'; name: string }>;
-  queryPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
-  requestPermission?(o: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
+/** データフォルダ (ブラウザの FileSystemDirectoryHandle) */
+type DirHandle = DirLike & {
   /** このフォルダの中のファイルなら、フォルダからの道のり (違えば null) */
   resolve?(h: FileHandle): Promise<string[] | null>;
-  getDirectoryHandle?(name: string, o?: { create?: boolean }): Promise<{ getFileHandle(name: string, o?: { create?: boolean }): Promise<FileHandle> }>;
 };
 type PickerWindow = Window & { showDirectoryPicker?: (o: { id?: string; mode?: 'read'; startIn?: DirHandle }) => Promise<DirHandle> };
 
 const FOLDER_KEY = 'dataFolder';
 /** 実験のキー → ファイルの取り出し方 */
 const sources = new Map<string, () => Promise<File>>();
-/** ファイル名 → フォルダの中のファイル (Delta との同期で書き込むのに使う) */
+/** 実験のキー → Bruker (TopSpin) の測定 */
+const datasets = new Map<string, BrukerDataset>();
+/** ファイル名 → フォルダの中のファイル (Delta との同期で書き込むのに使う。TopSpin で処理した 1D は仮のファイル) */
 const handles = new Map<string, FileEntry>();
+
+/** 一覧を作る元。Delta の .jdf はファイル、Bruker は測定 (フォルダ) */
+type ScanEntry = { name: string; getFile: () => Promise<File>; dataset?: undefined } | { name: string; dataset: BrukerDataset; getFile?: undefined };
 let folder: DirHandle | null = null;
+
+/** TopSpin の測定を探しているときの進み具合 (見たフォルダの数) */
+function scanningDirs(count: number) {
+  set({ progress: { done: 0, total: 0, dirs: count } });
+}
 
 export function sampleKeyOf(e: Pick<ExperimentMeta, 'title' | 'fileName'>) {
   return e.title || e.fileName.replace(/\.jdf$/i, '');
@@ -169,6 +176,29 @@ export async function pickFolder() {
 }
 
 /**
+ * ドロップ・選んだフォルダをデータフォルダにする (TopSpin のデータのフォルダごと開いたとき)。
+ * ブラウザのフォルダ (FileSystemDirectoryHandle) なら覚えておき、読むだけのもの (ドロップの古い形) はその場限りの一覧にする
+ */
+export async function adoptDataFolder(dir: DirLike) {
+  const real = typeof (dir as { isSameEntry?: unknown }).isSameEntry === 'function';
+  if (real) {
+    folder = dir as DirHandle;
+    await dbSet('kv', FOLDER_KEY, dir).catch(() => undefined);
+    set({ folderName: dir.name, temporary: false, selected: [], focus: null, folderPermission: 'granted' });
+    await scanFolder();
+    return;
+  }
+  folder = null;
+  handles.clear();
+  set({ folderName: dir.name, temporary: true, selected: [], focus: null });
+  const found = await findDatasets(dir, scanningDirs);
+  await scanEntries(
+    found.map((dataset) => ({ name: dataset.path.name, dataset })),
+    false,
+  );
+}
+
+/**
  * フォルダの読み取りを許可してもらう (ボタンを押したときに呼ぶ)。
  * ブラウザが「拒否」を覚えていると requestPermission は何も聞かずに拒否を返すので、
  * そのときはフォルダを選び直してもらう (押しても何も起きない状態にしない)。
@@ -207,19 +237,24 @@ function pickFilesFallback() {
   input.multiple = true;
   input.setAttribute('webkitdirectory', '');
   input.onchange = () => {
-    const files = [...(input.files ?? [])].filter((f) => !f.webkitRelativePath.split('/').slice(1, -1).length);
-    void loadLibraryFiles(files, input.files?.[0]?.webkitRelativePath.split('/')[0] ?? null);
+    const all = [...(input.files ?? [])];
+    void loadLibraryFiles(all, all[0]?.webkitRelativePath.split('/')[0] ?? null);
   };
   input.click();
 }
 
-/** ファイルの一覧から、その場限りのライブラリを作る (フォルダを覚えておけないとき・開発時) */
+/**
+ * ファイルの一覧から、その場限りのライブラリを作る (フォルダを覚えておけないとき・開発時)。
+ * フォルダの直下の .jdf と、下のフォルダの Bruker の測定 (webkitRelativePath で場所が分かるとき)
+ */
 export async function loadLibraryFiles(files: File[], name: string | null) {
   folder = null;
   set({ folderName: name, temporary: true, selected: [], focus: null });
-  const jdf = files.filter((f) => /\.jdf$/i.test(f.name));
+  const jdf = files.filter((f) => /\.jdf$/i.test(f.name) && !f.webkitRelativePath.split('/').slice(1, -1).length);
+  const tree = files.some((f) => /(^|\/)acqus$/.test(f.webkitRelativePath)) ? filesDir(files) : null;
+  const found = tree ? await findDatasets(tree, scanningDirs) : [];
   await scanEntries(
-    jdf.map((file) => ({ name: file.name, getFile: async () => file })),
+    [...jdf.map((file) => ({ name: file.name, getFile: async () => file })), ...found.map((dataset) => ({ name: dataset.path.name, dataset }))],
     false,
   );
 }
@@ -227,15 +262,17 @@ export async function loadLibraryFiles(files: File[], name: string | null) {
 export async function scanFolder() {
   if (!folder) return;
   set({ status: 'scanning', progress: { done: 0, total: 0 } });
-  const entries: { name: string; getFile: () => Promise<File> }[] = [];
+  const entries: ScanEntry[] = [];
   handles.clear();
   try {
     for await (const entry of folder.values()) {
       if (entry.kind === 'file' && /\.jdf$/i.test(entry.name)) {
         entries.push({ name: entry.name, getFile: () => entry.getFile() });
-        handles.set(entry.name, entry);
+        handles.set(entry.name, entry as FileEntry);
       }
     }
+    // Bruker (TopSpin) の測定 (下のフォルダの「データ名/実験番号/」)
+    for (const dataset of await findDatasets(folder, scanningDirs)) entries.push({ name: dataset.path.name, dataset });
   } catch (e) {
     // 途中で読めなくなったら (許可が切れたなど)、読み込みボタンを出し直す
     set({ status: 'need-permission', progress: null });
@@ -246,26 +283,42 @@ export async function scanFolder() {
 }
 
 /** persist: 覚えているフォルダの読み込みのときだけ、ファイル情報のキャッシュを更新する */
-async function scanEntries(entries: { name: string; getFile: () => Promise<File> }[], persist: boolean) {
+async function scanEntries(entries: ScanEntry[], persist: boolean) {
   set({ status: 'scanning', progress: { done: 0, total: entries.length } });
   const cache = await dbEntries<ExperimentMeta>('meta');
   const seen = new Set<string>();
   const experiments: ExperimentMeta[] = [];
   const failed: LibraryState['failed'] = [];
   sources.clear();
+  datasets.clear();
   let done = 0;
   for (const entry of entries) {
     try {
-      const file = await entry.getFile();
-      const key = experimentKey(file);
-      seen.add(key);
-      let meta = cache.get(key);
-      if (!meta) {
-        meta = await readJdfMeta(file);
-        if (persist) await dbSet('meta', key, meta);
+      if (entry.dataset) {
+        const ds = entry.dataset;
+        const key = datasetKey(ds);
+        seen.add(key);
+        let meta = cache.get(key);
+        if (!meta) {
+          meta = await datasetMeta(ds);
+          if (persist) await dbSet('meta', key, meta);
+        }
+        experiments.push(meta);
+        datasets.set(key, ds);
+        // TopSpin で処理した 1D は、積分・ピーク値を TopSpin と行き来できるように (state/deltaSync.ts)
+        if (ds.dimension === 1 && ds.path.procno !== null && persist) handles.set(meta.fileName, topspinHandle(ds));
+      } else {
+        const file = await entry.getFile();
+        const key = experimentKey(file);
+        seen.add(key);
+        let meta = cache.get(key);
+        if (!meta) {
+          meta = await readJdfMeta(file);
+          if (persist) await dbSet('meta', key, meta);
+        }
+        experiments.push(meta);
+        sources.set(key, entry.getFile);
       }
-      experiments.push(meta);
-      sources.set(key, entry.getFile);
     } catch (e) {
       failed.push({ fileName: entry.name, message: (e as Error).message });
     }
@@ -287,6 +340,12 @@ async function scanEntries(entries: { name: string; getFile: () => Promise<File>
 }
 
 export async function loadExperiment(key: string, options?: ReadOptions): Promise<LoadedSpectrum> {
+  const ds = datasets.get(key);
+  if (ds) {
+    const { one } = await readDataset(ds, options);
+    if (!one) throw new Error(tr('2D の測定です'));
+    return one;
+  }
   const source = sources.get(key);
   if (!source) throw new Error(tr('ファイルが見つかりません。フォルダを読み直してください'));
   const file = await source();
@@ -395,6 +454,7 @@ export async function folderWriteChildFile(dir: string, name: string, text: stri
   if (!folder?.getDirectoryHandle) throw new Error(tr('フォルダが開かれていません'));
   const sub = await folder.getDirectoryHandle(dir, { create: true });
   const handle = await sub.getFileHandle(name, { create: true });
+  if (!handle.createWritable) throw new Error(tr('このフォルダには書き込めません'));
   const w = await handle.createWritable();
   await w.write(text);
   await w.close();
@@ -402,6 +462,12 @@ export async function folderWriteChildFile(dir: string, name: string, text: stri
 
 /** 2D の実験を読む */
 export async function load2dExperiment(key: string): Promise<Loaded2dSpectrum> {
+  const ds = datasets.get(key);
+  if (ds) {
+    const { two } = await readDataset(ds);
+    if (!two) throw new Error(tr('1D の測定です'));
+    return two;
+  }
   const source = sources.get(key);
   if (!source) throw new Error(tr('ファイルが見つかりません。フォルダを読み直してください'));
   const file = await source();

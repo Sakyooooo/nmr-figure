@@ -12,7 +12,7 @@ import { deltaBaseline, integralArea, integralRange, pointStep, referenceOf } fr
 import { deltaReference, readAnnotations } from './jdfAnnotations';
 import type { WritableAnnotations } from './jdfWrite';
 
-type Axis = Pick<SpectrumMeta, 'first' | 'last' | 'n' | 'refOffset'>;
+type Axis = Pick<SpectrumMeta, 'first' | 'last' | 'n' | 'refOffset' | 'vendor'>;
 
 /**
  * Delta と行き来できるスペクトルか。Delta で処理済みの 1D と、FID からこのアプリで処理して図入りの .jdf に保存したもの
@@ -20,6 +20,8 @@ type Axis = Pick<SpectrumMeta, 'first' | 'last' | 'n' | 'refOffset'>;
  */
 export function canSyncDelta(meta: SpectrumMeta | undefined): meta is SpectrumMeta {
   if (!meta || meta.simulated) return false;
+  // Bruker: TopSpin で処理した版 (1r) は、その処理番号のフォルダの積分・ピーク値と行き来する。生データから処理したものはしない
+  if (meta.vendor === 'bruker') return !meta.processing;
   if (meta.processing) return !!meta.syncFile && /\.jdf$/i.test(meta.syncFile);
   return /\.jdf$/i.test(syncFileOf(meta));
 }

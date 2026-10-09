@@ -7,9 +7,11 @@ import { readJdf2d } from '../lib/jdf2d';
 import { hasEmbeddedFigure, readEmbeddedFigure } from '../lib/jdfEmbed';
 import { labReference } from '../lib/settings';
 import { PROJECT_EXT, parseProject, serializeProject } from '../lib/projectFile';
+import { datasetFileName, filesDir as filesDirOf, findDatasets, readDataset, topspinHandle, type BrukerDataset, type DirLike } from './bruker';
 import { placeCdxml } from './chemdraw';
 import { ask } from './dialog';
 import {
+  adoptDataFolder,
   canOpen,
   figureFileOf,
   listedFiles,
@@ -37,6 +39,7 @@ type PickerOptions = {
 type FsWindow = Window & {
   showOpenFilePicker?: (o: PickerOptions) => Promise<FileHandle[]>;
   showSaveFilePicker?: (o: PickerOptions) => Promise<FileHandle>;
+  showDirectoryPicker?: (o: { id?: string; mode?: 'read' | 'readwrite' }) => Promise<DirLike>;
 };
 const fsWindow = window as FsWindow;
 
@@ -74,16 +77,61 @@ async function confirmDiscard(): Promise<boolean> {
   return false;
 }
 
+/** 一度に開く測定の数の目安。これより多いフォルダは、ホーム画面の一覧にするか聞く */
+const MANY_DATASETS = 8;
+
 /**
- * .nmrfig は図ごと開く。.jdf は mode が add なら編集中の図に追加し、new なら新しい図にする
+ * .nmrfig は図ごと開く。.jdf と TopSpin の測定 (フォルダ) は mode が add なら編集中の図に追加し、new なら新しい図にする
  * (ホーム画面からは new)
  */
-export async function openFiles(files: { file: File; handle?: FileHandle }[], mode: 'add' | 'new' = 'add') {
+export async function openFiles(files: { file: File; handle?: FileHandle }[], mode: 'add' | 'new' = 'add', dirs: DirLike[] = []) {
   const spectra: LoadedSpectrum[] = [];
   let cleared = false;
   /** 2D を開いた / 1D を 2D の上・右に使った */
   let opened2d = false;
   let attached = false;
+  // TopSpin の測定 (ドロップしたフォルダ・選んだフォルダ)
+  for (const ds of await datasetsToOpen(dirs)) {
+    const name = datasetFileName(ds);
+    try {
+      const { one, two } = await readDataset(ds, readOptions());
+      if (two) {
+        if (!(await confirmDiscard())) continue;
+        addSpectrum2d(two);
+        notify(tr('{name} (2D) を開きました', { name }));
+        opened2d = true;
+        cleared = true;
+        for (const s of spectra.splice(0)) {
+          const sides = sidesFor(useEditor.getState().doc, s.meta.nucleus);
+          if (sides.length) {
+            applySide(sides, { meta: s.meta, data: s.data, from: s.meta.fileName, marks: [], figure: false });
+            attached = true;
+          }
+        }
+        continue;
+      }
+      if (!one) continue;
+      // 編集中の 2D に足した 1D は、核種の合う側 (上・右) に使う
+      if ((mode === 'add' || opened2d) && useEditor.getState().doc.plot2d) {
+        const sides = sidesFor(useEditor.getState().doc, one.meta.nucleus);
+        if (sides.length) {
+          applySide(sides, { meta: one.meta, data: one.data, from: name, marks: [], figure: false });
+          attached = true;
+          continue;
+        }
+      }
+      if (mode === 'new' && !cleared && useEditor.getState().doc.layers.length) {
+        if (!(await confirmDiscard())) return;
+        loadDocument(emptyDocument(), {}, null, null);
+      }
+      cleared = true;
+      // TopSpin で処理した版は、積分・ピーク値を TopSpin と行き来する (書き込みの許可はそのフォルダに聞く)
+      if (ds.path.procno !== null) registerJdfHandle(name, topspinHandle(ds));
+      spectra.push(one);
+    } catch (e) {
+      notify(e instanceof JdfError ? e.message : `${name}: ${(e as Error).message}`, 'error');
+    }
+  }
   for (const { file, handle } of files) {
     const name = file.name.toLowerCase();
     try {
@@ -143,6 +191,8 @@ export async function openFiles(files: { file: File; handle?: FileHandle }[], mo
         else notify(tr('{name}: 構造式は、スペクトルを開いた図にドロップしてください', { name: file.name }), 'error');
       } else if (name.endsWith('.cdx')) {
         notify(tr('{name}: ChemDraw で .cdxml の形で保存し直すか、「Edit > Copy As > CDXML Text」でコピーして貼ってください', { name: file.name }), 'error');
+      } else if (['acqus', 'acqu2s', 'procs', 'proc2s', 'fid', 'ser', '1r', '1i', '2rr'].includes(name)) {
+        notify(tr('{name}: TopSpin の測定は、フォルダ (データ名か実験番号のフォルダ) ごとドロップしてください', { name: file.name }), 'error');
       } else {
         notify(tr('{name}: .jdf か {PROJECT_EXT} を選んでください', { name: file.name, PROJECT_EXT }), 'error');
       }
@@ -217,6 +267,66 @@ export async function pickSide1d(sides: Side2d[]) {
 /** .jdf のヘッダーだけ見て 2D かどうか調べる (13 バイト目が次元の数) */
 function is2d(buffer: ArrayBuffer) {
   return buffer.byteLength > 16 && new DataView(buffer).getUint8(12) >= 2;
+}
+
+/**
+ * ドロップ・選んだフォルダの中の TopSpin の測定から、開くものを選ぶ。測定ごとに 1 つ (TopSpin で処理した版、なければ生データ)。
+ * 多いときは、ホーム画面の一覧にするか聞く (データフォルダごとドロップしたときなど)
+ */
+async function datasetsToOpen(dirs: DirLike[]): Promise<BrukerDataset[]> {
+  if (!dirs.length) return [];
+  const found: BrukerDataset[] = [];
+  for (const dir of dirs) {
+    const list = await findDatasets(dir);
+    if (!list.length) notify(tr('{name}: TopSpin の測定 (acqus のあるフォルダ) が見つかりません', { name: dir.name }), 'error');
+    found.push(...list);
+  }
+  const byExp = new Map<string, BrukerDataset>();
+  for (const ds of found) {
+    const id = `${ds.path.name}/${ds.path.expno}`;
+    const now = byExp.get(id);
+    // 処理した版を先に (処理番号の小さい方)
+    if (!now || (now.path.procno === null && ds.path.procno !== null)) byExp.set(id, ds);
+  }
+  const chosen = [...byExp.values()];
+  if (chosen.length <= MANY_DATASETS) return chosen;
+  const choice = await ask(
+    tr('測定がたくさんあります'),
+    tr('{name} には TopSpin の測定が {n} 件あります。ホーム画面の一覧にして、そこから選びますか？', { name: dirs.map((d) => d.name).join(', '), n: chosen.length }),
+    [
+      { label: tr('全部まとめて開く'), value: 'all' },
+      { label: tr('ホーム画面の一覧にする'), value: 'home', kind: 'primary' },
+    ],
+  );
+  if (choice === 'all') return chosen;
+  if (choice === 'home') {
+    await adoptDataFolder(dirs[0]);
+    useEditor.setState({ screen: 'home' });
+  }
+  return [];
+}
+
+/** TopSpin の測定のフォルダを選んで開く (データ名のフォルダか実験番号のフォルダ) */
+export async function openFolderDialog(mode: 'add' | 'new' = 'add') {
+  if (!fsWindow.showDirectoryPicker) {
+    // フォルダを選ぶ画面の無いブラウザ: ファイルの一覧として選んでもらう (読むだけ)
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.setAttribute('webkitdirectory', '');
+    input.onchange = () => {
+      const dir = filesDirOf([...(input.files ?? [])]);
+      if (dir) void openFiles([], mode, [dir]);
+    };
+    input.click();
+    return;
+  }
+  try {
+    const dir = await fsWindow.showDirectoryPicker({ id: 'nmr-topspin', mode: 'read' });
+    await openFiles([], mode, [dir]);
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') notify((e as Error).message, 'error');
+  }
 }
 
 async function askFigureOrSpectrum(fileName: string): Promise<'figure' | 'spectrum' | null> {
@@ -561,8 +671,8 @@ async function downloadJdf(bytes: ArrayBuffer, json: string, name: string, messa
 }
 
 async function saveNmrfig(saveAs: boolean) {
-  const { doc, data, fids, fids2d, fileHandle } = useEditor.getState();
-  const text = serializeProject(doc, data, fids, fids2d);
+  const { doc, data, fids, fids2d, data2d, fileHandle } = useEditor.getState();
+  const text = serializeProject(doc, data, fids, fids2d, { data2d });
   try {
     let handle = saveAs || !fileHandle?.name.endsWith(PROJECT_EXT) ? null : fileHandle;
     // 覚えていた保存先は、書き込みの許可を取り直す (ブラウザを開き直したあとなど)

@@ -19,12 +19,12 @@ export function openOnboarding() {
 const STEPS: { title: string; text: string; art: () => ReactNode; chemdraw?: boolean }[] = [
   {
     title: trk('NMR Figure Editor へようこそ'),
-    text: trk('JEOL Delta のスペクトル (.jdf) から、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。'),
+    text: trk('JEOL Delta (.jdf)・Bruker TopSpin のスペクトルから、Word・PowerPoint に貼るきれいな図を作ります。データは外に送らず、このパソコンの中だけで扱います。開発者には、開いた回数と編集した回数だけを送ります (設定で止められます)。'),
     art: ArtWelcome,
   },
   {
     title: trk('データフォルダを選ぶ'),
-    text: trk('ホーム画面で「データフォルダを選ぶ」を押し、.jdf の入ったフォルダを選びます。測定日・サンプルごとに並び、ダブルクリックで開きます。チェックを付けてまとめて開くと、重ね書きになります。'),
+    text: trk('ホーム画面で「データフォルダを選ぶ」を押し、.jdf (または TopSpin のデータ) の入ったフォルダを選びます。測定日・サンプルごとに並び、ダブルクリックで開きます。チェックを付けてまとめて開くと、重ね書きになります。'),
     art: ArtFolder,
   },
   {

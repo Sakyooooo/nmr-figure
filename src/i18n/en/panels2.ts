@@ -12,9 +12,9 @@ export const EN_PANELS2: Record<string, string> = {
   手で引く: 'Draw manually',
   全部消す: 'Clear all',
   'この .jdf に入っている、Delta で引いた積分の範囲をそのまま使います': 'Use the integral ranges drawn in Delta that are stored in this .jdf',
-  'Delta の積分を {n} 件取り込みました': 'Imported {n} {n|integral|integrals} from Delta',
+  "{app} の積分を {n} 件取り込みました": "Imported {n} {n|integral|integrals} from {app}",
   すべて取り込み済みです: 'Everything is already imported',
-  'Delta の積分を取り込む ({n})': 'Import integrals from Delta ({n})',
+  "{app} の積分を取り込む ({n})": "Import integrals from {app} ({n})",
   '一番高いピークの何 % 以上を信号とみなすか': 'Minimum height, as % of the tallest peak, to count as a signal',
   高さ: 'Height',
   '%以上': '% or more',
@@ -139,8 +139,8 @@ export const EN_PANELS2: Record<string, string> = {
   'クリックで 1 本ずつ付け外し': 'Click to add or remove one at a time',
   手で付ける: 'Add manually',
   'この .jdf に入っている、Delta で付けたピーク値をそのまま使います': 'Use the peak labels from Delta that are stored in this .jdf',
-  'Delta のピーク値を {n} 本取り込みました': 'Imported {n} peak {n|label|labels} from Delta',
-  'Delta のピーク値を取り込む ({n})': 'Import peak labels from Delta ({n})',
+  "{app} のピーク値を {n} 本取り込みました": "Imported {n} peak {n|label|labels} from {app}",
+  "{app} のピーク値を取り込む ({n})": "Import peak labels from {app} ({n})",
   '一番高いピークの何 % 以上を拾うか': 'Minimum height to pick, as % of the tallest peak',
   '一番高いピークを 100 とした高さ': 'Height with the tallest peak as 100',
   '高さ (%)': 'Height (%)',
@@ -202,8 +202,7 @@ export const EN_PANELS2: Record<string, string> = {
 
   // ProcessingPanel.tsx (FID の処理)
   'FID の処理 (位相補正)': 'FID processing (phase correction)',
-  'Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。':
-    'This raw data (FID) was not processed in Delta and was Fourier-transformed in this app. If the phase is off, re-run auto phasing or adjust it with the sliders.',
+  "{app} で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。": "This raw data (FID) was not processed in {app} and was Fourier-transformed in this app. If the phase is off, re-run auto phasing or adjust it with the sliders.",
   '元の FID がないため、調整できません (古い形式で保存した図です)。': 'Cannot adjust because the original FID is missing (the figure was saved in an older format).',
   位相を自動で合わせる: 'Auto phase',
   溶媒ピークで基準を合わせました: 'Referenced to the solvent peak',
@@ -248,4 +247,7 @@ export const EN_PANELS2: Record<string, string> = {
   "今の連携は前の版です。ChemDraw で直した内容が図に入らず、図の構造式が ChemDraw と違ったままになることがあります。連携し直してください (1 回だけ)。":
     "The installed link is an older version. Changes made in ChemDraw may not reach the figure, so the structure in the figure can stay different from ChemDraw. Please link again (once).",
   "このまま開く": "Open anyway",
+  "TopSpin で引いた積分の範囲 (intrng) と値のそろえ方をそのまま使います": "Use the integral ranges (intrng) and calibration from TopSpin as they are",
+  "TopSpin で付けたピーク値 (peaklist.xml) をそのまま使います": "Use the peak labels from TopSpin (peaklist.xml) as they are",
+  "TopSpin で処理した 2D をそのまま使っています (負の山も正の山と同じ線で出します)。処理を変えるときは TopSpin で処理し直すか、ホーム画面で生データ (ser) の版を開いてください。": "This 2D is used as processed in TopSpin (negative peaks are drawn with the same lines as positive ones). To change the processing, reprocess it in TopSpin or open the raw data (ser) version from the home screen.",
 };

@@ -16,6 +16,8 @@ interface ProjectFileV1 {
   fids?: Record<string, Omit<FidData, 're' | 'im'> & { re: string; im: string }>;
   /** 2D の生データ。開いたときに FT し直す (処理後の行列は大きいので入れない) */
   fids2d?: Record<string, Omit<Fid2dData, 're' | 'im'> & { re: string; im: string; rows: number }>;
+  /** 生データの無い 2D (TopSpin で処理したもの) の行列 */
+  data2d?: Record<string, Omit<Spectrum2dData, 'data'> & { data: string }>;
   /** 図入りの .jdf に入れたとき、その .jdf の土台のスペクトル (spectrumId) */
   jdfBase?: string;
 }
@@ -26,7 +28,7 @@ export function serializeProject(
   data: Record<string, Float32Array>,
   fids: Record<string, FidData> = {},
   fids2d: Record<string, Fid2dData> = {},
-  extra: { jdfBase?: string } = {},
+  extra: { jdfBase?: string; data2d?: Record<string, Spectrum2dData> } = {},
 ): string {
   const used: Record<string, string> = {};
   const usedFids: NonNullable<ProjectFileV1['fids']> = {};
@@ -37,9 +39,12 @@ export function serializeProject(
     if (fid) usedFids[s.id] = { ...fid, re: toBase64(fid.re), im: toBase64(fid.im) };
   }
   const used2d: NonNullable<ProjectFileV1['fids2d']> = {};
+  const matrices: NonNullable<ProjectFileV1['data2d']> = {};
   for (const s2 of doc.spectra2d ?? []) {
     const fid = fids2d[s2.id];
     if (fid) used2d[s2.id] = { ...fid, rows: fid.re.length, re: toBase64(flatten(fid.re)), im: toBase64(flatten(fid.im)) };
+    // 生データの無い 2D は、行列をそのまま入れる
+    else if (extra.data2d?.[s2.id]) matrices[s2.id] = { ...extra.data2d[s2.id], data: toBase64(extra.data2d[s2.id].data) };
   }
   const file: ProjectFileV1 = {
     format: 'nmr-figure-editor',
@@ -49,6 +54,7 @@ export function serializeProject(
     data: used,
     fids: usedFids,
     fids2d: used2d,
+    ...(Object.keys(matrices).length ? { data2d: matrices } : {}),
     ...(extra.jdfBase ? { jdfBase: extra.jdfBase } : {}),
   };
   return JSON.stringify(file);
@@ -80,6 +86,7 @@ export function parseProject(text: string): {
     const meta = doc.spectra2d.find((s2) => s2.id === id);
     if (meta) data2d[id] = transform2d(fid, meta.processing);
   }
+  for (const [id, m] of Object.entries(file.data2d ?? {})) if (!data2d[id]) data2d[id] = { ...m, data: fromBase64(m.data) };
   return { doc, data, fids, fids2d, data2d, jdfBase: file.jdfBase ?? null };
 }
 

@@ -340,7 +340,7 @@ export function addSpectra(items: LoadedSpectrum[]) {
  */
 export function addSpectrum2d(item: Loaded2dSpectrum) {
   const { meta, data, fid } = item;
-  loadDocument(emptyDocument(), {}, null, null, {}, { data2d: { [meta.id]: data }, fids2d: { [meta.id]: fid } });
+  loadDocument(emptyDocument(), {}, null, null, {}, { data2d: { [meta.id]: data }, fids2d: fid ? { [meta.id]: fid } : {} });
   edit((d) => {
     d.spectra2d = [meta];
     d.plot2d = defaultPlot2d(meta);

@@ -9,7 +9,8 @@ import type { Axis2dMeta, Spectrum2dMeta } from '../state/types';
 export interface Loaded2dSpectrum {
   meta: Spectrum2dMeta;
   data: Spectrum2dData;
-  fid: Fid2dData;
+  /** 生データ (処理し直すのに使う)。TopSpin で処理した 2D には無い */
+  fid?: Fid2dData;
 }
 
 /**

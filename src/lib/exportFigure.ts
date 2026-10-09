@@ -62,8 +62,12 @@ export function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/**
+ * 拡張子を除いた名前 (保存するファイルの名前に使う)。Bruker の測定の名前 (1-crude/10) の / など、
+ * ファイル名に使えない文字は _ にする
+ */
 export function baseName(fileName: string) {
-  return fileName.replace(/\.[^.]+$/, '');
+  return fileName.replace(/\.[^./\\]+$/, '').replace(/[\\/:*?"<>|]+/g, '_');
 }
 
 /** Word などに書式付きで貼れるようにコピーする (貼り先が HTML を読めなければ text が使われる) */

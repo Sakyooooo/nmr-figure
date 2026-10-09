@@ -154,7 +154,7 @@ describe.skipIf(!has('cosy-2d.jdf'))('実データの 2D (COSY)', () => {
     const doc = emptyDocument();
     doc.spectra2d.push(meta);
     doc.plot2d = defaultPlot2d(meta);
-    const back = parseProject(serializeProject(doc, {}, {}, { [meta.id]: fid }));
+    const back = parseProject(serializeProject(doc, {}, {}, { [meta.id]: fid! }));
     expect(back.doc.spectra2d[0].fileName).toBe('cosy-2d.jdf');
     const again = back.data2d[meta.id];
     expect(again.n2).toBe(data.n2);

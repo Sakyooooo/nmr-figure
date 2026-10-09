@@ -19,6 +19,14 @@ export interface Axis2d {
   clip: number;
 }
 
+/**
+ * 間接観測 (F1) の取り込み方。
+ * complex: 行がそのまま t1 の複素の点 (Delta の COSY・HMBC、Bruker の QF)
+ * states / states-tppi: 2 行で 1 点 (cos と sin)。states-tppi は 1 点ごとに符号が変わる
+ * echo-antiecho: 2 行で 1 点 (echo と antiecho。Bruker の HSQC など)
+ */
+export type F1Mode = 'complex' | 'states' | 'states-tppi' | 'echo-antiecho' | 'real';
+
 export interface Fid2dData {
   /** 行 = t1 の点。各行は t2 の複素 FID */
   re: Float32Array[];
@@ -27,6 +35,8 @@ export interface Fid2dData {
   x: Axis2d;
   /** 間接観測の軸 (縦軸) */
   y: Axis2d;
+  /** F1 の取り込み方 (無ければ complex) */
+  f1?: F1Mode;
 }
 
 export interface Processing2d {
@@ -75,15 +85,27 @@ function ppmOf(axis: Axis2d, size: number, keep: number, r: number) {
   return axis.offsetPpm + (bin * (axis.sw / size)) / axis.refMHz;
 }
 
+/** TPPI の r 番目の点の ppm。FFT の周波数 0 が SW の高い側の端 (BMRB の COSY で対角線が合う向き) */
+function tppiPpm(axis: Axis2d, keep: number, r: number) {
+  const hz = ((keep - 1 - r) * axis.sw) / keep - axis.sw / 2;
+  return axis.offsetPpm + hz / axis.refMHz;
+}
+
 /** 2次元の FT。絶対値のスペクトルを返す */
 export function transform2d(fid: Fid2dData, p: Processing2d): Spectrum2dData {
-  const n1 = fid.re.length;
+  const rows = fid.re.length;
   const n2 = fid.re[0]?.length ?? 0;
+  const mode = fid.f1 ?? 'complex';
+  const paired = mode === 'states' || mode === 'states-tppi' || mode === 'echo-antiecho';
+  /** t1 の点の数 (2 行で 1 点のときは半分) */
+  const n1 = paired ? Math.floor(rows / 2) : rows;
   if (!n1 || !n2) throw new Error(tr('2D のデータが空です'));
   const size2 = Math.min(pow2ceil(n2) * Math.max(1, p.zf2), 1 << 16);
-  const size1 = Math.min(pow2ceil(n1) * Math.max(1, p.zf1), 1 << 14);
+  const real = mode === 'real';
+  // TPPI は t1 の実数の点が倍の速さで並ぶ。FFT の正の周波数の側 (半分) が SW の幅になる
+  const size1 = Math.min(pow2ceil(n1) * Math.max(1, p.zf1) * (real ? 2 : 1), 1 << 14);
   const keep2 = Math.round(size2 * Math.min(1, Math.max(0.05, fid.x.clip)));
-  const keep1 = Math.round(size1 * Math.min(1, Math.max(0.05, fid.y.clip)));
+  const keep1 = real ? size1 / 2 : Math.round(size1 * Math.min(1, Math.max(0.05, fid.y.clip)));
   const start2 = Math.floor((size2 - keep2) / 2);
   const start1 = Math.floor((size1 - keep1) / 2);
 
@@ -92,7 +114,7 @@ export function transform2d(fid: Fid2dData, p: Processing2d): Spectrum2dData {
   const rowIm: Float64Array[] = [];
   const re = new Float64Array(size2);
   const im = new Float64Array(size2);
-  for (let r = 0; r < n1; r++) {
+  for (let r = 0; r < (paired ? n1 * 2 : n1); r++) {
     re.fill(0);
     im.fill(0);
     const sr = fid.re[r];
@@ -121,23 +143,66 @@ export function transform2d(fid: Fid2dData, p: Processing2d): Spectrum2dData {
   const out = new Float32Array(keep1 * keep2);
   const colRe = new Float64Array(size1);
   const colIm = new Float64Array(size1);
+  // 2 行で 1 点のとき・TPPI: F2 の実部・虚部それぞれで F1 の点を作り (X・Y)、両方の絶対値の 2 乗和をとる (位相によらない)
+  const twin = paired || real;
+  const yRe = new Float64Array(twin ? size1 : 0);
+  const yIm = new Float64Array(twin ? size1 : 0);
   let maxAbs = 0;
   for (let c = 0; c < keep2; c++) {
     colRe.fill(0);
     colIm.fill(0);
+    if (twin) {
+      yRe.fill(0);
+      yIm.fill(0);
+    }
     for (let r = 0; r < n1; r++) {
       const w = windowAt(p.window, r, n1);
-      colRe[r] = rowRe[r][c] * w;
-      // 間接観測の軸は回る向きが逆 (共役にしないと、搬送波を中心に反転した像になる)
-      colIm[r] = -rowIm[r][c] * w;
+      if (real) {
+        colRe[r] = rowRe[r][c] * w;
+        yRe[r] = rowIm[r][c] * w;
+        continue;
+      }
+      if (!paired) {
+        colRe[r] = rowRe[r][c] * w;
+        // 間接観測の軸は回る向きが逆 (共役にしないと、搬送波を中心に反転した像になる)
+        colIm[r] = -rowIm[r][c] * w;
+        continue;
+      }
+      const aRe = rowRe[2 * r][c];
+      const aIm = rowIm[2 * r][c];
+      const bRe = rowRe[2 * r + 1][c];
+      const bIm = rowIm[2 * r + 1][c];
+      // cos の点 (cRe + i cIm) と sin の点 (sRe + i sIm)。F2 のスペクトルの値 (複素数) ごとに
+      let cRe = aRe;
+      let cIm = aIm;
+      let sRe = bRe;
+      let sIm = bIm;
+      if (mode === 'echo-antiecho') {
+        // echo = e^{iΩt}・S、antiecho = e^{−iΩt}・S → cos = (echo + antiecho) / 2、sin = (echo − antiecho) / 2i
+        cRe = (aRe + bRe) / 2;
+        cIm = (aIm + bIm) / 2;
+        sRe = (aIm - bIm) / 2;
+        sIm = -(aRe - bRe) / 2;
+      }
+      const sign = mode === 'states-tppi' && r % 2 ? -1 : 1;
+      colRe[r] = cRe * w * sign;
+      colIm[r] = -sRe * w * sign;
+      yRe[r] = cIm * w * sign;
+      yIm[r] = -sIm * w * sign;
     }
     colRe[0] *= 0.5;
     colIm[0] *= 0.5;
     fft(colRe, colIm);
+    if (twin) {
+      yRe[0] *= 0.5;
+      yIm[0] *= 0.5;
+      fft(yRe, yIm);
+    }
     for (let r = 0; r < keep1; r++) {
-      const bin = size1 - 1 - (start1 + r) - size1 / 2;
+      // TPPI: 正の周波数の側 (0〜size1/2) の低い方から (高い ppm から)
+      const bin = real ? r + 1 : size1 - 1 - (start1 + r) - size1 / 2;
       const src = (bin + size1) % size1;
-      const v = Math.hypot(colRe[src], colIm[src]);
+      const v = twin ? Math.sqrt(colRe[src] ** 2 + colIm[src] ** 2 + yRe[src] ** 2 + yIm[src] ** 2) : Math.hypot(colRe[src], colIm[src]);
       out[r * keep2 + c] = v;
       if (v > maxAbs) maxAbs = v;
     }
@@ -154,8 +219,8 @@ export function transform2d(fid: Fid2dData, p: Processing2d): Spectrum2dData {
     n1: keep1,
     first2: ppmOf(fid.x, size2, keep2, 0),
     last2: ppmOf(fid.x, size2, keep2, keep2 - 1),
-    first1: ppmOf(fid.y, size1, keep1, 0),
-    last1: ppmOf(fid.y, size1, keep1, keep1 - 1),
+    first1: real ? tppiPpm(fid.y, keep1, 0) : ppmOf(fid.y, size1, keep1, 0),
+    last1: real ? tppiPpm(fid.y, keep1, keep1 - 1) : ppmOf(fid.y, size1, keep1, keep1 - 1),
     maxAbs: maxAbs || 1,
   };
 }

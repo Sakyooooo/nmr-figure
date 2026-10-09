@@ -22,7 +22,9 @@ export function PeakPanel() {
   const layer = doc.layers.find((l) => l.id === activeLayerId);
   const rows = useMemo(() => (layer ? peakRows(doc, data, layer.id) : []), [doc, data, layer]);
   if (!layer) return null;
-  const fromDelta = doc.spectra.find((s) => s.id === layer.spectrumId)?.delta?.peaks ?? [];
+  const layerMeta = doc.spectra.find((s) => s.id === layer.spectrumId);
+  const fromDelta = layerMeta?.delta?.peaks ?? [];
+  const app = layerMeta?.vendor === 'bruker' ? 'TopSpin' : 'Delta';
   const f = doc.figure;
   const set = (patch: Partial<FigureStyle>) =>
     edit((d) => {
@@ -65,13 +67,13 @@ export function PeakPanel() {
       {fromDelta.length > 0 && !synced && (
         <div className="row wrap">
           <button
-            title={tr('この .jdf に入っている、Delta で付けたピーク値をそのまま使います')}
+            title={app === 'TopSpin' ? tr('TopSpin で付けたピーク値 (peaklist.xml) をそのまま使います') : tr('この .jdf に入っている、Delta で付けたピーク値をそのまま使います')}
             onClick={() => {
               const n = importDeltaPeaks(layer.id);
-              notify(n ? tr('Delta のピーク値を {n} 本取り込みました', { n }) : tr('すべて取り込み済みです'));
+              notify(n ? tr('{app} のピーク値を {n} 本取り込みました', { app, n }) : tr('すべて取り込み済みです'));
             }}
           >
-            {tr('Delta のピーク値を取り込む ({n})', { n: fromDelta.length })}
+            {tr('{app} のピーク値を取り込む ({n})', { app, n: fromDelta.length })}
           </button>
         </div>
       )}

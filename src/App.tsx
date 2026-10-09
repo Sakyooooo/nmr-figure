@@ -23,7 +23,8 @@ import { IconButton, Kbd } from './components/ui';
 import { computeLayout } from './lib/layout';
 import { layout2d } from './lib/scene2d';
 import { PROJECT_EXT } from './lib/projectFile';
-import { copyFigure, openDialog, openFiles, saveProject } from './state/fileOps';
+import { entryDir, type DirLike } from './state/bruker';
+import { copyFigure, openDialog, openFiles, openFolderDialog, saveProject } from './state/fileOps';
 import type { FileHandle } from './state/store';
 import {
   beginGesture,
@@ -98,17 +99,30 @@ export default function App() {
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       setDragging(false);
-      // ハンドルが取れると、あとで同じファイルに上書き保存できる
+      // ハンドルが取れると、あとで同じファイルに上書き保存できる。フォルダ (TopSpin の測定) はフォルダのまま開く
       const items = [...e.dataTransfer.items].filter((i) => i.kind === 'file');
       const files = [...e.dataTransfer.files];
+      // webkitGetAsEntry はドロップした直後にしか呼べないので、先に取っておく
+      const entries = items.map((item) => (item as DataTransferItem & { webkitGetAsEntry?: () => unknown }).webkitGetAsEntry?.() ?? null);
+      const dirs: DirLike[] = [];
       void Promise.all(
         items.map(async (item, i) => {
-          const get = (item as DataTransferItem & { getAsFileSystemHandle?: () => Promise<FileHandle | null> }).getAsFileSystemHandle;
+          const get = (item as DataTransferItem & { getAsFileSystemHandle?: () => Promise<(FileHandle & { kind?: string }) | DirLike | null> }).getAsFileSystemHandle;
           const handle = get ? await get.call(item).catch(() => null) : null;
-          const file = handle ? await handle.getFile() : files[i];
-          return { file, handle: handle ?? undefined };
+          if (handle?.kind === 'directory') {
+            dirs.push(handle as DirLike);
+            return null;
+          }
+          const entry = entries[i] as { isDirectory?: boolean } | null;
+          if (!handle && entry?.isDirectory) {
+            dirs.push(entryDir(entry as Parameters<typeof entryDir>[0]));
+            return null;
+          }
+          const fileHandle = handle as FileHandle | null;
+          const file = fileHandle ? await fileHandle.getFile() : files[i];
+          return { file, handle: fileHandle ?? undefined };
         }),
-      ).then((dropped) => openFiles(dropped.filter((d) => d.file), mode));
+      ).then((dropped) => openFiles(dropped.filter((d): d is { file: File; handle: FileHandle | undefined } => !!d?.file), mode, dirs));
     },
   });
 
@@ -117,7 +131,7 @@ export default function App() {
       <div className="home-root" {...dropProps('new')}>
         <Home />
         <StructureEditorHost />
-      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は新しい図で開く、図入りの .jdf と {ext} は図を開く)', { ext: PROJECT_EXT })}</div>}
+      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf・TopSpin の測定のフォルダは新しい図で開く、図入りの .jdf と {ext} は図を開く)', { ext: PROJECT_EXT })}</div>}
         <DialogHost />
         <Onboarding />
         <Toast />
@@ -169,7 +183,7 @@ export default function App() {
         <Toast />
       </main>
       <StructureEditorHost />
-      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf は追加、図入りの .jdf と {ext} は図を開く、ChemDraw の .cdxml は構造式を置く)', { ext: PROJECT_EXT })}</div>}
+      {dragging && <div className="drop-overlay">{tr('ここにドロップ (.jdf・TopSpin の測定のフォルダは追加、図入りの .jdf と {ext} は図を開く、ChemDraw の .cdxml は構造式を置く)', { ext: PROJECT_EXT })}</div>}
       <ReferenceDialog />
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {siImport && <SiImportDialog onClose={closeSiImport} spectrumId={siImport.spectrumId} />}
@@ -294,12 +308,16 @@ function EmptyState() {
         <Icon name="nmr-spectrum" size={32} />
       </span>
       <h1>{tr('スペクトルがありません')}</h1>
-      <p className="secondary">{tr('測定の .jdf をこの画面にドロップするか、下から選んでください')}</p>
+      <p className="secondary">{tr('測定の .jdf (Delta) か TopSpin の測定のフォルダをこの画面にドロップするか、下から選んでください')}</p>
       <div className="empty-actions" role="group" aria-label={tr('始め方')}>
         <button type="button" className="empty-row" onClick={() => void openDialog('new')}>
           <Icon name="folder-open" />
           <span className="grow">{tr('ファイルを開く')}</span>
           <Kbd>Ctrl+O</Kbd>
+        </button>
+        <button type="button" className="empty-row" onClick={() => void openFolderDialog('new')}>
+          <Icon name="folder-open" />
+          <span className="grow">{tr('TopSpin の測定のフォルダを開く')}</span>
         </button>
         <button type="button" className="empty-row" onClick={() => useEditor.setState({ screen: 'home' })}>
           <Icon name="house" />

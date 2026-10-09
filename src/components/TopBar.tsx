@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { useSync } from '../state/deltaSync';
 import { openInChemDraw } from '../state/chemdrawExport';
 import { makeWordFigure } from '../state/wordFigure';
-import { copyFigure, exportPng, exportSvg, openDialog, saveProject } from '../state/fileOps';
+import { copyFigure, exportPng, exportSvg, openDialog, openFolderDialog, saveProject } from '../state/fileOps';
 import { printFigure, setCanvasTab, togglePanel, useEditor } from '../state/store';
 import { Icon } from './Icon';
 import { IconButton, Kbd, MenuButton } from './ui';
@@ -113,6 +113,7 @@ function FileMenu({ onImportSi }: { onImportSi: () => void }) {
       className="file-menu"
       items={[
         { label: tr('開く'), icon: 'folder-open', shortcut: 'Ctrl+O', hint: tr('.jdf は今の図に足す、図のファイルは開く'), onSelect: () => void openDialog() },
+        { label: tr('TopSpin の測定を開く'), icon: 'folder-open', hint: tr('Bruker の測定のフォルダ (データ名か実験番号のフォルダ) を選びます。今の図に足します'), onSelect: () => void openFolderDialog() },
         { label: projectName ? tr('上書き保存') : tr('保存'), icon: 'save', shortcut: 'Ctrl+S', disabled: !hasData, onSelect: () => saveProject() },
         { label: tr('名前を付けて保存'), icon: 'save', shortcut: 'Ctrl+Shift+S', disabled: !hasData, onSelect: () => saveProject(true) },
         'divider',
@@ -140,15 +141,17 @@ function SyncPill() {
   const writing = list.some((v) => v.status === 'pending');
   const waiting = list.find((v) => v.status === 'waiting');
   const last = Math.max(0, ...list.map((v) => v.lastSyncAt ?? 0));
+  // 相手のソフト (Delta と TopSpin が混ざっていれば両方)
+  const app = [...new Set(list.map((v) => v.app))].join('・');
   const text = bad
     ? bad.status === 'need-permission'
-      ? tr('Delta へは許可が必要')
-      : tr('Delta: エラー')
+      ? tr('{app} へは許可が必要', { app: bad.app })
+      : tr('{app}: エラー', { app: bad.app })
     : writing
-      ? tr('Delta に書き込み中…')
+      ? tr('{app} に書き込み中…', { app })
       : waiting && !last
-        ? tr('Delta: 待機中')
-        : tr('Delta と同期{v0}', { v0: last ? ` ${time(last)}` : '' });
+        ? tr('{app}: 待機中', { app })
+        : tr('{app} と同期{v0}', { app, v0: last ? ` ${time(last)}` : '' });
   const tone = bad ? ' warn' : waiting && !last ? ' idle' : '';
   return (
     <button

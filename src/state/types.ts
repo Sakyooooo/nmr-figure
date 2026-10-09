@@ -38,6 +38,8 @@ export interface SpectrumMeta {
   delta?: DeltaAnnotations | null;
   /** Delta と同期する .jdf の名前。図を .jdf に保存したあとの土台のスペクトルは、その図のファイル (無ければ fileName) */
   syncFile?: string | null;
+  /** Bruker (TopSpin) のデータ。無ければ JEOL Delta */
+  vendor?: 'bruker' | null;
 }
 
 /** Delta が .jdf に残した注釈 (lib/jdfAnnotations.ts で読む) */
@@ -315,6 +317,8 @@ export interface Spectrum2dMeta {
   /** 雑音の目安。等高線の下限の初期値に使う */
   noise: number;
   processing: Processing2d;
+  /** Bruker (TopSpin) のデータ。無ければ JEOL Delta */
+  vendor?: 'bruker' | null;
 }
 
 export type Side2d = 'top' | 'right';

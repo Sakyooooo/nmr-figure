@@ -12,7 +12,8 @@ import { startUsageCount } from './state/usage';
 import { openWordFigureFromUrl } from './state/wordFigure';
 import { openOnboarding } from './components/Onboarding';
 import { startFileLaunch } from './state/launch';
-import { initLibrary, loadLibraryFiles, useLibrary } from './state/library';
+import { adoptDataFolder, initLibrary, loadLibraryFiles, useLibrary } from './state/library';
+import type { DirLike } from './state/bruker';
 import { addAnnotation, autoDetectSignals, select, updateFigureImage, useEditor } from './state/store';
 import { annotationDefaults } from './state/types';
 import './styles/tokens.css';
@@ -136,6 +137,10 @@ if (import.meta.env.DEV) {
     __nmr: {
       store: useEditor,
       library: useLibrary,
+      /** フォルダ (OPFS など) をデータフォルダにする (TopSpin のデータを試す) */
+      dataFolder: (dir: DirLike) => adoptDataFolder(dir),
+      /** フォルダ (TopSpin の測定) を新しい図で開く */
+      openFolder: (dir: DirLike) => openFiles([], 'new', [dir]),
       /** samples/ のファイルでホーム画面を試す */
       async libraryFrom(paths: string[]) {
         const files = await Promise.all(

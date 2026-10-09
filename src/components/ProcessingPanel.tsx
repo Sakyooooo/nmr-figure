@@ -22,7 +22,7 @@ export function ProcessingPanel() {
       id="analysis-processing"
       defaultOpen={false}
       title={tr('FID の処理 (位相補正)')}
-      help={tr('Delta で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。')}
+      help={tr('{app} で処理していない生データ (FID) を、このアプリで FT しました。位相がずれていたら、自動で合わせ直すかスライダーで調整してください。', { app: meta.vendor === 'bruker' ? 'TopSpin' : 'Delta' })}
     >
       {!canRedo && <p className="hint warn">{tr('元の FID がないため、調整できません (古い形式で保存した図です)。')}</p>}
       <div className="row wrap">

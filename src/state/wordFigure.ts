@@ -78,7 +78,7 @@ export async function makeWordFigure(svg: SVGSVGElement) {
   const name = wordFigureName(st.projectName ?? defaultProjectName(), id);
   const doc = { ...st.doc, id: crypto.randomUUID(), wordFigure: { id, name } };
   try {
-    await folderWriteChildFile(WORD_DIR, name + PROJECT_EXT, serializeProject(doc, st.data, st.fids, st.fids2d));
+    await folderWriteChildFile(WORD_DIR, name + PROJECT_EXT, serializeProject(doc, st.data, st.fids, st.fids2d, { data2d: st.data2d }));
     await folderWriteChildFile(WORD_DIR, name + '.svg', svgText);
   } catch (e) {
     notify(tr('Word に貼る図を作れませんでした: {message}', { message: (e as Error).message }), 'error');
@@ -101,13 +101,13 @@ export async function makeWordFigure(svg: SVGSVGElement) {
 
 /** 保存: 写しの .nmrfig と見た目の .svg を書き直す (Word で F9 を押すと新しくなる) */
 export async function saveWordFigure() {
-  const { doc, data, fids, fids2d } = useEditor.getState();
+  const { doc, data, fids, fids2d, data2d } = useEditor.getState();
   const wf = doc.wordFigure;
   if (!wf) return;
   if (!(await readyFolder(true))) return;
   const svg = document.querySelector<SVGSVGElement>('svg.figure');
   try {
-    await folderWriteChildFile(WORD_DIR, wf.name + PROJECT_EXT, serializeProject(doc, data, fids, fids2d));
+    await folderWriteChildFile(WORD_DIR, wf.name + PROJECT_EXT, serializeProject(doc, data, fids, fids2d, { data2d }));
     if (svg) await folderWriteChildFile(WORD_DIR, wf.name + '.svg', figureSvgString(svg));
   } catch (e) {
     notify(tr('保存できませんでした: {message}', { message: (e as Error).message }), 'error');

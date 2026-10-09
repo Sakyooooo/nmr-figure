@@ -107,7 +107,7 @@ export const EN_PANELS1: Record<string, string> = {
   枠: 'Frame',
   縦軸: 'Y axis',
   スペクトル名: 'Spectrum names',
-  '図から外しても消えません (Delta と同期しているピーク値・積分はそのまま)': 'Hiding them does not delete them (peak labels and integrals synced with Delta are kept)',
+  "図から外しても消えません (Delta・TopSpin と同期しているピーク値・積分はそのまま)": "Hiding them does not delete them (peak labels and integrals synced with Delta / TopSpin are kept)",
   '自動 (核種・周波数・溶媒)': 'Automatic (nucleus, frequency, solvent)',
   いま入るのは: 'Currently shows',
   ' (核種が違うスペクトルが混ざっています。一番下のスペクトルから作ります)': ' (spectra of different nuclei are mixed; the bottom spectrum is used)',
@@ -121,10 +121,9 @@ export const EN_PANELS1: Record<string, string> = {
   游ゴシック: 'Yu Gothic',
 
   // SyncPanel.tsx (記録・Delta との同期)
-  'Delta との同期・記録': 'Delta sync & history',
+  "{app} との同期・記録": "{app} sync & history",
   編集記録: 'Edit history',
-  'ピーク値・積分を変えると {fileName} にそのまま書き込み、Delta で保存した中身は自動でこちらに入ります。Delta で開いたままのときは、Delta でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。':
-    'Changes to peak labels and integrals are written to {fileName} right away, and what you save in Delta comes back here automatically. If the file is open in Delta, reopen it there to see the changes. Click "Add record" to keep the current peak labels and integrals so you can return to them later.',
+  "ピーク値・積分を変えると {fileName} にそのまま書き込み、{app} で保存した中身は自動でこちらに入ります。{app} で開いたままのときは、{app} でファイルを開き直すと反映されます。「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。": "Changes to peak labels and integrals are written to {fileName} right away, and what you save in {app} comes back here automatically. If the data is open in {app}, reopen it there to see the changes. Click \"Add record\" to keep the current peak labels and integrals so you can return to them later.",
   '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。FID から処理したスペクトルは、図を保存すると (図入りの .jdf)、その .jdf と Delta の同期が始まります。':
     'Click "Add record" to keep the current peak labels and integrals so you can return to them later. For spectra processed from an FID, syncing with Delta starts once you save the figure (a .jdf with the figure inside).',
   '「記録を付ける」を押すと、今のピーク値・積分が残り、あとからこの時点に戻せます。':
@@ -145,27 +144,27 @@ export const EN_PANELS1: Record<string, string> = {
   許可が必要: 'Permission needed',
   エラー: 'Error',
   同期しない: 'Not synced',
-  'Delta と自動で行き来するには、書き込みの許可が要ります': 'Write permission is needed to sync automatically with Delta',
-  'Delta で直した積分・ピーク値が、ここにも自動で入ります': 'Integrals and peak labels changed in Delta come here automatically',
-  'ここで直したものが、Delta で開いたときにも入っています': 'What you change here is there when you open the file in Delta',
+  "{app} と自動で行き来するには、書き込みの許可が要ります": "Write permission is needed to sync automatically with {app}",
+  "{app} で直した積分・ピーク値が、ここにも自動で入ります": "Integrals and peak labels changed in {app} come here automatically",
+  "ここで直したものが、{app} で開いたときにも入っています": "What you change here is there when you open the data in {app}",
   '書き込む前の状態は「記録」からいつでも戻せます': 'You can always restore the state before writing from "History"',
   '。次にブラウザが確認を出したら「許可」を押してください (許可はこのデータフォルダだけ)': '. When the browser asks next, click "Allow" (it applies only to this data folder)',
   書き込みを許可する: 'Allow writing',
-  'Delta → このソフト': 'Delta → this app',
-  'このソフト → Delta': 'This app → Delta',
+  "{app} → このソフト": "{app} → this app",
+  "このソフト → {app}": "This app → {app}",
   同じ中身: 'Same content',
-  '変更を Delta に書き込みます…': 'Writing changes to Delta…',
+  "変更を {app} に書き込みます…": "Writing changes to {app}…",
   '{fileName} と同じ中身です{v1}': 'Same content as {fileName}{v1}',
   ' (最後に合わせた: {when}、{dir})': ' (last synced: {when}, {dir})',
   '積分 (ppm)': 'Integrals (ppm)',
   'ピーク値:': 'Peak labels:',
   ピーク値・積分なし: 'No peak labels or integrals',
-  '図と Delta のファイルを、この時点の中身にします (今の中身は自動の控えに残ります)': 'Set the figure and the Delta file to this point (the current content is kept as an automatic backup)',
+  "図と {app} のファイルを、この時点の中身にします (今の中身は自動の控えに残ります)": "Set the figure and the {app} file to this point (the current content is kept in the automatic backups)",
   '図のピーク値・積分を、この時点の中身にします': 'Set the figure’s peak labels and integrals to this point',
   この時点に戻す: 'Restore this point',
   'この時点の中身で、別の .jdf を作ります (元のファイルは変えません)': 'Make a separate .jdf with this content (the original file is not changed)',
   '別の .jdf に書き出す': 'Export to another .jdf',
-  'この記録を消します (図や Delta のファイルは変わりません)': 'Delete this record (the figure and the Delta file are not changed)',
+  "この記録を消します (図や {app} のファイルは変わりません)": "Delete this record (the figure and the {app} file are not changed)",
   記録を消す: 'Delete record',
 
   // Plot2dPanel.tsx (2D)
@@ -248,4 +247,5 @@ export const EN_PANELS1: Record<string, string> = {
   '選択中の構造式 (ChemDraw)': 'Selected structure (ChemDraw)',
   'ChemDraw で直す': 'Edit in ChemDraw',
   "「ChemDraw で直す」(またはダブルクリック) で ChemDraw が開きます。上書き保存すると図も変わります。上に置いた文字は構造式と一緒に動きます。「書き出し > ChemDraw で開く」から Word に貼ると、Word の上でも ChemDraw で直せます。": "\"Edit in ChemDraw\" (or double-click) opens it in ChemDraw; saving there updates the figure. Text you put on the structure moves with it. Paste into Word through Export > Open in ChemDraw to keep it editable in ChemDraw there too.",
+  "このソフトで初めて書き込む前の、TopSpin の積分・ピーク値に戻します": "Restore TopSpin’s integrals and peak labels to how they were before this app first wrote to them",
 };

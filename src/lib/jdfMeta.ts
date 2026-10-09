@@ -35,6 +35,10 @@ export interface ExperimentMeta {
    */
   savedFigureId?: string;
   baseKey?: string;
+  /** Bruker (TopSpin) の測定 (state/bruker.ts)。無ければ JEOL Delta の .jdf */
+  vendor?: 'bruker';
+  /** Bruker の TopSpin で処理した版の処理番号 (生データは null) */
+  procno?: string | null;
 }
 
 export function experimentKey(file: { name: string; size: number; lastModified: number }) {

@@ -84,7 +84,7 @@ export function Home() {
 
       <div className="home-body">
         <main className="home-list">
-          {lib.status === 'ready' && !lib.experiments.length && <p className="hint pad">{tr('このフォルダには .jdf がありません。')}</p>}
+          {lib.status === 'ready' && !lib.experiments.length && <p className="hint pad">{tr('このフォルダには .jdf も TopSpin の測定もありません。')}</p>}
           {lib.experiments.length > 0 && !list.length && <p className="hint pad">{tr('条件に合う実験はありません。')}</p>}
           {groups.map((g) => (
             <section key={g.day ?? 'all'} className="day">
@@ -158,7 +158,9 @@ function FolderStatus() {
           )}
           {status === 'scanning' && progress && (
             <span className="muted">
-              {tr('読み込み中 {done}/{total}', { done: progress.done, total: progress.total })}
+              {progress.dirs !== undefined
+                ? tr('TopSpin の測定を探しています (フォルダ {dirs})', { dirs: progress.dirs })
+                : tr('読み込み中 {done}/{total}', { done: progress.done, total: progress.total })}
             </span>
           )}
           {status === 'ready' && !temporary && <IconButton icon="refresh" size="sm" label={tr('読み込み直す (新しく測定したファイル)')} onClick={() => void scanFolder()} />}
@@ -419,12 +421,15 @@ function ExperimentChip({ m, file, checked, focused }: { m: Measurement; file: E
           </span>
         )}
         {!file.figure && file.dimension >= 2 && (
-          <span className="badge fid" title={tr('2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します')}>
+          <span
+            className="badge fid"
+            title={file.processed ? tr('TopSpin で処理した 2D です。開くと等高線で表示します') : tr('2D の生データです。開くとこのアプリで 2次元の FT をして、等高線で表示します')}
+          >
             2D
           </span>
         )}
         {!file.figure && file.dimension === 1 && !file.processed && (
-          <span className="badge fid" title={tr('Delta で処理していない生データです。開くとこのアプリで FT・位相補正します')}>
+          <span className="badge fid" title={tr('{app} で処理していない生データです。開くとこのアプリで FT・位相補正します', { app: file.vendor === 'bruker' ? 'TopSpin' : 'Delta' })}>
             FID
           </span>
         )}
@@ -609,8 +614,12 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
         </p>
       ) : (
         <>
-          {e.dimension >= 2 && <p className="hint">{tr('2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。')}</p>}
+          {e.dimension >= 2 && !e.processed && <p className="hint">{tr('2D の生データです。開くと 2次元の FT (サインベル窓・絶対値) をして、等高線で表示します。')}</p>}
+          {e.dimension >= 2 && e.processed && <p className="hint">{tr('TopSpin で処理した 2D です。開くと等高線で表示します (負の山も正の山と同じ線で出します)。')}</p>}
           {e.dimension === 1 && !e.processed && <p className="hint">{tr('生データ (FID) です。開くと自動で FT・位相補正・ベースライン補正・溶媒での基準合わせをします。')}</p>}
+          {e.dimension === 1 && e.processed && e.vendor === 'bruker' && (
+            <p className="hint">{tr('TopSpin で処理したスペクトルです。積分・ピーク値は TopSpin のもの (intrng・peaklist.xml) と行き来します。')}</p>
+          )}
         </>
       )}
       <dl className="facts">
@@ -643,6 +652,7 @@ function Detail({ m, e }: { m: Measurement; e: ExperimentMeta }) {
 /** 版の選択肢の名前 */
 function versionLabel(f: ExperimentMeta) {
   if (f.figure) return f.figure.layers > 1 ? tr('このソフトで編集した版 ({layers} 本を重ねた図)', { layers: f.figure.layers }) : tr('このソフトで編集した版');
+  if (f.vendor === 'bruker' && f.processed) return f.procno && f.procno !== '1' ? tr('TopSpin で処理した版 (処理番号 {procno})', { procno: f.procno }) : tr('TopSpin で処理した版');
   if (f.dimension >= 2) return tr('2D (このアプリで処理)');
   return f.processed ? tr('Delta で処理した版 {v0}', { v0: fileVersion(f.fileName) || '' }) : tr('生データ (FID・このアプリで処理)');
 }
@@ -669,8 +679,8 @@ function Welcome() {
       {status === 'no-folder' && (
         <p className="hint">
           {supportsFolderAccess()
-            ? tr('最初に .jdf が入っているフォルダを選んでください。次からは自動で読み込みます。')
-            : tr('最初に .jdf が入っているフォルダを選んでください。このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。')}
+            ? tr('最初に .jdf (Delta) か TopSpin のデータが入っているフォルダを選んでください。次からは自動で読み込みます。')
+            : tr('最初に .jdf (Delta) か TopSpin のデータが入っているフォルダを選んでください。このブラウザでは毎回選ぶ必要があります (Chrome / Edge なら覚えておけます)。')}
         </p>
       )}
       {experiments.length > 0 && <p className="muted">{tr('{n} 件の実験', { n: experiments.length })}</p>}

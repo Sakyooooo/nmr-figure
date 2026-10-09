@@ -2,7 +2,7 @@
   "name": "nmr-figure-editor",
   "private": true,
   "version": "0.1.0",
-  "description": "JEOL Delta (.jdf) のNMRスペクトルを重ね書き・注釈して資料用の図にするブラウザアプリ",
+  "description": "JEOL Delta (.jdf)・Bruker TopSpin のNMRスペクトルを重ね書き・注釈して資料用の図にするブラウザアプリ",
   "type": "module",
   "scripts": {
     "dev": "vite",
