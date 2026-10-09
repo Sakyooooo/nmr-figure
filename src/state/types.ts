@@ -205,6 +205,8 @@ export interface Annotation {
   showValues?: boolean;
   /** 交点の線を自動で引いたもの (引き直すときに消す) */
   auto?: boolean;
+  /** NMR 収率を書いた文字 (書き直すときに入れ替える) */
+  yieldText?: boolean;
 }
 
 export interface FigureStyle {
@@ -268,8 +270,47 @@ export interface TrackedRegion {
 }
 
 export type TrendMeasure = 'area' | 'height';
-/** none: そのまま / first: 最初の時点を100% / reference: 基準の範囲との比 / sum: 合計を100% */
-export type TrendNormalize = 'none' | 'first' | 'reference' | 'sum';
+/** none: そのまま / first: 最初の時点を100% / reference: 基準の範囲との比 / sum: 合計を100% / yield: 内標から NMR 収率 (%) */
+export type TrendNormalize = 'none' | 'first' | 'reference' | 'sum' | 'yield';
+
+/** 内標の量の単位。equiv は基質 (限定試薬) に対する当量 */
+export type StandardUnit = 'mg' | 'uL' | 'mmol' | 'equiv';
+
+/** 内標の量と基質の量 */
+export interface YieldAmounts {
+  amount: number | null;
+  unit: StandardUnit;
+  /** 基質 (限定試薬) の mmol。当量で入れたときは要らない */
+  substrateMmol: number | null;
+}
+
+/** NMR 収率で数える生成物の信号 */
+export interface YieldProduct {
+  id: string;
+  name: string;
+  /** 範囲 (表示の ppm。基準合わせのあと) */
+  from: number;
+  to: number;
+  /** 信号の H (F) の数 */
+  nH: number;
+}
+
+/**
+ * NMR 収率 (本人の希望 2026-10-09「crude に内標を入れたときの NMR 収率」, lib/nmrYield.ts)。
+ * 範囲は表示の ppm で持ち、重ねたスペクトル全部に同じ範囲を使う
+ */
+export interface YieldSetup extends YieldAmounts {
+  /** 内標 (data/internalStandards.ts の id。自分で足したものは設定の custom の id) と使う信号の番号 */
+  standardId: string;
+  signal: number;
+  /** 選んだときの内標の値 (図を開くほかの PC に、自分で足した内標が無くても同じ計算になるように) */
+  standard: { name: string; mw: number; density?: number; nucleus: string; nH: number };
+  /** 内標の範囲 (表示の ppm) */
+  standardRange: { from: number; to: number } | null;
+  products: YieldProduct[];
+  /** スペクトルごとに量が違うとき (layerId → 量) */
+  perLayer: Record<string, YieldAmounts>;
+}
 
 export interface TrendSettings {
   regions: TrackedRegion[];
@@ -421,6 +462,8 @@ export interface NmrDocument {
   figure: FigureStyle;
   view: ViewState;
   trend: TrendSettings;
+  /** NMR 収率 (内標から)。null は使っていない */
+  yield?: YieldSetup | null;
   /** Word に貼る図の写し (state/wordFigure.ts)。保存すると NMR の保存先の Word図 フォルダの name.nmrfig と name.svg を書き直す */
   wordFigure?: { id: string; name: string };
 }
@@ -525,6 +568,7 @@ export function emptyDocument(): NmrDocument {
     figure: defaultFigure(),
     view: { xMax: 10, xMin: -1, yZoom: 1 },
     trend: defaultTrend(),
+    yield: null,
   };
 }
 
@@ -543,6 +587,7 @@ export function migrateDocument(doc: NmrDocument): NmrDocument {
     si: { ...base.si, ...doc.si },
     figure: { ...base.figure, ...doc.figure },
     trend: { ...base.trend, ...doc.trend },
+    yield: doc.yield ?? null,
   };
 }
 

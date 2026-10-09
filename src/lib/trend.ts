@@ -1,5 +1,6 @@
 import { tr } from '../i18n';
 import type { Layer, NmrDocument, SpectrumMeta, TrackedRegion, TrendSettings } from '../state/types';
+import { amountsFor, regionArea, standardEquiv } from './nmrYield';
 import { indexRange } from './spectrum';
 
 /** 名前の最初の数値を時間として読む ("24 h" → 24, "t = 0.5h" → 0.5) */
@@ -65,9 +66,10 @@ export interface TrendResult {
 export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Array>): TrendResult {
   const t = doc.trend;
   const notes: string[] = [];
-  const ref = t.normalize === 'reference' || t.normalize === 'sum' ? t.regions.find((r) => r.id === t.referenceId) : undefined;
+  const ref = t.normalize === 'reference' || t.normalize === 'sum' || t.normalize === 'yield' ? t.regions.find((r) => r.id === t.referenceId) : undefined;
   const series = t.regions.filter((r) => r !== ref);
-  if (t.normalize === 'reference' && !ref) notes.push(tr('基準にする範囲を選んでください'));
+  if ((t.normalize === 'reference' || t.normalize === 'yield') && !ref) notes.push(tr('基準にする範囲を選んでください'));
+  if (t.normalize === 'yield' && !doc.yield) notes.push(tr('NMR 収率は、解析の「NMR 収率」で内標と量を入れると出ます'));
 
   const rows: TrendRow[] = [];
   const unitMs = TIME_UNITS[t.timeUnit.trim().toLowerCase()] ?? TIME_UNITS.h;
@@ -84,7 +86,10 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
     const fromClock = meta.acquiredAt ? Math.round(((meta.acquiredAt - t0) / unitMs) * 1000) / 1000 : null;
     const time = layer.time ?? fromLabel ?? fromClock ?? index;
     const timeSource = layer.time != null ? 'set' : fromLabel !== null ? 'label' : fromClock !== null ? 'acquired' : 'order';
-    const raw = t.regions.map((r) => measureRegion(data, meta, r.from, r.to, t.measure) / (r.nH || 1));
+    // NMR 収率は、収率の表と同じ面積 (図の積分と同じ足し方) にする
+    const raw = t.regions.map(
+      (r) => (t.normalize === 'yield' && t.measure === 'area' ? regionArea(doc, data, meta, r.from, r.to) : measureRegion(data, meta, r.from, r.to, t.measure)) / (r.nH || 1),
+    );
     rows.push({ layer, time, timeSource, raw, values: [] });
   });
   rows.sort((a, b) => a.time - b.time);
@@ -94,6 +99,8 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
   const col = (r: TrackedRegion) => t.regions.indexOf(r);
   for (const row of rows) {
     const refValue = ref ? row.raw[col(ref)] : null;
+    // 内標の当量 (スペクトルごとの量があればそれ)
+    const equiv = t.normalize === 'yield' && doc.yield ? standardEquiv(amountsFor(doc.yield, row.layer.id), doc.yield.standard) : null;
     const total = series.reduce((sum, r) => sum + Math.max(0, row.raw[col(r)] ?? 0), 0);
     row.values = t.regions.map((r, k) => {
       const v = row.raw[k];
@@ -109,6 +116,8 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
           return refValue ? v / refValue : null;
         case 'sum':
           return total > 0 ? (Math.max(0, v) / total) * 100 : null;
+        case 'yield':
+          return refValue && equiv !== null ? (v / refValue) * equiv * 100 : null;
       }
     });
   }
@@ -120,6 +129,7 @@ export function computeTrend(doc: NmrDocument, dataMap: Record<string, Float32Ar
     first: 'Relative intensity (%)',
     reference: `Ratio to ${refName}`,
     sum: 'Ratio (%)',
+    yield: 'NMR yield (%)',
   }[t.normalize];
   return {
     rows,

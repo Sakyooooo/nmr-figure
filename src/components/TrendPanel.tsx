@@ -114,15 +114,16 @@ export function TrendPanel() {
         <select value={t.normalize} onChange={(e) => set({ normalize: e.target.value as TrendSettings['normalize'] })}>
           <option value="sum">{tr('合計を 100% (転化率・生成比)')}</option>
           <option value="reference">{tr('基準の範囲との比 (内部標準)')}</option>
+          <option value="yield">{tr('NMR 収率 (内標の量から)')}</option>
           <option value="first">{tr('最初の時点を 100%')}</option>
           <option value="none">{tr('そのままの値')}</option>
         </select>
       </label>
-      {(t.normalize === 'reference' || t.normalize === 'sum') && (
+      {(t.normalize === 'reference' || t.normalize === 'sum' || t.normalize === 'yield') && (
         <label className="field block">
-          {t.normalize === 'reference' ? tr('基準の範囲') : tr('合計から除く範囲 (内部標準など)')}
+          {t.normalize === 'reference' ? tr('基準の範囲') : t.normalize === 'yield' ? tr('内標の範囲') : tr('合計から除く範囲 (内部標準など)')}
           <select value={t.referenceId ?? ''} onChange={(e) => set({ referenceId: e.target.value || null })}>
-            <option value="">{t.normalize === 'reference' ? tr('選んでください') : tr('なし')}</option>
+            <option value="">{t.normalize === 'sum' ? tr('なし') : tr('選んでください')}</option>
             {t.regions.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}

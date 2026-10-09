@@ -1,5 +1,6 @@
 import { tr } from '../i18n';
-import type { FigureStyle } from '../state/types';
+import type { InternalStandard } from '../data/internalStandards';
+import type { FigureStyle, YieldAmounts } from '../state/types';
 import type { CustomImpurity, SolventKey } from './impurityTypes';
 import { nucleusDefaults } from './nuclei';
 import { tableResidual } from './solvents';
@@ -11,6 +12,8 @@ export interface Settings {
   /** 照合の許容幅 (ppm)。未設定なら核種の既定値 */
   tolerances: Record<string, number>;
   customImpurities: CustomImpurity[];
+  /** NMR 収率: 前に使った内標と量 (新しい順。一番上を次の図で最初から選ぶ) と、自分で足した内標 */
+  yield: { recent: YieldPreset[]; custom: InternalStandard[] };
   pngScale: number;
   templates: StyleTemplate[];
   /** 新しい図を作ったときに自動で当てるテンプレート */
@@ -37,6 +40,14 @@ export type LangSetting = 'auto' | 'ja' | 'en';
 export type ThemeSetting = 'system' | 'light' | 'dark';
 /** chemdraw = ChemDraw で描いて保存すると図に入る / ketcher = このアプリの中で描く */
 export type StructureTool = 'chemdraw' | 'ketcher';
+
+/** 前に使った内標と量 (履歴) */
+export interface YieldPreset extends YieldAmounts {
+  standardId: string;
+  signal: number;
+  /** 使った時刻 (ms) */
+  at: number;
+}
 
 /** ホーム画面の並び順 */
 export interface HomeSort {
@@ -84,6 +95,7 @@ export function defaultSettings(): Settings {
     references: { C6D6: { '1H': 7.15 } },
     tolerances: {},
     customImpurities: [],
+    yield: { recent: [], custom: [] },
     pngScale: 4,
     templates: [],
     defaultTemplateId: null,
@@ -99,7 +111,7 @@ export function loadSettings(): Settings {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const base = defaultSettings();
       // ui は後から項目が増えるので、既定値と混ぜる
-      return { ...base, ...saved, ui: { ...base.ui, ...saved.ui } };
+      return { ...base, ...saved, ui: { ...base.ui, ...saved.ui }, yield: { ...base.yield, ...saved.yield } };
     }
   } catch {
     // プライベートモードなどで読めないときは既定値

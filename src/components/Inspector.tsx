@@ -10,6 +10,7 @@ import { SiPanel } from './SiPanel';
 import { SyncPanel } from './SyncPanel';
 import { TemplatePanel } from './TemplatePanel';
 import { TrendPanel } from './TrendPanel';
+import { YieldPanel } from './YieldPanel';
 
 const TABS: { id: InspectorTab; label: string }[] = [
   { id: 'analysis', label: trk('解析') },
@@ -68,6 +69,7 @@ export function Inspector() {
             <PropertiesPanel only="analysis" />
             <ProcessingPanel />
             <IntegralPanel />
+            <YieldPanel />
             <PeakPanel />
             <ImpurityPanel />
             <MarkerPanel />
