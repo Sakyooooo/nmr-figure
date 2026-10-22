@@ -16,6 +16,7 @@ import { downloadBlob } from '../lib/exportFigure';
 import { buildLinkFiles, LINK_FILE_NAMES, LINK_INSTALLER_NAME, zipFiles } from '../lib/linkInstaller';
 import { imageRect, PX_PER_PT } from '../lib/scene';
 import { ask } from './dialog';
+import { refreshHNumbers } from './hNumbers';
 import {
   dataFolderName,
   folderChildFile,
@@ -101,6 +102,8 @@ function replaceCdxml(imageId: string, text: string, record = true): boolean {
     Object.assign(im, { cdxml: text, svg: drawn.svg, source: null, href: null, ratio, x: nx / fig.width, y: ny / fig.height, w: nw / fig.width });
   }, record);
   if (removed) notify(tr('構造式から原子がなくなったので、帰属のマーカーを {n} 個外しました', { n: removed }), 'info');
+  // H の番号を振ってあれば、直した構造式で求め直す (残った H の番号はそのまま)
+  void refreshHNumbers(imageId);
   return true;
 }
 

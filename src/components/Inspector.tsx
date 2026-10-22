@@ -1,5 +1,6 @@
 import { tr, trk } from '../i18n';
 import { setInspectorTab, useEditor, type InspectorTab } from '../state/store';
+import { HNumberPanel } from './HNumberPanel';
 import { ImpurityPanel, MarkerPanel } from './ImpurityPanel';
 import { IntegralPanel } from './IntegralPanel';
 import { PeakPanel } from './PeakPanel';
@@ -73,6 +74,7 @@ export function Inspector() {
             <PeakPanel />
             <ImpurityPanel />
             <MarkerPanel />
+            <HNumberPanel />
             <SiPanel />
             <TrendPanel />
           </>

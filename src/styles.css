@@ -189,6 +189,7 @@ input[type='radio'] {
 }
 .figure.tool-peak,
 .figure.tool-marker,
+.figure.tool-hnum,
 .figure.tool-reference {
   cursor: pointer;
 }
@@ -240,6 +241,17 @@ input[type='radio'] {
 }
 .figure .hit.pointer {
   cursor: pointer;
+}
+/* 道具「H の番号」: 構造式の H。選んだ H は枠で示す */
+.figure.tool-hnum .hit {
+  fill: transparent;
+  cursor: pointer;
+}
+.figure.tool-hnum .hit.h-active {
+  fill: var(--accent-soft);
+  fill-opacity: 0.6;
+  stroke: var(--accent);
+  stroke-width: 1.2;
 }
 .figure.tool-integral {
   cursor: col-resize;

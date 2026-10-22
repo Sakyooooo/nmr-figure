@@ -20,6 +20,7 @@
     "ketcher-core": "^3.18.0",
     "ketcher-react": "^3.18.0",
     "ketcher-standalone": "^3.18.0",
+    "openchemlib": "^9.25.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zustand": "^5.0.15"

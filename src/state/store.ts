@@ -63,6 +63,8 @@ interface EditorState {
   selection: Selection;
   activeLayerId: string | null;
   activeMarkerStyleId: string | null;
+  /** 道具「H の番号」で選んだ構造式の H (このあとクリックしたピークにその番号を付ける) */
+  activeH: { imageId: string; key: string } | null;
   settings: Settings;
   fileHandle: FileHandle | null;
   projectName: string | null;
@@ -105,6 +107,7 @@ export const useEditor = create<EditorState>(() => ({
   selection: null,
   activeLayerId: null,
   activeMarkerStyleId: null,
+  activeH: null,
   settings: loadSettings(),
   fileHandle: null,
   projectName: null,
@@ -210,7 +213,7 @@ export function redo() {
 }
 
 function validateSelection() {
-  const { selection, doc, activeLayerId, activeMarkerStyleId } = get();
+  const { selection, doc, activeLayerId, activeMarkerStyleId, activeH } = get();
   const exists = (id: string | null, list: { id: string }[]) => !!id && list.some((x) => x.id === id);
   const patch: Partial<EditorState> = {};
   if (selection && selection.kind !== 'legend') {
@@ -225,6 +228,7 @@ function validateSelection() {
   }
   if (!exists(activeLayerId, doc.layers)) patch.activeLayerId = doc.layers[0]?.id ?? null;
   if (activeMarkerStyleId && !exists(activeMarkerStyleId, doc.markerStyles)) patch.activeMarkerStyleId = null;
+  if (activeH && !doc.figureImages.find((x) => x.id === activeH.imageId)?.hNumbers?.labels[activeH.key]) patch.activeH = null;
   set(patch);
 }
 
@@ -461,6 +465,7 @@ export function loadDocument(
     selection: null,
     activeLayerId: doc.layers[0]?.id ?? null,
     activeMarkerStyleId: null,
+    activeH: null,
     projectName: name,
     fileHandle: handle,
     tool: 'select',
@@ -479,6 +484,7 @@ export function removeLayer(layerId: string) {
     if (!layer) return;
     d.layers = d.layers.filter((l) => l.id !== layerId);
     d.markers = d.markers.filter((m) => m.layerId !== layerId);
+    d.hAssigns = d.hAssigns.filter((a) => a.layerId !== layerId);
     d.peakLabels = d.peakLabels.filter((p) => p.layerId !== layerId);
     d.annotations = d.annotations.filter((a) => a.layerId !== layerId);
     d.integrals = d.integrals.filter((x) => x.layerId !== layerId);
@@ -822,6 +828,7 @@ export function deleteSelection() {
       // 構造式に固定した印・原子のマーカーも一緒に消す
       d.annotations = d.annotations.filter((a) => a.imageId !== selection.id);
       d.markers = d.markers.filter((m) => m.imageId !== selection.id);
+      d.hAssigns = d.hAssigns.filter((a) => a.imageId !== selection.id);
     }
     if (selection.kind === 'legend') d.figure.showLegend = false;
     pruneStyles(d);

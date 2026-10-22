@@ -1,6 +1,7 @@
 import { tr } from '../i18n';
 import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Spectrum2dData } from '../lib/fid2d';
+import { placeHLabels } from '../lib/hLabels';
 import { annotationBox, dashArray, imageRect, markerBounds, nearestAtomAt, pxToImageAnchor, type PlacedAnnotation } from '../lib/scene';
 import { buildScene2d, fullView2d, type Layout2d, type Scene2d } from '../lib/scene2d';
 import { snapToPeak } from '../lib/spectrum';
@@ -24,7 +25,7 @@ import {
   useEditor,
 } from '../state/store';
 import { annotationDefaults, type Annotation, type AnnotationKind, type FigureImage, type FigureStyle, type Side2d } from '../state/types';
-import { AnnotationShape, LegendBox, MarkerGlyphs } from './FigureContent';
+import { AnnotationShape, HLabels, LegendBox, MarkerGlyphs } from './FigureContent';
 import { constrain, ImageHits, MarkerHits, MarkerSelection, resizePoints, type Handle } from './FigureView';
 import { FigureImages } from './FigureImages';
 import { RichSvgText } from './RichText';
@@ -47,6 +48,7 @@ export const Figure2dContent = memo(function Figure2dContent({
   return (
     <g fontFamily={figure.fontFamily} pointerEvents="none">
       <FigureImages images={images} figure={layout} />
+      <HLabels items={placeHLabels(images, layout)} />
       {figure.showBorder && (
         <rect x={0.5} y={0.5} width={layout.width - 1} height={layout.height - 1} fill="none" stroke={INK} strokeWidth={1} />
       )}

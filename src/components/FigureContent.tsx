@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { arrowHead, dashArray, legendGlyphSize, markerPath, type PlacedAnnotation, type PlacedLegend, type PlacedMarker, type Scene } from '../lib/scene';
+import { H_SUP_SIZE, type PlacedH } from '../lib/hLabels';
 import { simulatedWord } from '../lib/simulate';
 import { tracePath } from '../lib/tracePath';
 import type { FigureImage, FigureStyle } from '../state/types';
@@ -20,6 +21,27 @@ export function MarkerGlyphs({ markers, figure }: { markers: PlacedMarker[]; fig
           // 構造式の原子に付けたもの (「ChemDraw で開く」では ChemDraw の図形にする)
           data-atom-marker={m.imageId}
         />
+      ))}
+    </>
+  );
+}
+
+/** 構造式の H の番号 (C–H³。1D・2D の図で共通)。「ChemDraw で開く」では ChemDraw の線と文字にする */
+export function HLabels({ items }: { items: PlacedH[] }) {
+  return (
+    <>
+      {items.map((h) => (
+        <g key={`${h.imageId}:${h.keys[0]}`} data-hnum-of={h.imageId} fill={h.color} fontFamily={h.font}>
+          {h.line && <line x1={r1(h.line.x1)} y1={r1(h.line.y1)} x2={r1(h.line.x2)} y2={r1(h.line.y2)} stroke={h.color} strokeWidth={h.lineWidth} />}
+          {h.h && (
+            <text x={r1(h.h.x)} y={r1(h.h.y)} fontSize={r1(h.size)} textAnchor="middle">
+              H
+            </text>
+          )}
+          <text x={r1(h.num.x)} y={r1(h.num.y)} fontSize={r1(h.size * H_SUP_SIZE)}>
+            {h.num.text}
+          </text>
+        </g>
       ))}
     </>
   );
@@ -59,6 +81,7 @@ export const FigureContent = memo(function FigureContent({
   return (
     <g fontFamily={figure.fontFamily} pointerEvents="none">
       <FigureImages images={images} figure={layout} />
+      <HLabels items={scene.hLabels} />
       {figure.showBorder && (
         <rect x={0.5} y={0.5} width={layout.width - 1} height={layout.height - 1} fill="none" stroke={INK} strokeWidth={1} />
       )}
@@ -158,6 +181,12 @@ export const FigureContent = memo(function FigureContent({
 
       {/* マーカーと凡例 */}
       <MarkerGlyphs markers={scene.markers} figure={figure} />
+      {/* ピークの上の H の番号 */}
+      {scene.hPeaks.map((p) => (
+        <text key={p.ids[0]} x={r1(p.x)} y={r1(p.y)} fontSize={figure.peakLabelFontSize} textAnchor="middle" fill={p.color}>
+          {p.text}
+        </text>
+      ))}
       {scene.legend && <LegendBox legend={scene.legend} figure={figure} />}
 
       {scene.annotations.map((pa) =>

@@ -2,7 +2,9 @@ import { tr } from '../i18n';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { layerAt, toData, type Layout, type LayerGeom } from '../lib/layout';
 import { nucleusDefaults } from '../lib/nuclei';
+import { H_SUP_SIZE, hScale, type PlacedH } from '../lib/hLabels';
 import { annotationBox, buildScene, markerBounds, nearestAtomAt, pxToImageAnchor, type PlacedAnnotation, type PlacedMarker, type Scene } from '../lib/scene';
+import { numberHydrogens, setHOffset, toggleHAssign } from '../state/hNumbers';
 import { snapToPeak } from '../lib/spectrum';
 import {
   editAnnotationText,
@@ -64,6 +66,7 @@ type Gesture =
   | { type: 'markerResize'; cx: number; cy: number; d0: number; s0: number; token: number }
   /** マーカーをつかんで、置いた位置から少しずらす */
   | { type: 'markerMove'; id: string; x0: number; y0: number; dx0: number; dy0: number; token: number }
+  | { type: 'hMove'; imageId: string; key: string; x0: number; y0: number; ox: number; oy: number; k: number; token: number }
   | { type: 'imageMove'; id: string; x0: number; y0: number; ox: number; oy: number; token: number }
   | { type: 'imageResize'; id: string; x0: number; w0: number; token: number };
 
@@ -145,6 +148,15 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
     return image ? pxToImageAnchor(px, py, imageRect(image, layout)) : { x: 0, y: 0 };
   };
   const anchorFields = (at: Anchor) => (at.kind === 'layer' ? { layerId: at.g.layer.id, imageId: undefined } : { layerId: '', imageId: at.id });
+
+  /** その場所の ChemDraw の構造式。端の原子 (末端の CH3 など) は構造式の枠のすぐ端にあるので、枠の少し外まで原子を探す */
+  const structureNear = (x: number, y: number) =>
+    [...doc.figureImages].reverse().find((im) => {
+      if (!im.cdxml) return false;
+      const r = imageRect(im, layout);
+      const pad = 12;
+      return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad && (imageAt(x, y) === im.id || !!nearestAtom(im, x, y));
+    });
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 || !doc.layers.length) return;
@@ -303,15 +315,46 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       return;
     }
 
+    // H の番号: 構造式の H を選ぶ (番号がまだなければ振る)。ピークをクリックすると、選んだ H の番号を付ける・外す
+    if (tool === 'hnum') {
+      if (hitKind === 'hsite' && hitId) {
+        // 同じ所に番号がいくつか (Ph など) あれば、押すたびに次へ
+        const item = scene.hLabels.find((h) => h.imageId === hitId && h.keys.includes(hitHandle));
+        const active = useEditor.getState().activeH;
+        const keys = item?.keys ?? [hitHandle];
+        const at = active?.imageId === hitId ? keys.indexOf(active.key) : -1;
+        useEditor.setState({ activeH: { imageId: hitId, key: keys[(at + 1) % keys.length] } });
+        // そのままドラッグすると H の字をずらせる (込み入った所で重なったとき)
+        const image = doc.figureImages.find((im) => im.id === hitId);
+        const offKey = [...keys].sort()[0];
+        const off = image?.hNumbers?.offsets?.[offKey] ?? { x: 0, y: 0 };
+        if (image) {
+          gesture.current = { type: 'hMove', imageId: hitId, key: offKey, x0: x, y0: y, ox: off.x, oy: off.y, k: hScale(image, layout), token: beginGesture() };
+          capture();
+        }
+        return;
+      }
+      const image = structureNear(x, y);
+      if (image) {
+        if (!image.hNumbers) {
+          void numberHydrogens(image.id).then((ok) => ok && notify(tr('H に番号を振りました。H をクリックして選び、ピークをクリックすると、ピークの上に番号が出ます'), 'info'));
+          return;
+        }
+        const atom = nearestAtom(image, x, y);
+        const site = atom ? image.hNumbers.sites.find((s) => (s.atomId === atom || s.parent === atom) && image.hNumbers!.labels[s.key] !== undefined) : undefined;
+        if (site) useEditor.setState({ activeH: { imageId: image.id, key: site.key } });
+        else notify(tr('番号の付いた H の近くをクリックしてください'), 'info');
+        return;
+      }
+      if (!g) return;
+      const peak = snapToPeak(g.data, g.meta, layout.pxToX(x), snapWindow(g));
+      if (peak) toggleHAssign(g.layer.id, peak.ppm - g.meta.refOffset, pointSpacing(g.meta) * 1.5);
+      return;
+    }
+
     // マーカー: ChemDraw の構造式の上なら、いちばん近い原子に付ける (帰属)
     if (tool === 'marker') {
-      // 端の原子 (末端の CH3 など) は構造式の枠のすぐ端にあるので、枠の少し外まで原子を探す
-      const image = [...doc.figureImages].reverse().find((im) => {
-        if (!im.cdxml) return false;
-        const r = imageRect(im, layout);
-        const pad = 12;
-        return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad && (imageAt(x, y) === im.id || !!nearestAtom(im, x, y));
-      });
+      const image = structureNear(x, y);
       if (image?.cdxml) {
         const styleId = useEditor.getState().activeMarkerStyleId;
         if (!styleId) {
@@ -442,6 +485,12 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
         setMarkerOffset(cur.id, cur.dx0 + x - cur.x0, cur.dy0 + y - cur.y0, false);
         break;
       }
+      case 'hMove': {
+        // 押しただけ (選ぶだけ) のときは動かさない
+        if (Math.hypot(x - cur.x0, y - cur.y0) < 3) break;
+        setHOffset(cur.imageId, cur.key, cur.ox + (x - cur.x0) / cur.k, cur.oy + (y - cur.y0) / cur.k, false);
+        break;
+      }
       case 'markerResize': {
         // つまみは中心から半径の所にあるので、指が中心から離れたぶんだけ半径 (大きさの半分) を大きくする (つまみが指に付いてくる)
         const size = Math.round(Math.min(30, Math.max(3, cur.s0 + 2 * (Math.hypot(x - cur.cx, y - cur.cy) - cur.d0))));
@@ -506,6 +555,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       cur.type === 'legendResize' ||
       cur.type === 'markerResize' ||
       cur.type === 'markerMove' ||
+      cur.type === 'hMove' ||
       cur.type === 'imageMove' ||
       cur.type === 'imageResize'
     ) {
@@ -570,6 +620,7 @@ export function FigureView({ svgRef }: { svgRef: React.RefObject<SVGSVGElement |
       {tool === 'select' && <HitLayer scene={scene} markerSize={doc.figure.markerSize} />}
       {(tool === 'select' || tool === 'integral') && <IntegralHits scene={scene} />}
       {(tool === 'peak' || tool === 'select') && <PeakLabelHits scene={scene} />}
+      {tool === 'hnum' && <HHits items={scene.hLabels} />}
       <SelectionOverlay scene={scene} selected={selected} doc={doc} />
       {draft && <DraftOverlay draft={draft} scene={scene} />}
     </svg>
@@ -740,6 +791,41 @@ function IntegralHits({ scene }: { scene: Scene }) {
             {x.curve && <path d={x.curve} fill="none" stroke="transparent" strokeWidth={10} />}
             <rect x={x.tx - 7} y={x.anchor === 'end' ? x.ty : x.ty - len} width={14} height={len} fill="transparent" />
           </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** 構造式の H の番号の枠 (図の座標) */
+function hBox(h: PlacedH) {
+  const numW = h.num.text.length * h.size * H_SUP_SIZE * 0.6;
+  const l = Math.min(h.h ? h.h.x - h.size * 0.4 : h.num.x, h.num.x) - 2;
+  const r = h.num.x + numW + 2;
+  const t = (h.h ? h.h.y - h.size * 0.75 : h.num.y - h.size * H_SUP_SIZE * 0.75) - 2;
+  const b = (h.h ? h.h.y : h.num.y) + 3;
+  return { x: l, y: t, w: r - l, h: b - t };
+}
+
+/** 道具「H の番号」: 構造式の H を押せる所と、選んだ H の印 */
+function HHits({ items }: { items: PlacedH[] }) {
+  const active = useEditor((s) => s.activeH);
+  return (
+    <g data-ui="hit">
+      {items.map((h) => {
+        const b = hBox(h);
+        const on = !!active && active.imageId === h.imageId && h.keys.includes(active.key);
+        return (
+          <rect
+            key={`${h.imageId}:${h.keys[0]}`}
+            data-hit={`hsite:${h.imageId}:${on ? active!.key : h.keys[0]}`}
+            x={b.x}
+            y={b.y}
+            width={b.w}
+            height={b.h}
+            rx={3}
+            className={on ? 'hit h-active' : 'hit'}
+          />
         );
       })}
     </g>

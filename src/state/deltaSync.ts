@@ -440,6 +440,7 @@ async function reloadIfReprocessed(link: Link, bytes: ArrayBuffer, fileChanged =
           }
           for (const p of d.peakLabels) if (layerIds.has(p.layerId)) p.ppm += shift;
           for (const k of d.markers) if (layerIds.has(k.layerId)) k.ppm += shift;
+          for (const a of d.hAssigns) if (layerIds.has(a.layerId)) a.ppm += shift;
           for (const a of d.annotations) {
             if (!layerIds.has(a.layerId)) continue;
             a.x1 += shift;

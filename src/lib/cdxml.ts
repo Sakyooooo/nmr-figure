@@ -132,6 +132,8 @@ interface Ctx {
   k: number;
   out: string[];
   box: Rect | null;
+  /** 原子の文字の枠 (原子の id → CDXML の座標)。H の番号を文字の右上に置くため */
+  labels: Record<string, Rect>;
 }
 
 const f2 = (v: number) => (Math.round(v * 1000) / 1000).toString();
@@ -656,6 +658,7 @@ function renderFragment(ctx: Ctx, frag: XNode) {
       margin: n.attrs.MarginWidth ? num(n.attrs.MarginWidth, 0) / ctx.k : marginDefault,
     };
     atoms.set(atom.id, atom);
+    if (atom.label) ctx.labels[atom.id] = atom.label.clip;
     grow(ctx, p[0], p[1]);
   }
   const bonds: Bond[] = [];
@@ -1099,6 +1102,12 @@ export interface CdxmlDrawing {
   inner: string;
   /** 描いた範囲 (CDXML の座標、pt) */
   box: Rect;
+  /** 原子の文字の枠 (原子の id → CDXML の座標) */
+  labels: Record<string, Rect>;
+  /** 原子の文字の大きさ (pt)・字体・線の太さ (pt) */
+  labelSize: number;
+  labelFont: string;
+  lineWidth: number;
 }
 
 /** 範囲: ChemDraw が書いた枠があればそれ (ChemDraw に戻すときも同じ枠で位置を合わせる) */
@@ -1120,13 +1129,17 @@ export function drawCdxml(text: string, scale = 1): CdxmlDrawing | null {
   const root = readCdxml(text);
   let result: CdxmlDrawing | null = null;
   if (root) {
-    const ctx: Ctx = { style: docStyle(root), colors: colorTable(root), fonts: fontTable(root), k: scale, out: [], box: null };
+    const ctx: Ctx = { style: docStyle(root), colors: colorTable(root), fonts: fontTable(root), k: scale, out: [], box: null, labels: {} };
     renderChildren(ctx, root);
     const box = cdxmlBox(root, ctx.box);
     if (box && ctx.out.length) {
       result = {
         inner: `<g transform="scale(${f2(scale)}) translate(${f2(-box.l)} ${f2(-box.t)})" stroke-linecap="butt">${ctx.out.join('')}</g>`,
         box,
+        labels: ctx.labels,
+        labelSize: ctx.style.labelSize,
+        labelFont: fontOf(ctx, ctx.style.labelFont, 'Arial'),
+        lineWidth: ctx.style.lineWidth,
       };
     }
   }
@@ -1148,7 +1161,7 @@ export function cdxmlToSvg(text: string): { svg: string; width: number; height: 
   };
 }
 
-function hashText(s: string) {
+export function hashText(s: string) {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -1168,6 +1181,11 @@ export interface AtomSite {
   labeled: boolean;
   /** 結合のない側 (単位ベクトル)。マーカーはこちらに置く */
   dir: { x: number; y: number };
+  /** 結合の向き (単位ベクトル) と、結合の相手の原子の id */
+  bonds: { x: number; y: number }[];
+  neighbors: string[];
+  /** その分子の結合の長さ (中央値、pt) */
+  bondLen: number;
 }
 
 const siteCache = new Map<string, AtomSite[]>();
@@ -1208,23 +1226,29 @@ function fragmentSites(frag: XNode, out: AtomSite[]) {
     e.nb.push(b.attrs.B);
   }
   const list = [...atoms.values()];
+  const lengths: number[] = [];
+  for (const a of list) for (const other of a.nb) lengths.push(Math.hypot(atoms.get(other)!.x - a.x, atoms.get(other)!.y - a.y));
+  lengths.sort((p, q) => p - q);
+  const bondLen = lengths.length ? lengths[lengths.length >> 1] : 14.4;
   const cx = list.reduce((s, a) => s + a.x, 0) / (list.length || 1);
   const cy = list.reduce((s, a) => s + a.y, 0) / (list.length || 1);
   for (const [id, a] of atoms) {
     // 結合の向きを足して逆を向く。釣り合っているとき (3 本が 120° など) は構造式の外側
     let dx = 0;
     let dy = 0;
+    const bonds: AtomSite['bonds'] = [];
     for (const other of a.nb) {
       const o = atoms.get(other)!;
       const L = Math.hypot(o.x - a.x, o.y - a.y) || 1;
       dx -= (o.x - a.x) / L;
       dy -= (o.y - a.y) / L;
+      bonds.push({ x: (o.x - a.x) / L, y: (o.y - a.y) / L });
     }
     if (Math.hypot(dx, dy) < 0.3) {
       dx = a.x - cx;
       dy = a.y - cy;
     }
     const L = Math.hypot(dx, dy);
-    out.push({ id, x: a.x, y: a.y, labeled: a.labeled, dir: L < 1e-6 ? { x: 0, y: -1 } : { x: dx / L, y: dy / L } });
+    out.push({ id, x: a.x, y: a.y, labeled: a.labeled, dir: L < 1e-6 ? { x: 0, y: -1 } : { x: dx / L, y: dy / L }, bonds, neighbors: a.nb, bondLen });
   }
 }

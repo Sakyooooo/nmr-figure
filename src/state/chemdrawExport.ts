@@ -6,7 +6,9 @@
  *  - ChemDraw の構造式はデータのまま、構造式に固定した文字 (帰属の印) は ChemDraw の文字にする
  */
 import { tr } from '../i18n';
-import { buildChemDrawDocument, type ExportMark, type ExportMarkSeg } from '../lib/chemdrawExport';
+import { buildChemDrawDocument, type ExportLine, type ExportMark, type ExportMarkSeg } from '../lib/chemdrawExport';
+import { textWidth } from '../lib/cdxml';
+import { H_SUP_SIZE, placeHLabels } from '../lib/hLabels';
 import { baseName, downloadBlob } from '../lib/exportFigure';
 import { parseRich } from '../lib/richText';
 import { atomMarkerPos, imageAnchorToPx, imageRect, PX_PER_PT } from '../lib/scene';
@@ -36,6 +38,10 @@ export async function openInChemDraw(svg: SVGSVGElement) {
   // 原子に付けたマーカー (帰属) は ChemDraw の図形にする
   clone.querySelectorAll('[data-atom-marker]').forEach((el) => {
     if (ids.has(el.getAttribute('data-atom-marker') ?? '')) el.remove();
+  });
+  // 構造式の H の番号 (C–H³) も ChemDraw の線と文字にする
+  clone.querySelectorAll('[data-hnum-of]').forEach((el) => {
+    if (ids.has(el.getAttribute('data-hnum-of') ?? '')) el.remove();
   });
   clone.querySelectorAll('[data-annotation]').forEach((el) => {
     if (markIds.has(el.getAttribute('data-annotation') ?? '')) el.remove();
@@ -88,7 +94,24 @@ export async function openInChemDraw(svg: SVGSVGElement) {
     if (!image || !style || !pos) continue;
     shapes.push({ structure: images.indexOf(image), shape: style.shape, x: pos.x * PT, y: pos.y * PT, size: fig.markerSize * PT, color: style.color });
   }
-  const xml = buildChemDrawDocument({ width: w * PT, height: h * PT, picture: { emf }, structures, marks: exportMarks, shapes });
+  const lines: ExportLine[] = [];
+  for (const hl of placeHLabels(images, layout)) {
+    const structure = images.findIndex((x) => x.id === hl.imageId);
+    const caption = (text: string, x: number, y: number, size: number): ExportMark => ({
+      structure,
+      lines: [[{ text }]],
+      x: x * PT,
+      y: y * PT,
+      size: size * PT,
+      lineHeight: size * 1.25 * PT,
+      font: hl.font,
+      color: hl.color,
+    });
+    if (hl.line) lines.push({ structure, x1: hl.line.x1 * PT, y1: hl.line.y1 * PT, x2: hl.line.x2 * PT, y2: hl.line.y2 * PT, width: hl.lineWidth * PT, color: hl.color });
+    if (hl.h) exportMarks.push(caption('H', hl.h.x - textWidth('H', hl.size) / 2, hl.h.y, hl.size));
+    exportMarks.push(caption(hl.num.text, hl.num.x, hl.num.y, hl.size * H_SUP_SIZE));
+  }
+  const xml = buildChemDrawDocument({ width: w * PT, height: h * PT, picture: { emf }, structures, marks: exportMarks, shapes, lines });
   const name = `${projectName ? baseName(projectName) : 'figure'}.cdxml`;
   downloadBlob(new Blob([xml], { type: 'chemical/x-cdxml' }), name);
   notify(

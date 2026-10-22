@@ -438,6 +438,48 @@ export interface FigureImage {
   w: number;
   /** 高さ ÷ 幅 */
   ratio: number;
+  /** H の番号 (ChemDraw の構造式だけ。本人の希望 2026-10-22) */
+  hNumbers?: HNumbering;
+}
+
+/** 構造式の H のまとまりの 1 か所 (lib/protonNumbering.ts が OpenChemLib で求める) */
+export interface HSite {
+  /** 保存に使う名前 (見えている原子の id。同じ原子に環境の違う H があれば #0, #1。描いてある H はその H の id) */
+  key: string;
+  /** 番号を書く原子 (略号 OMe などの中の H なら略号の原子)。描いてある H はその H */
+  atomId: string;
+  /** H が付いている見えている原子 (描いてある H 以外は atomId と同じ) */
+  parent: string;
+  /** ChemDraw で H を描いてある (くさびの H など) */
+  drawn: boolean;
+  /** 環境の番号 (同じ番号の H は同じ環境 = ¹H の同じ信号)。求め直すと変わる */
+  env: number;
+  /** H の数 */
+  count: number;
+}
+
+/**
+ * 構造式の H の番号。番号は H のまとまり (環境) ごと。対称で同じ H は同じ番号、
+ * 同じ炭素でも環境の違う H は別の番号。番号の付いた H は構造式に「C–H³」と描き足す
+ */
+export interface HNumbering {
+  /** どの構造式 (CDXML) から求めたか。ChemDraw で直したら求め直す */
+  source: string;
+  sites: HSite[];
+  /** site の key → 番号。無い key の H は描かない */
+  labels: Record<string, string>;
+  /** 手でずらした H の字 (key → CDXML の座標で pt)。文字の原子は番号をずらす */
+  offsets?: Record<string, { x: number; y: number }>;
+}
+
+/** ピークの上に出す H の番号 (帰属)。構造式の H (imageId と key) を指すので、番号を振り直しても H についていく */
+export interface HAssign {
+  id: string;
+  layerId: string;
+  /** 基準合わせ前の ppm */
+  ppm: number;
+  imageId: string;
+  key: string;
 }
 
 export interface NmrDocument {
@@ -455,6 +497,8 @@ export interface NmrDocument {
   layers: Layer[];
   markerStyles: MarkerStyle[];
   markers: Marker[];
+  /** ピークの上に出す H の番号 */
+  hAssigns: HAssign[];
   peakLabels: PeakLabel[];
   annotations: Annotation[];
   integrals: Integral[];
@@ -482,7 +526,8 @@ export type Tool =
   | 'marker'
   | 'reference'
   | 'region'
-  | 'cross';
+  | 'cross'
+  | 'hnum';
 
 export type Selection = { kind: 'annotation' | 'marker' | 'peakLabel' | 'integral' | 'legend' | 'image'; id: string } | null;
 
@@ -561,6 +606,7 @@ export function emptyDocument(): NmrDocument {
     layers: [],
     markerStyles: defaultMarkerStyles(),
     markers: [],
+    hAssigns: [],
     peakLabels: [],
     annotations: [],
     integrals: [],
@@ -583,6 +629,7 @@ export function migrateDocument(doc: NmrDocument): NmrDocument {
     spectra2d: doc.spectra2d ?? [],
     plot2d: doc.plot2d ?? null,
     integrals: doc.integrals ?? [],
+    hAssigns: doc.hAssigns ?? [],
     markerStyles: doc.markerStyles?.length ? doc.markerStyles : base.markerStyles,
     si: { ...base.si, ...doc.si },
     figure: { ...base.figure, ...doc.figure },

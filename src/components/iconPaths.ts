@@ -66,6 +66,7 @@ export const ICON_PATHS = {
   "nmr-marker": "<path d=\"M3 21h18\"/><path d=\"M5 20h4l3-9 3 9h4\"/><circle cx=\"12\" cy=\"5\" r=\"2\"/>",
   "nmr-spectrum": "<path d=\"M2 21h20\"/><path d=\"M3 20h3l2-6 2 6h2l3-15 3 15h5\"/>",
   "nmr-cross": "<path d=\"M3 3h18\"/><path d=\"M21 3v18\"/><path d=\"M8 15V4\"/><path d=\"M9.5 15H20\"/><circle cx=\"8\" cy=\"15\" r=\"2\"/>",
+  "nmr-hnum": "<path d=\"M3 21h18\"/><path d=\"M5 20h4l3-9 3 9h4\"/><path d=\"M9 2v6\"/><path d=\"M15 2v6\"/><path d=\"M9 5h6\"/>",
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

@@ -13,6 +13,13 @@ export const TOOLS: { id: Tool; label: string; key: string; icon: IconName; hint
   { id: 'peak', label: trk('ピーク値'), key: 'P', icon: 'nmr-peak', hint: trk('ピーク値: クリックで付け外し') },
   { id: 'integral', label: trk('積分'), key: 'I', icon: 'nmr-integral', hint: trk('積分: 左右にドラッグして範囲を選ぶ · 続けて何本でも · [Esc] で終わる') },
   { id: 'marker', label: trk('マーカー'), key: 'M', icon: 'nmr-marker', hint: trk('マーカー: 右のパネルで種類を選び、ピークをクリック') },
+  {
+    id: 'hnum',
+    label: trk('H の番号'),
+    key: 'N',
+    icon: 'nmr-hnum',
+    hint: trk('H の番号: 構造式の H をクリックして選び、ピークをクリック (もう一度で外す) · 番号がなければ構造式をクリックで振る'),
+  },
   { id: 'region', label: trk('推移グラフの範囲'), key: 'G', icon: 'nmr-region', hint: trk('推移の範囲: 左右にドラッグ') },
   { id: 'reference', label: trk('基準合わせ'), key: 'B', icon: 'nmr-reference', hint: trk('基準合わせ: 溶媒のピークをクリック') },
   { id: 'ellipse', label: trk('楕円'), key: 'O', icon: 'ellipse', hint: trk('楕円: ドラッグで描く · [Shift] で正円') },
@@ -30,7 +37,7 @@ export function toolUsable(id: Tool, is2d: boolean): boolean {
 }
 
 const VIEW_TOOLS: Tool[] = ['select', 'zoom', 'height'];
-const ANALYSIS_TOOLS: Tool[] = ['peak', 'integral', 'marker', 'region', 'reference'];
+const ANALYSIS_TOOLS: Tool[] = ['peak', 'integral', 'marker', 'hnum', 'region', 'reference'];
 const SHAPE_TOOLS: Tool[] = ['ellipse', 'rect', 'arrow', 'line'];
 /** 道具 (名前と説明は今の言語で) */
 const tool = (id: Tool) => {

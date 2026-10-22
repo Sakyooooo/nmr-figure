@@ -279,4 +279,8 @@ export const EN_MESSAGES: Record<string, string> = {
   "ホーム画面のサンプルのメモに残しました ({n} 件)": "Saved to the sample memo on the home screen ({n})",
   "同じ収率はもうメモにあります": "The same yield is already in the memo",
   "内標の範囲と生成物を入れてください": "Enter the internal standard range and the products",
+  'H の番号は ChemDraw の構造式だけに振れます': 'H numbers can only be added to ChemDraw structures',
+  'H の番号を振れませんでした: {message}': 'Could not number the H atoms: {message}',
+  'この構造式には H がありません': 'This structure has no H atoms',
+  '先に構造式の H をクリックして選んでください': 'First click an H on the structure to select it',
 };

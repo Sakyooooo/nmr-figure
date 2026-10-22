@@ -50,6 +50,18 @@ export interface ExportShape {
   color: string;
 }
 
+/** 構造式に描き足した線 (H の番号の C–H)。ChemDraw の線にする */
+export interface ExportLine {
+  structure: number;
+  /** 両端 (pt、図の左上が 0,0) と太さ (pt) */
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  color: string;
+}
+
 export interface ChemDrawExport {
   /** 図の大きさ (pt) */
   width: number;
@@ -59,6 +71,7 @@ export interface ChemDrawExport {
   structures: ExportStructure[];
   marks: ExportMark[];
   shapes?: ExportShape[];
+  lines?: ExportLine[];
 }
 
 /** ChemDraw の余白 (ページの端から図までの距離、pt) */
@@ -307,6 +320,9 @@ export function buildChemDrawDocument(input: ChemDrawExport): string {
     (input.shapes ?? [])
       .filter((s) => s.structure === k)
       .forEach((s, i) => group.children.push(markShape(s, id(), placed.zBase + 80_000 + i, tables)));
+    (input.lines ?? [])
+      .filter((l) => l.structure === k)
+      .forEach((l, i) => group.children.push(markLine(l, id(), placed.zBase + 70_000 + i, tables)));
     page.children.push(group);
     schemes.push(...placed.schemes);
   });
@@ -414,6 +430,17 @@ function markShape(s: ExportShape, idValue: string, z: number, tables: Tables): 
       FillType: 'Solid',
       CurvePoints: seq.map(([x, y]) => `${f2(x)} ${f2(y)}`).join(' '),
     },
+    children: [],
+  };
+}
+
+/** 線 → ChemDraw の線 (曲線の形で書く。制御点を両端に重ねると直線) */
+function markLine(l: ExportLine, idValue: string, z: number, tables: Tables): XNode {
+  const a = `${f2(MARGIN + l.x1)} ${f2(MARGIN + l.y1)}`;
+  const b = `${f2(MARGIN + l.x2)} ${f2(MARGIN + l.y2)}`;
+  return {
+    name: 'curve',
+    attrs: { id: idValue, Z: String(z), color: tables.color(l.color), LineWidth: f2(l.width), CurvePoints: [a, a, a, b, b, b].join(' ') },
     children: [],
   };
 }

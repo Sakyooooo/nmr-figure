@@ -1,5 +1,6 @@
 import type { Annotation, Dash, FigureImage, FigureStyle, MarkerStyle, NmrDocument } from '../state/types';
 import { cdxmlAtomSites, drawCdxml } from './cdxml';
+import { placeHLabels, type PlacedH } from './hLabels';
 import { decimalsFor, niceStep, spreadLabels, ticks } from './labels';
 import { cumulative, integralValues } from './integrals';
 import {
@@ -56,6 +57,18 @@ export interface PlacedMarker {
   imageId?: string;
 }
 
+/** ピークの上の H の番号 (帰属) */
+export interface PlacedHPeak {
+  /** この位置の帰属 (HAssign の id) */
+  ids: string[];
+  layerId: string;
+  /** 文字の中央の基線 */
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+}
+
 export interface PlacedLegend {
   x: number;
   y: number;
@@ -78,6 +91,10 @@ export interface Scene {
   peakLabels: PlacedPeakLabel[];
   integrals: PlacedIntegral[];
   markers: PlacedMarker[];
+  /** 構造式の H の番号 (C–H³) */
+  hLabels: PlacedH[];
+  /** ピークの上の H の番号 */
+  hPeaks: PlacedHPeak[];
   legend: PlacedLegend | null;
   annotations: PlacedAnnotation[];
   layerLabels: { x: number; y: number; text: string; color: string }[];
@@ -218,6 +235,27 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
     markers.push({ id: m.id, x: x + (m.dx ?? 0), y: y + (m.dy ?? 0), style });
   }
 
+  // H の番号 (帰属): ピークの上。マーカーがあればその上に。同じピークの番号は「3, 4」とまとめる
+  const hPeaks: PlacedHPeak[] = [];
+  const hGroups = new Map<string, { g: LayerGeom; ppm: number; x: number; ids: string[]; labels: Set<string> }>();
+  for (const a of doc.hAssigns) {
+    const g = geomById.get(a.layerId);
+    const label = doc.figureImages.find((x) => x.id === a.imageId)?.hNumbers?.labels[a.key];
+    if (!g || label === undefined || !inView(g, a.ppm)) continue;
+    const x = layout.xToPx(a.ppm + g.meta.refOffset);
+    const key = `${g.layer.id}:${Math.round(x / 2)}`;
+    const group = hGroups.get(key) ?? { g, ppm: a.ppm, x, ids: [], labels: new Set<string>() };
+    group.ids.push(a.id);
+    group.labels.add(label);
+    hGroups.set(key, group);
+  }
+  for (const { g, ppm, x, ids, labels } of hGroups.values()) {
+    const k = stackCount.get(`${g.layer.id}:${Math.round(x / size)}`) ?? 0;
+    const y = Math.max(plot.y + fs, peakTopY(g, ppm) - 5 - k * (size + 2));
+    const text = [...labels].sort((p, q) => parseFloat(p) - parseFloat(q) || p.localeCompare(q)).join(', ');
+    hPeaks.push({ ids, layerId: g.layer.id, x, y, text, color: multiColor && !stacked ? g.layer.color : '#000000' });
+  }
+
   // 凡例: 表示中のスペクトルで使っている種類だけ。名前を入れていない種類 (色だけのマーカー) は凡例に出さない
   const usedStyles = doc.markerStyles.filter(
     (s) =>
@@ -254,6 +292,8 @@ export function buildScene(source: NmrDocument, dataMap: Record<string, Float32A
     peakLabels,
     integrals,
     markers,
+    hLabels: placeHLabels(doc.figureImages, layout),
+    hPeaks,
     legend,
     annotations,
     layerLabels,

@@ -69,6 +69,12 @@ export const EN_EDITOR: Record<string, string> = {
   '積分: 左右にドラッグして範囲を選ぶ · 続けて何本でも · [Esc] で終わる': 'Integral: drag left/right to set a range · add as many as you like · [Esc] to finish',
   マーカー: 'Marker',
   'マーカー: 右のパネルで種類を選び、ピークをクリック': 'Marker: choose a type in the right panel, then click a peak',
+  'H の番号': 'H numbers',
+  'H の番号: 構造式の H をクリックして選び、ピークをクリック (もう一度で外す) · 番号がなければ構造式をクリックで振る':
+    'H numbers: click an H on the structure, then click a peak (click again to remove) · click a structure without numbers to number it',
+  'H に番号を振りました。H をクリックして選び、ピークをクリックすると、ピークの上に番号が出ます':
+    'Numbered the H atoms. Click an H, then click a peak to show its number above the peak',
+  '番号の付いた H の近くをクリックしてください': 'Click near a numbered H',
   推移グラフの範囲: 'Trend range',
   '推移の範囲: 左右にドラッグ': 'Trend range: drag left/right',
   基準合わせ: 'Referencing',
